@@ -12,13 +12,14 @@ import java.time.LocalDateTime;
 public class AgentRun {
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;
-    
+
     private String runId;
     private String traceId;
     private String conversationId;
     private String userId;
     private String status;
     private String goal;
+    private String intent;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String input;

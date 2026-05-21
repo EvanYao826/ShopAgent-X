@@ -5,6 +5,7 @@ from workflows.inspection_agent import InspectionAgent
 from workflows.router_agent import RouterAgent
 from workflows.retrieval_agent import RetrievalAgent, retrieval_agent
 from workflows.ops_agent import OpsAgent, ops_agent
+from workflows.shopping_agent import ShoppingAgent
 
 __all__ = [
     "KnowledgeQAAgent",
@@ -15,5 +16,6 @@ __all__ = [
     "RetrievalAgent",
     "retrieval_agent",
     "OpsAgent",
-    "ops_agent"
+    "ops_agent",
+    "ShoppingAgent"
 ]

@@ -13,6 +13,7 @@ public class QaUnanswered {
     private Long id;
     private String question;
     private Integer count;
+    private Long lastUserId;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

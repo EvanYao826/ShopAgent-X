@@ -14,7 +14,8 @@ public class KnowledgeDoc {
     private String docName;
     private String filePath;
     private Long categoryId;
-    private String status; // PENDING, PROCESSING, COMPLETED, FAILED
-    private String errorMessage; // 存储解析失败的错误原因
+    private String docType;
+    private String status;
+    private String errorMessage;
     private LocalDateTime createTime;
 }

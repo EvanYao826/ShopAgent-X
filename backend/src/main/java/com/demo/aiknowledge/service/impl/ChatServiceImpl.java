@@ -8,12 +8,13 @@ import com.demo.aiknowledge.entity.Message;
 import com.demo.aiknowledge.entity.QaLog;
 import com.demo.aiknowledge.mapper.ConversationMapper;
 import com.demo.aiknowledge.mapper.MessageMapper;
+import com.demo.aiknowledge.entity.QaUnanswered;
 import com.demo.aiknowledge.mapper.QaLogMapper;
+import com.demo.aiknowledge.mapper.QaUnansweredMapper;
 import com.demo.aiknowledge.service.AiService;
 import com.demo.aiknowledge.service.CacheService;
 import com.demo.aiknowledge.service.ChatService;
 import com.demo.aiknowledge.service.ConversationContextService;
-import com.demo.aiknowledge.service.QaUnansweredService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,7 @@ public class ChatServiceImpl implements ChatService {
     private final MessageMapper messageMapper;
     private final QaLogMapper qaLogMapper;
     private final AiService aiService;
-    private final QaUnansweredService qaUnansweredService;
+    private final QaUnansweredMapper qaUnansweredMapper;
     private final ConversationContextService conversationContextService;
     private final ObjectMapper objectMapper;
     private final CacheService cacheService;
@@ -119,7 +120,21 @@ public class ChatServiceImpl implements ChatService {
             // 简单的判断逻辑：如果 answer 包含 "不知道" 或 sources 为空且 answer 很短?
             // 这里假设 sources 为空且 answer 是兜底回复时记录
             if (answer.contains("抱歉") || answer.contains("无法回答")) {
-                 qaUnansweredService.recordUnansweredQuestion(content);
+                QaUnanswered existing = qaUnansweredMapper.selectOne(
+                        new LambdaQueryWrapper<QaUnanswered>().eq(QaUnanswered::getQuestion, content));
+                if (existing != null) {
+                    existing.setCount(existing.getCount() + 1);
+                    existing.setLastUserId(userId);
+                    existing.setUpdateTime(LocalDateTime.now());
+                    qaUnansweredMapper.updateById(existing);
+                } else {
+                    QaUnanswered ua = new QaUnanswered();
+                    ua.setQuestion(content);
+                    ua.setCount(1);
+                    ua.setLastUserId(userId);
+                    ua.setCreateTime(LocalDateTime.now());
+                    qaUnansweredMapper.insert(ua);
+                }
             }
         }
 
@@ -129,7 +144,12 @@ public class ChatServiceImpl implements ChatService {
         aiMsg.setRole("assistant");
         aiMsg.setContent(answer);
         aiMsg.setSources(sourcesJson);
-        aiMsg.setTaskType(taskType); // 设置任务类型
+        aiMsg.setTaskType(taskType);
+        // 如果有商品卡片，直接设置（JacksonTypeHandler 自动序列化）
+        if (aiResponse.getProductCards() != null && !aiResponse.getProductCards().isEmpty()) {
+            aiMsg.setProductCards(aiResponse.getProductCards());
+            aiMsg.setMessageType("product_card");
+        }
         aiMsg.setCreateTime(LocalDateTime.now());
         messageMapper.insert(aiMsg);
 
@@ -139,8 +159,10 @@ public class ChatServiceImpl implements ChatService {
         // 4. 记录 QA 日志
         QaLog qaLog = new QaLog();
         qaLog.setUserId(userId);
+        qaLog.setConversationId(conversationId);
         qaLog.setQuestion(content);
         qaLog.setAnswer(answer);
+        qaLog.setTaskType(taskType);
         qaLog.setCreateTime(LocalDateTime.now());
         qaLogMapper.insert(qaLog);
 

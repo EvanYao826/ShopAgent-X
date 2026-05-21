@@ -3,6 +3,7 @@ from agent.orchestrator import Orchestrator
 from agent.state import AgentState
 from agent.events import EventBus, event_bus
 from workflows.retrieval_agent import RetrievalAgent
+from workflows.base_agent import BaseAgent
 from core.vector_store import vector_store
 from core.llm import LLMService
 from tools.registry import tool_registry
@@ -12,7 +13,7 @@ import json
 logger = logging.getLogger(__name__)
 
 
-class KnowledgeQAAgent:
+class KnowledgeQAAgent(BaseAgent):
     """知识问答Agent - 三级链路：L1简化/L2标准/L3推理"""
 
     def __init__(self):
@@ -184,41 +185,6 @@ class KnowledgeQAAgent:
             })
         return sources
 
-    def _save_to_memory(self, conversation_id: str, question: str, answer: str):
-        """保存对话到会话记忆"""
-        if not conversation_id or not tool_registry.has_tool("conversation_memory_write"):
-            return
-        try:
-            tool_registry.invoke_tool(
-                "conversation_memory_write",
-                {"conversation_id": conversation_id, "role": "user", "content": question}
-            )
-            tool_registry.invoke_tool(
-                "conversation_memory_write",
-                {"conversation_id": conversation_id, "role": "assistant", "content": answer}
-            )
-            logger.info(f"[KnowledgeQAAgent] Saved conversation to memory")
-        except Exception as e:
-            logger.warning(f"[KnowledgeQAAgent] Failed to write conversation memory: {e}")
-
-    def _format_history(self, messages: list) -> str:
-        """格式化对话历史为上下文字符串"""
-        if not messages:
-            return ""
-
-        formatted = []
-        for msg in messages:
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")
-            if role == "system":
-                formatted.append(content)
-            elif role == "user":
-                formatted.append(f"用户: {content}")
-            elif role == "assistant":
-                formatted.append(f"AI: {content}")
-
-        return "\n".join(formatted)
-
     def ask_stream(self, question: str, conversation_id: Optional[str] = None,
                    user_id: Optional[str] = None, context: str = "",
                    **kwargs) -> Generator[str, None, None]:
@@ -240,22 +206,8 @@ class KnowledgeQAAgent:
 
             logger.info(f"[KnowledgeQAAgent] Retrieved {len(docs)} documents")
 
-            # 2. 构建引用来源（按 doc_id 去重）
-            seen_doc_ids = set()
-            sources = []
-            for doc in docs:
-                metadata = getattr(doc, 'metadata', {})
-                doc_id = metadata.get("doc_id")
-                if doc_id and doc_id in seen_doc_ids:
-                    continue
-                if doc_id:
-                    seen_doc_ids.add(doc_id)
-                sources.append({
-                    "doc_id": doc_id,
-                    "doc": metadata.get("source", "未知文档"),
-                    "page": metadata.get("page"),
-                    "chunk_index": metadata.get("chunk_index"),
-                })
+            # 2. 构建引用来源
+            sources = self._build_sources(docs)
 
             # 3. 流式 LLM 生成
             for chunk in self.llm_service.get_answer_stream(

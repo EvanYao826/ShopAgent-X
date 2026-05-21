@@ -10,6 +10,17 @@ logger = logging.getLogger(__name__)
 class AdminCopilotAgent:
     """管理助手Agent - 专门处理管理端运营分析的工作流"""
 
+    # 操作类型到 ops_agent 分析类型的映射
+    _OPS_TYPE_MAP = {
+        "knowledge_gap": ("knowledge_gap", "知识缺口分析"),
+        "user_activity": ("user_activity", "用户活跃度分析"),
+        "full_ops_report": ("full_report", "完整运营报告"),
+        "hot_questions": ("hot_questions", "热门问题分析"),
+        "knowledge_growth": ("knowledge_growth", "知识库增长趋势"),
+        "agent_success_rate": ("agent_success_rate", "Agent成功率"),
+        "tool_call_failures": ("tool_call_failures", "工具调用失败排行"),
+    }
+
     def __init__(self):
         self.ops_agent = ops_agent
         self.admin_operations = {
@@ -28,36 +39,15 @@ class AdminCopilotAgent:
     def handle(self, question: str, conversation_id: Optional[str] = None,
                user_id: Optional[str] = None, context: str = "",
                **kwargs) -> Dict[str, Any]:
-        """
-        处理管理助手请求
-
-        Args:
-            question: 用户问题
-            conversation_id: 会话ID
-            user_id: 用户ID
-            context: 对话上下文
-            **kwargs: 其他参数
-
-        Returns:
-            包含answer和sources的字典
-        """
+        """处理管理助手请求"""
         logger.info(f"[AdminCopilotAgent] Processing admin request: {question[:50]}...")
 
         try:
             operation = self._parse_operation(question)
-            result = self._execute_operation(operation, question)
-
-            return result
-
+            return self._execute_operation(operation, question)
         except Exception as e:
             logger.error(f"[AdminCopilotAgent] Error: {e}", exc_info=True)
-            return {
-                "answer": f"抱歉，处理管理请求时出错：{str(e)}",
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
+            return self._error_result(f"抱歉，处理管理请求时出错：{str(e)}")
 
     def handle_stream(self, question: str, conversation_id: Optional[str] = None,
                      user_id: Optional[str] = None, context: str = "",
@@ -118,39 +108,49 @@ class AdminCopilotAgent:
                 return self._get_stats()
             elif operation == "knowledge_inspection":
                 return self._knowledge_inspection()
-            elif operation == "knowledge_gap":
-                return self._analyze_knowledge_gap()
-            elif operation == "user_activity":
-                return self._analyze_user_activity()
-            elif operation == "full_ops_report":
-                return self._generate_full_ops_report()
-            elif operation == "hot_questions":
-                period = "week" if "周" in question else "day"
-                return self._analyze_hot_questions(period)
-            elif operation == "knowledge_growth":
-                period = "week" if "周" in question else "month"
-                return self._analyze_knowledge_growth(period)
-            elif operation == "agent_success_rate":
-                period = "week" if "周" in question else "month"
-                return self._analyze_agent_success_rate(period)
-            elif operation == "tool_call_failures":
-                return self._analyze_tool_call_failures()
-            else:
-                return {
-                    "answer": "抱歉，我暂时无法处理这类管理请求。",
-                    "sources": [],
-                    "has_sources": False,
-                    "task_type": "admin_copilot"
-                }
+
+            # 以下操作统一委托给 ops_agent
+            ops_kwargs = {}
+            if operation == "hot_questions":
+                ops_kwargs["period"] = "week" if "周" in question else "day"
+            elif operation in ("knowledge_growth", "agent_success_rate"):
+                ops_kwargs["period"] = "week" if "周" in question else "month"
+
+            return self._delegate_to_ops(operation, **ops_kwargs)
+
         except Exception as e:
             logger.error(f"[AdminCopilotAgent] Operation error: {e}", exc_info=True)
+            return self._error_result(f"执行操作时出错：{str(e)}")
+
+    def _delegate_to_ops(self, operation: str, **kwargs) -> Dict[str, Any]:
+        """统一委托操作给 ops_agent，消除重复的包装逻辑"""
+        if operation not in self._OPS_TYPE_MAP:
+            return self._error_result("抱歉，我暂时无法处理这类管理请求。")
+
+        analysis_type, label = self._OPS_TYPE_MAP[operation]
+        logger.info(f"[AdminCopilotAgent] {label} via Ops Agent")
+        result = self.ops_agent.analyze(analysis_type, **kwargs)
+
+        if result.get("success"):
             return {
-                "answer": f"执行操作时出错：{str(e)}",
+                "answer": result.get("answer", ""),
                 "sources": [],
                 "has_sources": False,
                 "task_type": "admin_copilot",
-                "error": True
+                "data": result.get("data", {})
             }
+        else:
+            return self._error_result(f"{label}失败：" + str(result.get("error", "")))
+
+    def _error_result(self, message: str) -> Dict[str, Any]:
+        """统一错误返回格式"""
+        return {
+            "answer": message,
+            "sources": [],
+            "has_sources": False,
+            "task_type": "admin_copilot",
+            "error": True
+        }
 
     def _get_stats(self) -> Dict[str, Any]:
         """获取统计数据"""
@@ -198,163 +198,10 @@ class AdminCopilotAgent:
             }
         except Exception as e:
             logger.error(f"[AdminCopilotAgent] Stats error: {e}", exc_info=True)
-            return {
-                "answer": "获取统计数据失败，请稍后重试。",
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
+            return self._error_result("获取统计数据失败，请稍后重试。")
 
     def _knowledge_inspection(self) -> Dict[str, Any]:
         """知识巡检 - 调用InspectionAgent"""
         from workflows.inspection_agent import InspectionAgent
         inspection_agent = InspectionAgent()
         return inspection_agent.inspect("full")
-
-    def _analyze_knowledge_gap(self) -> Dict[str, Any]:
-        """知识缺口分析 - P4-3功能 - 调用Ops Agent"""
-        logger.info("[AdminCopilotAgent] Analyzing knowledge gap via Ops Agent")
-        result = self.ops_agent.analyze("knowledge_gap")
-        if result.get("success"):
-            return {
-                "answer": result.get("answer", ""),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "data": result.get("data", {})
-            }
-        else:
-            return {
-                "answer": "知识缺口分析失败：" + str(result.get("error", "")),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
-
-    def _analyze_user_activity(self) -> Dict[str, Any]:
-        """用户活跃度分析 - 调用Ops Agent"""
-        logger.info("[AdminCopilotAgent] Analyzing user activity via Ops Agent")
-        result = self.ops_agent.analyze("user_activity")
-        if result.get("success"):
-            return {
-                "answer": result.get("answer", ""),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "data": result.get("data", {})
-            }
-        else:
-            return {
-                "answer": "用户活跃度分析失败：" + str(result.get("error", "")),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
-
-    def _generate_full_ops_report(self) -> Dict[str, Any]:
-        """生成完整运营报告 - P4-3功能 - 调用Ops Agent"""
-        logger.info("[AdminCopilotAgent] Generating full ops report via Ops Agent")
-        result = self.ops_agent.analyze("full_report")
-        if result.get("success"):
-            return {
-                "answer": result.get("answer", ""),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "data": result.get("data", {})
-            }
-        else:
-            return {
-                "answer": "完整运营报告生成失败：" + str(result.get("error", "")),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
-
-    def _analyze_hot_questions(self, period: str) -> Dict[str, Any]:
-        """分析热门问题 - 调用Ops Agent"""
-        logger.info(f"[AdminCopilotAgent] Analyzing hot questions, period: {period}")
-        result = self.ops_agent.analyze("hot_questions", period=period)
-        if result.get("success"):
-            return {
-                "answer": result.get("answer", ""),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "data": result.get("data", {})
-            }
-        else:
-            return {
-                "answer": "热门问题分析失败：" + str(result.get("error", "")),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
-
-    def _analyze_knowledge_growth(self, period: str) -> Dict[str, Any]:
-        """分析知识库增长趋势 - 调用Ops Agent"""
-        logger.info(f"[AdminCopilotAgent] Analyzing knowledge growth, period: {period}")
-        result = self.ops_agent.analyze("knowledge_growth", period=period)
-        if result.get("success"):
-            return {
-                "answer": result.get("answer", ""),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "data": result.get("data", {})
-            }
-        else:
-            return {
-                "answer": "知识库增长趋势分析失败：" + str(result.get("error", "")),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
-
-    def _analyze_agent_success_rate(self, period: str) -> Dict[str, Any]:
-        """分析Agent成功率 - 调用Ops Agent"""
-        logger.info(f"[AdminCopilotAgent] Analyzing agent success rate, period: {period}")
-        result = self.ops_agent.analyze("agent_success_rate", period=period)
-        if result.get("success"):
-            return {
-                "answer": result.get("answer", ""),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "data": result.get("data", {})
-            }
-        else:
-            return {
-                "answer": "Agent成功率分析失败：" + str(result.get("error", "")),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }
-
-    def _analyze_tool_call_failures(self) -> Dict[str, Any]:
-        """分析工具调用失败排行 - 调用Ops Agent"""
-        logger.info("[AdminCopilotAgent] Analyzing tool call failures")
-        result = self.ops_agent.analyze("tool_call_failures")
-        if result.get("success"):
-            return {
-                "answer": result.get("answer", ""),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "data": result.get("data", {})
-            }
-        else:
-            return {
-                "answer": "工具调用失败分析失败：" + str(result.get("error", "")),
-                "sources": [],
-                "has_sources": False,
-                "task_type": "admin_copilot",
-                "error": True
-            }

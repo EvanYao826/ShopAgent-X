@@ -9,6 +9,7 @@ __pycache__/
 *.py[cod]
 venv/
 .venv/
+.env/
 *.egg-info/
 faiss_index/
 temp/
@@ -46,3 +47,6 @@ data/ecommerce_agent_dataset/images/
 
 # === Logs ===
 *.log
+
+# Upload files
+uploads/

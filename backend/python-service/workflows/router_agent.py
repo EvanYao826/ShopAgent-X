@@ -5,6 +5,7 @@ from workflows.chitchat_agent import ChitChatAgent
 from workflows.admin_copilot_agent import AdminCopilotAgent
 from workflows.inspection_agent import InspectionAgent
 from workflows.retrieval_agent import RetrievalAgent
+from workflows.shopping_agent import ShoppingAgent
 from intent.classifier import IntentClassifier, IntentType
 import logging
 import json
@@ -19,6 +20,7 @@ class TaskType(Enum):
     ADMIN_COPILOT = "admin_copilot"
     KNOWLEDGE_INSPECTION = "knowledge_inspection"
     REASONING = "reasoning"
+    SHOPPING = "shopping"
     UNKNOWN = "unknown"
 
 
@@ -31,6 +33,7 @@ class RouterAgent:
         self.admin_copilot_agent = AdminCopilotAgent()
         self.inspection_agent = InspectionAgent()
         self.retrieval_agent = RetrievalAgent()
+        self.shopping_agent = ShoppingAgent()
         self.classifier = IntentClassifier()
         self._reasoning_agent = None
 
@@ -88,6 +91,11 @@ class RouterAgent:
             elif task_type == TaskType.REASONING:
                 return self.reasoning_agent.reason(
                     input_text, context, conversation_id
+                )
+
+            elif task_type == TaskType.SHOPPING:
+                return self.shopping_agent.recommend(
+                    input_text, conversation_id, user_id, context, **kwargs
                 )
 
             else:
@@ -166,6 +174,12 @@ class RouterAgent:
                     "sources": result.get("sources", [])
                 })
 
+            elif task_type == TaskType.SHOPPING:
+                for event in self.shopping_agent.recommend_stream(
+                    input_text, conversation_id, user_id, context, **kwargs
+                ):
+                    yield event
+
             else:
                 for event in self.knowledge_qa_agent.ask_stream(
                     input_text, conversation_id, user_id, context, **kwargs
@@ -199,6 +213,7 @@ class RouterAgent:
             IntentType.ADMIN_OPERATION: TaskType.ADMIN_COPILOT,
             IntentType.KNOWLEDGE_INSPECTION: TaskType.KNOWLEDGE_INSPECTION,
             IntentType.IDENTITY_QUERY: TaskType.CHITCHAT,
+            IntentType.SHOPPING: TaskType.SHOPPING,
             IntentType.UNKNOWN: TaskType.KNOWLEDGE_QA,
         }
 
@@ -260,6 +275,7 @@ class RouterAgent:
             TaskType.ADMIN_COPILOT: self.admin_copilot_agent,
             TaskType.KNOWLEDGE_INSPECTION: self.inspection_agent,
             TaskType.REASONING: self.reasoning_agent,
+            TaskType.SHOPPING: self.shopping_agent,
         }
         return agent_map.get(task_type, self.knowledge_qa_agent)
 

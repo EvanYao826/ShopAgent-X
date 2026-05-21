@@ -17,6 +17,7 @@ class IntentType(Enum):
     ADMIN_OPERATION = "admin_operation"
     KNOWLEDGE_INSPECTION = "knowledge_inspection"
     IDENTITY_QUERY = "identity_query"
+    SHOPPING = "shopping"
     UNKNOWN = "unknown"
 
 
@@ -123,6 +124,34 @@ class IntentClassifier:
             "累", "困", "饿", "渴", "舒服", "不爽", "真好", "太棒了", "不错",
         ]
 
+        # 购物导购关键词库（fallback用）
+        self.shopping_keywords = [
+            # 推荐类
+            "推荐", "有什么好的", "有什么好用", "帮我选", "帮我挑", "哪个好",
+            "值得买", "值不值", "好用吗", "好用的", "好用不",
+            # 商品类
+            "精华", "面霜", "面膜", "防晒", "水乳", "洁面", "眼霜", "口红",
+            "粉底", "散粉", "腮红", "眉笔", "眼线", "睫毛膏", "卸妆",
+            "手机", "电脑", "笔记本", "平板", "耳机", "键盘", "鼠标", "显示器",
+            "衣服", "裤子", "裙子", "鞋", "包", "帽子", "围巾",
+            "零食", "饮料", "水果", "生鲜", "牛奶",
+            # 肤质/需求类
+            "油皮", "干皮", "敏感肌", "混合皮", "中性",
+            "保湿", "美白", "抗老", "祛痘", "控油", "补水", "紧致",
+            "防晒", "抗氧化", "修复", "舒缓", "清洁",
+            # 品牌类
+            "大牌", "平价", "国货", "小众", "贵妇",
+            # 价格类
+            "便宜", "性价比", "划算", "预算", "百元", "千元",
+            # 场景类
+            "适合", "学生党", "上班族", "送礼", "自用",
+            # 对比类
+            "对比", "比较", "区别", "哪个好", "选哪个",
+            # 电商类
+            "买", "购买", "下单", "加购", "收藏", "购物",
+            "有没有", "多少钱", "价格", "打折", "优惠", "促销",
+        ]
+
     @property
     def llm_service(self):
         """延迟加载LLM服务"""
@@ -177,7 +206,8 @@ class IntentClassifier:
 3. admin_operation - 管理操作（后台管理、数据统计、运营分析等，需要管理员权限）
 4. knowledge_inspection - 知识巡检（检查文档质量、重复、过期等）
 5. identity_query - 身份查询（询问系统身份、名称等）
-6. unknown - 无法确定
+6. shopping - 购物导购（商品推荐、商品搜索、购买咨询、价格询问、商品对比、护肤/美妆/数码/服饰推荐等）
+7. unknown - 无法确定
 
 请返回JSON格式：
 {"intent": "意图类型", "confidence": 0.0-1.0, "reasoning": "判断理由"}
@@ -209,6 +239,7 @@ class IntentClassifier:
                 "admin_operation": IntentType.ADMIN_OPERATION,
                 "knowledge_inspection": IntentType.KNOWLEDGE_INSPECTION,
                 "identity_query": IntentType.IDENTITY_QUERY,
+                "shopping": IntentType.SHOPPING,
                 "unknown": IntentType.UNKNOWN,
             }
 
@@ -248,8 +279,9 @@ class IntentClassifier:
         admin_score = sum(1 for kw in self.admin_keywords if kw in clean_text)
         inspection_score = sum(1 for kw in self.inspection_keywords if kw in clean_text)
         emotion_score = sum(1 for kw in self.emotion_keywords if kw in clean_text)
+        shopping_score = sum(1 for kw in self.shopping_keywords if kw in clean_text)
 
-        logger.debug(f"[IntentClassifier] Scores - chitchat:{chitchat_score}, knowledge:{knowledge_score}, admin:{admin_score}, inspection:{inspection_score}")
+        logger.debug(f"[IntentClassifier] Scores - chitchat:{chitchat_score}, knowledge:{knowledge_score}, admin:{admin_score}, inspection:{inspection_score}, shopping:{shopping_score}")
 
         # 管理员模式：优先处理管理相关任务
         if is_admin:
@@ -274,6 +306,21 @@ class IntentClassifier:
                     confidence=min(0.9, 0.5 + admin_score * 0.1),
                     reasoning=f"管理员模式，命中{admin_score}个管理关键词"
                 )
+
+        # 购物导购（核心功能，优先级高）
+        if shopping_score >= 2:
+            return IntentResult(
+                intent=IntentType.SHOPPING,
+                confidence=min(0.95, 0.5 + shopping_score * 0.15),
+                reasoning=f"命中{shopping_score}个购物关键词"
+            )
+        # 有购物关键词且没有更强的知识/管理信号
+        if shopping_score > 0 and shopping_score >= knowledge_score and shopping_score >= admin_score:
+            return IntentResult(
+                intent=IntentType.SHOPPING,
+                confidence=min(0.9, 0.5 + shopping_score * 0.1),
+                reasoning=f"命中{shopping_score}个购物关键词"
+            )
 
         # 知识巡检（管理员和普通用户都可以触发）
         if inspection_score > 0 and inspection_score >= knowledge_score:
@@ -390,4 +437,5 @@ class IntentClassifier:
             "admin_keywords": len(self.admin_keywords),
             "inspection_keywords": len(self.inspection_keywords),
             "emotion_keywords": len(self.emotion_keywords),
+            "shopping_keywords": len(self.shopping_keywords),
         }

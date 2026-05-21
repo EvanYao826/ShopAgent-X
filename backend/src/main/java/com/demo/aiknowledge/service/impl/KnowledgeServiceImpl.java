@@ -1,9 +1,7 @@
 package com.demo.aiknowledge.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.demo.aiknowledge.entity.DocViewLog;
 import com.demo.aiknowledge.entity.KnowledgeDoc;
-import com.demo.aiknowledge.mapper.DocViewLogMapper;
 import com.demo.aiknowledge.mapper.KnowledgeDocMapper;
 import com.demo.aiknowledge.service.AiService;
 import com.demo.aiknowledge.service.KnowledgeService;
@@ -33,7 +31,6 @@ import java.util.UUID;
 public class KnowledgeServiceImpl implements KnowledgeService {
 
     private final KnowledgeDocMapper knowledgeDocMapper;
-    private final DocViewLogMapper docViewLogMapper;
     private final AiService aiService;
 
     // Qiniu Cloud Kodo 配置
@@ -203,14 +200,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public KnowledgeDoc viewDoc(Long docId, Long userId) {
-        KnowledgeDoc doc = knowledgeDocMapper.selectById(docId);
-        if (doc != null) {
-            DocViewLog log = new DocViewLog();
-            log.setDocId(docId);
-            log.setUserId(userId);
-            log.setCreateTime(LocalDateTime.now());
-            docViewLogMapper.insert(log);
-        }
-        return doc;
+        return knowledgeDocMapper.selectById(docId);
     }
 }

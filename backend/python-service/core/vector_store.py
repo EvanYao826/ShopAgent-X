@@ -2,10 +2,16 @@ import os
 import shutil
 from typing import List, Optional, Dict, Any
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import DashScopeEmbeddings, HuggingFaceEmbeddings
+try:
+    from langchain_huggingface import HuggingFaceEmbeddings
+except ImportError:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import DashScopeEmbeddings
 from langchain_core.documents import Document
 from core.reranker import create_reranker, BaseReranker
 from core.config import config
+
+# ... existing code ...
 
 # pymilvus 和 Milvus 是可选依赖，仅在使用 Milvus 时需要
 try:

@@ -2,12 +2,14 @@ package com.demo.aiknowledge.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.demo.aiknowledge.dto.DashboardStats;
-import com.demo.aiknowledge.entity.DocViewLog;
 import com.demo.aiknowledge.entity.KnowledgeDoc;
 import com.demo.aiknowledge.entity.QaLog;
 import com.demo.aiknowledge.entity.QaUnanswered;
 import com.demo.aiknowledge.entity.User;
-import com.demo.aiknowledge.mapper.*;
+import com.demo.aiknowledge.mapper.KnowledgeDocMapper;
+import com.demo.aiknowledge.mapper.QaLogMapper;
+import com.demo.aiknowledge.mapper.QaUnansweredMapper;
+import com.demo.aiknowledge.mapper.UserMapper;
 import com.demo.aiknowledge.service.DashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -29,8 +31,6 @@ public class DashboardServiceImpl implements DashboardService {
     private QaLogMapper qaLogMapper;
     @Autowired
     private QaUnansweredMapper qaUnansweredMapper;
-    @Autowired
-    private DocViewLogMapper docViewLogMapper;
 
     @Override
     public DashboardStats getStats() {
@@ -60,25 +60,7 @@ public class DashboardServiceImpl implements DashboardService {
             stats.setHitRate(0.0);
         }
 
-        // 2. Hot Docs (Top 5 by view count)
-        // Select doc_id, count(*) as view_count from doc_view_log group by doc_id order by view_count desc limit 5
-        QueryWrapper<DocViewLog> hotDocsWrapper = new QueryWrapper<>();
-        hotDocsWrapper.select("doc_id", "count(*) as view_count")
-                .groupBy("doc_id")
-                .orderByDesc("view_count")
-                .last("limit 5");
-        stats.setHotDocs(docViewLogMapper.selectMaps(hotDocsWrapper));
-        
-        // Enrich Hot Docs with Titles
-        for (Map<String, Object> map : stats.getHotDocs()) {
-            Long docId = (Long) map.get("doc_id");
-            KnowledgeDoc doc = docMapper.selectById(docId);
-            if (doc != null) {
-                map.put("title", doc.getDocName());
-            }
-        }
-
-        // 3. Top Questions (from QaUnanswered or QaLog? Prompt says "Top 1 How to apply server")
+        // 2. Top Questions (from QaUnanswered or QaLog? Prompt says "Top 1 How to apply server")
         // Let's assume frequently asked questions are stored in qa_unanswered with count, 
         // OR we aggregate from qa_log. 
         // Prompt implies qa_unanswered tracks "Missed" questions, but we also want "Hot" questions.

@@ -13,6 +13,8 @@ public class Conversation {
     private Long id;
     private Long userId;
     private String title;
+    private String scene;
     private Boolean isPinned;
     private LocalDateTime createTime;
+    private LocalDateTime updateTime;
 }

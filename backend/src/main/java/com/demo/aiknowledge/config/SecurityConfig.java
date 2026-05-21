@@ -46,6 +46,9 @@ public class SecurityConfig {
                 // 用户接口需要USER或ADMIN角色
                 .requestMatchers("/api/chat/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/knowledge/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/category/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/product/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/recommend/**").hasAnyRole("USER", "ADMIN")
                 // 其他请求需要认证
                 .anyRequest().authenticated()
             )

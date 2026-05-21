@@ -42,6 +42,16 @@ public class ConversationContext {
     private String embedding;
 
     /**
+     * 本轮对话提取的用户偏好 JSON
+     */
+    private String userPreferences;
+
+    /**
+     * 本轮对话中提到的商品ID列表 JSON
+     */
+    private String mentionedProducts;
+
+    /**
      * 上下文窗口大小
      */
     private Integer windowSize;

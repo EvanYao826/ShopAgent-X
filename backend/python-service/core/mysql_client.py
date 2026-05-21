@@ -1,5 +1,6 @@
 import os
 import json
+import uuid
 import mysql.connector
 from mysql.connector import Error, pooling
 from typing import List, Dict, Any
@@ -156,25 +157,59 @@ class MySQLClient:
         """执行SQL语句（INSERT/UPDATE/DELETE）"""
         if not self.connection or not self.connection.is_connected():
             self.connect()
-        
+
         try:
             cursor = self.connection.cursor()
-            
+
             if params:
                 cursor.execute(sql, params)
             else:
                 cursor.execute(sql)
-            
+
             self.connection.commit()
             affected_rows = cursor.rowcount
             cursor.close()
             return affected_rows
-        
+
         except Error as e:
             logger.error(f"Error executing SQL: {e}")
             if self.connection:
                 self.connection.rollback()
             return 0
+
+    def insert_agent_run(self, run_id: str, trace_id: str, conversation_id: str,
+                         user_id: str, status: str, goal: str, intent: str,
+                         start_time: str, end_time: str,
+                         input_text: str, output_text: str,
+                         error_message: str = None, error_code: str = None,
+                         created_at: str = None):
+        """插入 Agent 运行记录"""
+        if not self.connection or not self.connection.is_connected():
+            self.connect()
+
+        try:
+            cursor = self.connection.cursor()
+            record_id = str(uuid.uuid4())
+            sql = """
+                INSERT INTO agent_run
+                (id, run_id, trace_id, conversation_id, user_id, status, goal, intent,
+                 start_time, end_time, `input`, output, error_message, error_code, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            if created_at is None:
+                created_at = start_time
+            cursor.execute(sql, (
+                record_id, run_id, trace_id, conversation_id, user_id, status, goal, intent,
+                start_time, end_time, input_text, output_text,
+                error_message, error_code, created_at
+            ))
+            self.connection.commit()
+            cursor.close()
+            logger.info(f"Agent run recorded: run_id={run_id}, intent={intent}, status={status}")
+        except Error as e:
+            logger.error(f"Error inserting agent run: {e}")
+            if self.connection:
+                self.connection.rollback()
 
 # 创建全局实例
 mysql_client = MySQLClient()

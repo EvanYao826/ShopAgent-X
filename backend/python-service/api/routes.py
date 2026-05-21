@@ -11,6 +11,8 @@ import re
 import logging
 import json
 import time
+import uuid
+from datetime import datetime
 
 # 配置结构化日志
 logging.basicConfig(
@@ -251,10 +253,16 @@ async def ask_question(request: ChatRequest):
     """
     问答接口 - 使用 RouterAgent 进行任务路由
     """
+    run_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
     start_time = time.time()
+    start_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status = "success"
+    error_message = None
+
     try:
         logger.info(f"Received question: {request.question}, username: {request.username}, is_admin: {request.is_admin}")
-        
+
         # 处理身份相关问题
         lower_question = request.question.lower()
         identity_keywords = ["我是谁", "我叫什么", "我的名字", "我的身份"]
@@ -271,17 +279,41 @@ async def ask_question(request: ChatRequest):
                 username=request.username,
                 is_admin=request.is_admin
             )
-            
+
             # 构建响应
             response = {
                 "answer": result.get("answer", ""),
                 "sources": result.get("sources", []),
                 "task_type": result.get("task_type", "unknown")
             }
-        
+            # 如果有商品卡片，一并返回
+            if result.get("product_cards"):
+                response["product_cards"] = result["product_cards"]
+
         logger.info(f"Response generated successfully, task_type: {response.get('task_type')}")
-        
+
+        # 记录 Agent 运行到 MySQL
+        end_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            mysql_client.insert_agent_run(
+                run_id=run_id,
+                trace_id=trace_id,
+                conversation_id=request.conversation_id or "",
+                user_id="",
+                status="success",
+                goal=request.question[:200],
+                intent=response.get("task_type", "unknown"),
+                start_time=start_dt,
+                end_time=end_dt,
+                input_text=request.question,
+                output_text=response.get("answer", "")[:500],
+                created_at=start_dt
+            )
+        except Exception as db_err:
+            logger.warning(f"Failed to record agent run: {db_err}")
+
         process_time = time.time() - start_time
+        response["run_id"] = run_id
         logger.info(
             json.dumps({
                 "method": "POST",
@@ -292,6 +324,8 @@ async def ask_question(request: ChatRequest):
         )
         return response
     except HTTPException as e:
+        status = "failed"
+        error_message = str(e.detail)
         process_time = time.time() - start_time
         logger.info(
             json.dumps({
@@ -303,6 +337,8 @@ async def ask_question(request: ChatRequest):
         )
         raise
     except Exception as e:
+        status = "failed"
+        error_message = str(e)
         process_time = time.time() - start_time
         logger.error(f"Error processing question: {str(e)}")
         logger.info(
@@ -313,17 +349,44 @@ async def ask_question(request: ChatRequest):
                 "process_time": process_time
             })
         )
-        # 不返回具体错误信息，避免泄露内部实现细节
         raise HTTPException(status_code=500, detail="问答处理失败")
+    finally:
+        # 异常时也记录
+        if status == "failed":
+            end_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                mysql_client.insert_agent_run(
+                    run_id=run_id,
+                    trace_id=trace_id,
+                    conversation_id=request.conversation_id or "",
+                    user_id="",
+                    status="failed",
+                    goal=request.question[:200],
+                    intent="unknown",
+                    start_time=start_dt,
+                    end_time=end_dt,
+                    input_text=request.question,
+                    output_text="",
+                    error_message=error_message,
+                    created_at=start_dt
+                )
+            except Exception:
+                pass
 
 @router.post("/ask/stream")
 async def ask_question_stream(request: ChatRequest):
     """
     流式问答接口 (Server-Sent Events) - 使用 RouterAgent
     """
+    run_id = str(uuid.uuid4())
+    trace_id = str(uuid.uuid4())
     start_time = time.time()
+    start_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    final_answer = ""
+    final_task_type = "unknown"
 
     async def event_generator():
+        nonlocal final_answer, final_task_type
         try:
             logger.info(f"Streaming question: {request.question}, username: {request.username}, is_admin: {request.is_admin}")
 
@@ -333,7 +396,8 @@ async def ask_question_stream(request: ChatRequest):
             if any(keyword in lower_question for keyword in identity_keywords) and request.username:
                 logger.info(f"Streaming identity answer for user: {request.username}")
                 answer = f"你是 {request.username}，是本系统的注册用户。"
-                # 流式返回身份回答
+                final_answer = answer
+                final_task_type = "chitchat"
                 for char in answer:
                     yield f"data: {json.dumps({'type': 'token', 'content': char})}\n\n"
                 yield f"data: {json.dumps({'type': 'end', 'content': answer, 'task_type': 'chitchat'})}\n\n"
@@ -346,6 +410,15 @@ async def ask_question_stream(request: ChatRequest):
                 username=request.username,
                 is_admin=request.is_admin
             ):
+                # 从事件中提取最终答案和任务类型
+                try:
+                    parsed = json.loads(event_data) if isinstance(event_data, str) else event_data
+                    if parsed.get("type") == "routed":
+                        final_task_type = parsed.get("task_type", "unknown")
+                    elif parsed.get("type") == "answer":
+                        final_answer = parsed.get("content", "")
+                except (json.JSONDecodeError, AttributeError):
+                    pass
                 yield f"data: {event_data}\n\n"
 
             process_time = time.time() - start_time
@@ -370,6 +443,26 @@ async def ask_question_stream(request: ChatRequest):
                 })
             )
             yield f"data: {json.dumps({'type': 'error', 'content': '流式问答处理失败'})}\n\n"
+        finally:
+            # 记录 Agent 运行
+            end_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                mysql_client.insert_agent_run(
+                    run_id=run_id,
+                    trace_id=trace_id,
+                    conversation_id=request.conversation_id or "",
+                    user_id="",
+                    status="success",
+                    goal=request.question[:200],
+                    intent=final_task_type,
+                    start_time=start_dt,
+                    end_time=end_dt,
+                    input_text=request.question,
+                    output_text=final_answer[:500],
+                    created_at=start_dt
+                )
+            except Exception as db_err:
+                logger.warning(f"Failed to record agent run: {db_err}")
 
     return StreamingResponse(
         event_generator(),

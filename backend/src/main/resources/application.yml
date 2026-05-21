@@ -3,18 +3,18 @@ server:
 
 spring:
   application:
-    name: ai-knowledge-system
+    name: shop-agent-x
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ai_knowledge_db}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:shop_agent_db}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
     username: ${DB_USER:root}
-    password: ${DB_PASSWORD:123456} # 通过环境变量配置
+    password: ${DB_PASSWORD:123456}
   data:
     redis:
-      host: ${REDIS_HOST:192.168.150.106}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:your_strong_password} # 可选，如有密码则通过环境变量配置
-      database: 0
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DB:0}
   servlet:
     multipart:
       max-file-size: ${MAX_FILE_SIZE:50MB}
@@ -48,16 +48,15 @@ qiniu:
   domain: ${QINIU_DOMAIN:}
   # 注意：生产环境必须配置七牛云AK/SK
 
-
 logging:
   level:
     com.demo.aiknowledge: DEBUG
 
 # JWT 配置
 jwt:
-  secret: ${JWT_SECRET:your-secret-key-change-in-production} # 必须通过环境变量配置生产环境密钥
+  secret: ${JWT_SECRET:your-secret-key-change-in-production}
   expiration: ${JWT_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}
 
 upload:
-  dir: ${UPLOAD_DIR:D:/aiknowledge/uploads} # 使用相对路径，兼容所有平台
+  dir: ${UPLOAD_DIR:E:/Python_qb/DEmo/ShopAgent-X/uploads}

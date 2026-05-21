@@ -273,6 +273,14 @@ public class AiServiceImpl implements AiService {
                     }
                 }
 
+                // 检查是否有商品卡片
+                if (body.containsKey("product_cards")) {
+                    List<Map<String, Object>> productCards = (List<Map<String, Object>>) body.get("product_cards");
+                    if (productCards != null && !productCards.isEmpty()) {
+                        aiResponse.setProductCards(productCards);
+                    }
+                }
+
                 // 只缓存非错误响应
                 if (!isErrorResponse(answer)) {
                     cacheService.set(

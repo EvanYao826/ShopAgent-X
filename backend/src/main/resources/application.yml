@@ -1,0 +1,63 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: ai-knowledge-system
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ai_knowledge_db}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:123456} # 通过环境变量配置
+  data:
+    redis:
+      host: ${REDIS_HOST:192.168.150.106}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:your_strong_password} # 可选，如有密码则通过环境变量配置
+      database: 0
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:50MB}
+      max-request-size: ${MAX_FILE_SIZE:50MB}
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# AI 服务配置
+ai:
+  service:
+    url: ${AI_SERVICE_URL:http://127.0.0.1:8000/api}
+
+# 阿里云短信配置
+aliyun:
+  sms:
+    accessKeyId: ${ALIYUN_SMS_ACCESS_KEY_ID:}
+    accessKeySecret: ${ALIYUN_SMS_ACCESS_KEY_SECRET:}
+    signName: ${ALIYUN_SMS_SIGN_NAME:}
+    templateCode: ${ALIYUN_SMS_TEMPLATE_CODE:}
+    # 如果未配置阿里云短信，则使用模拟模式（控制台输出验证码）
+
+# 七牛云配置
+qiniu:
+  accessKey: ${QINIU_ACCESS_KEY:}
+  secretKey: ${QINIU_SECRET_KEY:}
+  bucket: ${QINIU_BUCKET:}
+  domain: ${QINIU_DOMAIN:}
+  # 注意：生产环境必须配置七牛云AK/SK
+
+
+logging:
+  level:
+    com.demo.aiknowledge: DEBUG
+
+# JWT 配置
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-change-in-production} # 必须通过环境变量配置生产环境密钥
+  expiration: ${JWT_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}
+
+upload:
+  dir: ${UPLOAD_DIR:D:/aiknowledge/uploads} # 使用相对路径，兼容所有平台

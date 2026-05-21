@@ -1,0 +1,48 @@
+# === Secrets / Credentials ===
+.env
+backend/python-service/.env
+backend/src/main/resources/application-local.yml
+backend/src/main/resources/application-prod.yml
+
+# === Python ===
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+*.egg-info/
+faiss_index/
+temp/
+
+# === Java ===
+backend/target/
+*.class
+*.jar
+*.war
+
+# === Android ===
+.gradle/
+build/
+local.properties
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+
+# === IDE ===
+.idea/
+*.iml
+.vscode/
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Node ===
+node_modules/
+backend/frontend/node_modules/
+
+# === Data ===
+data/ecommerce_agent_dataset/images/
+
+# === Logs ===
+*.log

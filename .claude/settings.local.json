@@ -5,7 +5,8 @@
       "Bash(cmd.exe *)",
       "Bash(powershell *)",
       "Bash(git branch *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git checkout *)"
     ]
   }
 }

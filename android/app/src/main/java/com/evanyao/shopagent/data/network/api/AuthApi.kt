@@ -1,6 +1,7 @@
 package com.evanyao.shopagent.data.network.api
 
 import com.evanyao.shopagent.data.model.LoginRequest
+import com.evanyao.shopagent.data.model.ProfileUpdateRequest
 import com.evanyao.shopagent.data.model.RegisterRequest
 import com.evanyao.shopagent.data.model.Result
 import com.evanyao.shopagent.data.model.User
@@ -18,7 +19,7 @@ interface AuthApi {
     suspend fun login(@Body request: LoginRequest): Result<Map<String, Any>>
 
     @POST("api/auth/update")
-    suspend fun updateUserInfo(@Body request: Map<String, Any>): Result<User>
+    suspend fun updateUserInfo(@Body request: ProfileUpdateRequest): Result<User>
 
     @POST("api/auth/refresh")
     suspend fun refreshToken(@Header("Authorization") token: String): Result<Map<String, Any>>

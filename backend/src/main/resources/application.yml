@@ -54,7 +54,7 @@ logging:
 
 # JWT 配置
 jwt:
-  secret: ${JWT_SECRET:your-secret-key-change-in-production}
+  secret: ${JWT_SECRET:shopagent-x-jwt-secret-key-must-be-at-least-32-characters-for-hs256-algorithm}
   expiration: ${JWT_EXPIRATION:3600000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:86400000}
 

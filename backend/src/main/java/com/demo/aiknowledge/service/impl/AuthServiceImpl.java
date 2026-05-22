@@ -9,6 +9,7 @@ import com.aliyuncs.exceptions.ClientException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.demo.aiknowledge.common.JwtUtil;
 import com.demo.aiknowledge.common.SensitiveWordUtil;
+import com.demo.aiknowledge.dto.UpdateUserRequest;
 import com.demo.aiknowledge.entity.User;
 import com.demo.aiknowledge.mapper.UserMapper;
 import com.demo.aiknowledge.service.AuthService;
@@ -185,16 +186,31 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public User updateUserInfo(Long userId, String username, String password) {
-        User user = userMapper.selectById(userId);
+    public User updateUserInfo(UpdateUserRequest request) {
+        User user = userMapper.selectById(request.getUserId());
         if (user == null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
-        if (StringUtils.hasText(username)) {
-            user.setUsername(username);
+        if (StringUtils.hasText(request.getUsername())) {
+            user.setUsername(request.getUsername());
         }
-        if (StringUtils.hasText(password)) {
-            user.setPassword(passwordEncoder.encode(password)); // 加密存储密码
+        if (StringUtils.hasText(request.getPassword())) {
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(request.getAvatarUrl());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getAgeRange() != null) {
+            user.setAgeRange(request.getAgeRange());
+        }
+        if (request.getSkinType() != null) {
+            user.setSkinType(request.getSkinType());
+        }
+        if (request.getPreferenceTags() != null) {
+            user.setPreferenceTags(request.getPreferenceTags());
         }
         userMapper.updateById(user);
         return user;

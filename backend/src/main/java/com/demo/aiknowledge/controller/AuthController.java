@@ -38,7 +38,7 @@ public class AuthController {
 
     @PostMapping("/update")
     public Result<User> updateUserInfo(@RequestBody UpdateUserRequest request) {
-        User user = authService.updateUserInfo(request.getUserId(), request.getUsername(), request.getPassword());
+        User user = authService.updateUserInfo(request);
         return Result.success(user);
     }
 

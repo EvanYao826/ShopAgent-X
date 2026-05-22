@@ -63,15 +63,8 @@ public class DashboardServiceImpl implements DashboardService {
             stats.setHitRate(0.0);
         }
 
-        // Top Questions
-        QueryWrapper<QaLog> topQaWrapper = new QueryWrapper<>();
-        topQaWrapper.select("question", "count(*) as count")
-                .groupBy("question")
-                .orderByDesc("count")
-                .last("limit 5");
-        stats.setTopQuestions(qaLogMapper.selectMaps(topQaWrapper));
 
-        // Unanswered Questions
+        // Unanswered Questions (保留，用于监控未命中问题)
         QueryWrapper<QaUnanswered> unansweredWrapper = new QueryWrapper<>();
         unansweredWrapper.orderByDesc("count").last("limit 5");
         List<QaUnanswered> unansweredList = qaUnansweredMapper.selectList(unansweredWrapper);

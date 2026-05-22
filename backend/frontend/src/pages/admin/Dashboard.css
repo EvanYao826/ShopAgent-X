@@ -96,3 +96,26 @@
   padding: 20px;
   font-size: 14px;
 }
+
+/* 新增：意图标签样式 */
+.intent-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* 新增：响应式布局 */
+@media (max-width: 768px) {
+  .stats-cards {
+    flex-wrap: wrap;
+  }
+  
+  .stat-card {
+    flex: 1 1 calc(50% - 10px);
+    min-width: 150px;
+  }
+  
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -26,7 +26,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (stats) {
-      // Small timeout to ensure DOM is ready
       setTimeout(initCharts, 100);
     }
   }, [stats]);
@@ -49,12 +48,17 @@ export default function Dashboard() {
     chartInstances.current.forEach(chart => chart.dispose());
     chartInstances.current = [];
 
-    // 1. 3D Pie Chart (Simulated)
-    if (pieChartRef.current) {
+    // 1. 意图分布饼图
+    if (pieChartRef.current && stats.intentDistribution) {
         const pieChart = echarts.init(pieChartRef.current);
+        const intentData = Object.entries(stats.intentDistribution || {}).map(([key, value]) => ({
+            name: getIntentLabel(key),
+            value: value
+        }));
+        
         const optionPie = {
             title: {
-                text: '核心指标分布',
+                text: '意图分布',
                 left: 'center',
                 textStyle: { fontSize: 16 }
             },
@@ -66,27 +70,19 @@ export default function Dashboard() {
                 bottom: '0%',
                 left: 'center'
             },
+            color: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f'],
             series: [
                 {
-                    name: '统计',
+                    name: '意图',
                     type: 'pie',
-                    radius: ['30%', '60%'], // Donut shape for better look
+                    radius: ['30%', '60%'],
                     center: ['50%', '50%'],
-                    roseType: 'area', // Rose chart looks more "3D" and handles scale differences better
                     itemStyle: {
                         borderRadius: 8,
                         shadowBlur: 20,
                         shadowColor: 'rgba(0, 0, 0, 0.3)'
                     },
-                    data: [
-                        { value: stats.userCount || 0, name: '用户数' },
-                        { value: stats.docCount || 0, name: '文档数' },
-                        { value: stats.qaCount || 0, name: '提问数' },
-                        // For Hit Rate, we use the value directly. 
-                        // Note: If hitRate is 95%, value is 95. If count is 1000, this slice is small.
-                        // But using 'roseType: area' helps visualize small values better.
-                        { value: stats.hitRate ? Math.round(stats.hitRate) : 0, name: 'AI命中率(%)' }
-                    ]
+                    data: intentData.length > 0 ? intentData : [{ value: 0, name: '暂无数据' }]
                 }
             ]
         };
@@ -94,18 +90,16 @@ export default function Dashboard() {
         chartInstances.current.push(pieChart);
     }
 
-    // 2. Trend Chart
+    // 2. 7日对话趋势图
     if (trendChartRef.current) {
         const trendChart = echarts.init(trendChartRef.current);
-        
-        // Prepare data
-        const trends = stats.questionTrends || [];
+        const trends = stats.dailyTrends || [];
         const dates = trends.map(item => item.date);
         const counts = trends.map(item => item.count);
 
         const optionTrend = {
             title: {
-                text: '近7日提问趋势',
+                text: '近7日对话趋势',
                 left: 'center',
                 textStyle: { fontSize: 16 }
             },
@@ -128,12 +122,19 @@ export default function Dashboard() {
             },
             series: [
                 {
-                    name: '提问数',
+                    name: '对话数',
                     type: 'line',
                     stack: 'Total',
                     smooth: true,
                     areaStyle: {
-                        opacity: 0.3
+                        opacity: 0.3,
+                        color: '#1890ff'
+                    },
+                    lineStyle: {
+                        color: '#1890ff'
+                    },
+                    itemStyle: {
+                        color: '#1890ff'
                     },
                     emphasis: {
                         focus: 'series'
@@ -147,30 +148,52 @@ export default function Dashboard() {
     }
   };
 
+  // 意图类型中文映射
+  const getIntentLabel = (intent) => {
+    const map = {
+      'shopping': '商品导购',
+      'chitchat': '闲聊',
+      'knowledge_qa': '知识问答',
+      'unknown': '未知'
+    };
+    return map[intent] || intent;
+  };
+
+  // 意图类型颜色映射
+  const getIntentColor = (intent) => {
+    const map = {
+      'shopping': '#1890ff',
+      'chitchat': '#52c41a',
+      'knowledge_qa': '#faad14',
+      'unknown': '#999'
+    };
+    return map[intent] || '#999';
+  };
+
   if (loading) return <div className="loading">加载中...</div>;
   if (!stats) return <div className="error">暂无数据</div>;
 
   return (
     <div className="dashboard-container">
-      <h2 className="page-title">仪表盘</h2>
+      <h2 className="page-title">电商导购数据大屏</h2>
       
       {/* 核心指标卡片 */}
       <div className="stats-cards">
         <div className="stat-card">
-          <div className="stat-value">{stats.userCount}</div>
-          <div className="stat-label">用户总数</div>
+          <div className="stat-value">{stats.todayConversations || 0}</div>
+          <div className="stat-label">今日对话数</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{stats.docCount}</div>
-          <div className="stat-label">文档总数</div>
+          <div className="stat-value">{stats.todayRecommendations || 0}</div>
+          <div className="stat-label">今日推荐次数</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{stats.qaCount}</div>
-          <div className="stat-label">提问总数</div>
+          <div className="stat-value">{(stats.clickRate || 0).toFixed(1)}%</div>
+          <div className="stat-label">推荐点击率</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{(stats.hitRate || 0).toFixed(1)}%</div>
-          <div className="stat-label">AI命中率</div>
+          <div className="stat-value">{(stats.satisfactionRate || 0).toFixed(1)}%</div>
+          <div className="stat-label">用户满意度</div>
         </div>
       </div>
 
@@ -185,57 +208,76 @@ export default function Dashboard() {
       </div>
 
       <div className="dashboard-grid">
-        {/* 热门文档 */}
+        {/* 热门商品 TOP5 */}
         <div className="dashboard-section">
-          <h3>🔥 热门文档</h3>
+          <h3>🔥 热门商品 TOP5</h3>
           <table className="data-table">
             <thead>
               <tr>
-                <th>文档名称</th>
-                <th>查看次数</th>
+                <th>商品名称</th>
+                <th>品牌</th>
+                <th>价格</th>
+                <th>销量</th>
+                <th>评分</th>
               </tr>
             </thead>
             <tbody>
-              {stats.hotDocs && stats.hotDocs.length > 0 ? (
-                stats.hotDocs.map((doc, index) => (
+              {stats.hotProducts && stats.hotProducts.length > 0 ? (
+                stats.hotProducts.map((product, index) => (
                   <tr key={index}>
-                    <td>{doc.title || `文档ID:${doc.doc_id}`}</td>
-                    <td>{doc.view_count}</td>
+                    <td className="text-truncate" title={product.title} style={{maxWidth: '150px'}}>{product.title}</td>
+                    <td>{product.brand}</td>
+                    <td>¥{product.base_price}</td>
+                    <td>{product.sales_count}</td>
+                    <td>⭐ {product.rating}</td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="2" className="empty-text">暂无数据</td></tr>
+                <tr><td colSpan="5" className="empty-text">暂无数据</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
-        {/* 热门问题 */}
+        {/* 最近推荐记录 */}
         <div className="dashboard-section">
-          <h3>💡 热门提问</h3>
+          <h3>💡 最近推荐记录</h3>
           <table className="data-table">
              <thead>
                 <tr>
-                    <th>问题内容</th>
-                    <th>提问次数</th>
+                    <th>查询内容</th>
+                    <th>意图</th>
+                    <th>是否点击</th>
+                    <th>反馈</th>
                 </tr>
              </thead>
              <tbody>
-                {stats.topQuestions && stats.topQuestions.length > 0 ? (
-                  stats.topQuestions.map((q, index) => (
+                {stats.recentRecommendations && stats.recentRecommendations.length > 0 ? (
+                  stats.recentRecommendations.map((rec, index) => (
                     <tr key={index}>
-                      <td className="text-truncate" title={q.question} style={{maxWidth: '200px'}}>{q.question}</td>
-                      <td>{q.count}</td>
+                      <td className="text-truncate" title={rec.query} style={{maxWidth: '150px'}}>{rec.query}</td>
+                      <td>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          background: getIntentColor(rec.intent) + '20',
+                          color: getIntentColor(rec.intent)
+                        }}>
+                          {getIntentLabel(rec.intent)}
+                        </span>
+                      </td>
+                      <td>{rec.userClicked ? '✅ 是' : '❌ 否'}</td>
+                      <td>{rec.userFeedback === 1 ? '👍 满意' : rec.userFeedback === 0 ? '👎 不满意' : '未反馈'}</td>
                     </tr>
                   ))
                 ) : (
-                  <tr><td colSpan="2" className="empty-text">暂无数据</td></tr>
+                  <tr><td colSpan="4" className="empty-text">暂无推荐记录</td></tr>
                 )}
              </tbody>
           </table>
         </div>
 
-        {/* 未命中问题 */}
+        {/* 未命中问题（保留，用于监控） */}
         <div className="dashboard-section">
           <h3>❓ 未命中问题 (需优化)</h3>
           <table className="data-table">

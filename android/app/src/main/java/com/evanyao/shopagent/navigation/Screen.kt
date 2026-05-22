@@ -3,7 +3,7 @@ package com.evanyao.shopagent.navigation
 sealed class Screen(val route: String) {
     object Login : Screen("login")
     object Register : Screen("register")
-    object Home : Screen("home")
+    object ProfileSetup : Screen("profile_setup")
     object Chat : Screen("chat")
     object Profile : Screen("profile")
     object ProductList : Screen("product_list")
@@ -13,4 +13,5 @@ sealed class Screen(val route: String) {
     object Cart : Screen("cart")
     object Favorites : Screen("favorites")
     object History : Screen("history")
+    object Settings : Screen("settings")
 }

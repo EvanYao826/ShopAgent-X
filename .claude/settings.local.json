@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd.exe /c \"dir \\\\\"D:\\\\物二姚昆鹏\\\\一些计划\\\\\" 2>nul\")",
+      "Bash(cmd.exe *)",
+      "Bash(powershell *)",
+      "Bash(git branch *)",
+      "WebSearch"
+    ]
+  }
+}

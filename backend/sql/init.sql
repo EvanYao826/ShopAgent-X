@@ -526,7 +526,7 @@ INSERT INTO `user` (`username`, `phone`, `password`, `gender`, `skin_type`) VALU
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
--- 完成！共 17 张表
+-- 完成！共 22 张表
 -- 用户体系：user, admin
 -- 商品体系：category, product, product_sku, product_image, product_review, product_faq
 -- 对话体系：conversation, message, conversation_context

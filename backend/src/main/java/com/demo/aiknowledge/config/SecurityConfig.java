@@ -41,6 +41,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/login").permitAll()
                 // 允许图片访问路径
                 .requestMatchers("/api/chat/view/image/**").permitAll()
+                // 允许商品图片静态资源访问
+                .requestMatchers("/product-images/**").permitAll()
                 // 管理员接口需要ADMIN角色
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // 用户接口需要USER或ADMIN角色

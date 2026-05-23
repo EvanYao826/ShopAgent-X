@@ -36,6 +36,16 @@ public class AuthController {
         return Result.success(result);
     }
 
+    /**
+     * 获取用户画像
+     * 返回字段：avatarUrl, gender, ageRange, skinType, preferenceTags
+     */
+    @GetMapping("/profile")
+    public Result<User> getProfile(@RequestParam Long userId) {
+        User user = authService.getProfile(userId);
+        return Result.success(user);
+    }
+
     @PostMapping("/update")
     public Result<User> updateUserInfo(@RequestBody UpdateUserRequest request) {
         User user = authService.updateUserInfo(request);

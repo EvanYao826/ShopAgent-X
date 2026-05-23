@@ -22,6 +22,8 @@ class TokenManager(
         private val USER_ID_KEY = stringPreferencesKey("user_id")
         private val USERNAME_KEY = stringPreferencesKey("username")
         private val PHONE_KEY = stringPreferencesKey("phone")
+        private val SKIN_TYPE_KEY = stringPreferencesKey("skin_type")
+        private val PREFERENCE_TAGS_KEY = stringPreferencesKey("preference_tags")
     }
 
     val tokenFlow: Flow<String?> = context.dataStore.data.map { preferences ->
@@ -90,6 +92,27 @@ class TokenManager(
         context.dataStore.edit { preferences ->
             preferences[key] = true
         }
+    }
+
+    suspend fun saveSkinType(skinType: String) {
+        context.dataStore.edit { preferences ->
+            preferences[SKIN_TYPE_KEY] = skinType
+        }
+    }
+
+    suspend fun getSkinType(): String? {
+        return context.dataStore.data.first()[SKIN_TYPE_KEY]
+    }
+
+    suspend fun savePreferenceTags(tags: List<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[PREFERENCE_TAGS_KEY] = tags.joinToString(",")
+        }
+    }
+
+    suspend fun getPreferenceTags(): List<String> {
+        val raw = context.dataStore.data.first()[PREFERENCE_TAGS_KEY]
+        return raw?.split(",")?.filter { it.isNotBlank() } ?: emptyList()
     }
 
     suspend fun clearAll() {

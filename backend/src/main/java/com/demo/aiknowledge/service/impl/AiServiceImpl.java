@@ -87,7 +87,10 @@ public class AiServiceImpl implements AiService {
             "无法连接",
             "网络错误",
             "暂时无法回答",
-            "稍后再试"
+            "稍后再试",
+            "遇到了问题",
+            "请稍后再试",
+            "无法回答"
         };
         for (String keyword : errorKeywords) {
             if (answer.contains(keyword)) {
@@ -171,25 +174,7 @@ public class AiServiceImpl implements AiService {
         log.info("User question: {}, userId: {}", question, userId);
         AiResponse aiResponse = new AiResponse();
 
-        // 生成缓存键（包含userId，避免不同用户共享缓存导致数据泄露）
-        String cacheKey = "ai:answer:" + (userId != null ? userId : "anonymous") + ":" + question.trim().toLowerCase();
-
         try {
-            // 1. 检查缓存（使用新的缓存服务）
-            AiResponse cachedResponse = cacheService.get(
-                CacheConfig.CacheConstants.CACHE_AI_ANSWER,
-                cacheKey,
-                AiResponse.class
-            );
-            if (cachedResponse != null) {
-                // 如果缓存的是错误响应，不使用缓存，重新请求
-                if (isErrorResponse(cachedResponse.getAnswer())) {
-                    log.info("Cache hit but contains error response, refreshing");
-                } else {
-                    log.info("Cache hit for question: {}", question);
-                    return cachedResponse;
-                }
-            }
 
             // 2. 构建请求（使用 /ask 接口，它内部已使用 RouterAgent）
             Map<String, Object> requestBody = new HashMap<>();
@@ -281,15 +266,6 @@ public class AiServiceImpl implements AiService {
                     }
                 }
 
-                // 只缓存非错误响应
-                if (!isErrorResponse(answer)) {
-                    cacheService.set(
-                        CacheConfig.CacheConstants.CACHE_AI_ANSWER,
-                        cacheKey,
-                        aiResponse
-                    );
-                }
-
                 return aiResponse;
             } else {
                 // 处理非 2xx 状态码（如 404, 500）
@@ -333,7 +309,7 @@ public class AiServiceImpl implements AiService {
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 String title = (String) response.getBody().get("title");
-                if (title != null && !title.isEmpty()) {
+                if (title != null && !title.isEmpty() && !title.equals("New Chat")) {
                     Conversation conversation = conversationMapper.selectById(conversationId);
                     if (conversation != null) {
                         conversation.setTitle(title);

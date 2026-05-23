@@ -36,7 +36,7 @@ class ConfigManager:
         self.DB_PORT = int(os.getenv("MYSQL_PORT", "3306"))
         self.DB_USER = os.getenv("MYSQL_USERNAME", "root")
         self.DB_PASSWORD = os.getenv("MYSQL_PASSWORD", "123456")
-        self.DB_NAME = os.getenv("MYSQL_DATABASE", "ai_knowledge_db")
+        self.DB_NAME = os.getenv("MYSQL_DATABASE", "shop_agent_db")
         
         # Vector Store Configuration
         self.USE_MILVUS = os.getenv("USE_MILVUS", "true").lower() == "true"

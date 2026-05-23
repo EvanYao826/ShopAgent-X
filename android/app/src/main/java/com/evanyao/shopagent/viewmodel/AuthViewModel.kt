@@ -60,6 +60,7 @@ class AuthViewModel(
                     val userMap = response.data["user"] as? Map<*, *>
                     val userId = (userMap?.get("id") as? Number)?.toLong()
                     val preferenceTags = userMap?.get("preferenceTags") as? List<*>
+                    val skinType = userMap?.get("skinType") as? String
                     if (token != null) {
                         tokenManager.saveToken(token)
                         if (refreshToken != null) {
@@ -73,6 +74,12 @@ class AuthViewModel(
                             tokenManager.saveUsername(username)
                         }
                         tokenManager.savePhone(phone)
+                        if (skinType != null) {
+                            tokenManager.saveSkinType(skinType)
+                        }
+                        if (!preferenceTags.isNullOrEmpty()) {
+                            tokenManager.savePreferenceTags(preferenceTags.map { it.toString() })
+                        }
                         // 判断是否已完成资料设置：preferenceTags 不为空
                         val profileDone = !preferenceTags.isNullOrEmpty()
                         if (profileDone) {
@@ -172,6 +179,8 @@ class AuthViewModel(
                 val response = authApi.updateUserInfo(request)
                 if (response.isSuccess) {
                     tokenManager.setProfileCompleted()
+                    tokenManager.saveSkinType(skinType)
+                    tokenManager.savePreferenceTags(tags)
                     _uiState.value = _uiState.value.copy(isProfileSetupDone = true)
                 } else {
                     _uiState.value = _uiState.value.copy(

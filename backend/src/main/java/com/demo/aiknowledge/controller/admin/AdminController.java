@@ -31,9 +31,11 @@ public class AdminController {
     private final AiService aiService;
     private final QaLogService qaLogService;
 
-    // --- 登录 ---
+    // --- 登录 (支持JSON格式) ---
     @PostMapping("/login")
-    public Result<Map<String, Object>> login(@RequestParam String username, @RequestParam String password) {
+    public Result<Map<String, Object>> login(@RequestBody Map<String, String> loginRequest) {
+        String username = loginRequest.get("username");
+        String password = loginRequest.get("password");
         return Result.success(adminService.login(username, password));
     }
 
@@ -54,18 +56,12 @@ public class AdminController {
     @PostMapping("/knowledge/upload")
     public Result<KnowledgeDoc> uploadDoc(@RequestParam("file") MultipartFile file,
                                           @RequestParam(required = false) Long categoryId) {
-        // KnowledgeService.saveDoc 内部已经包含了调用 AI 解析的逻辑
         KnowledgeDoc doc = knowledgeService.saveDoc(file, categoryId);
-        
-        // 因此不需要再次显式调用 aiService.parseDocument，避免重复解析
-        
         return Result.success(doc);
     }
 
     @DeleteMapping("/knowledge/{id}")
     public Result<Void> deleteDoc(@PathVariable Long id) {
-        // 需要同时删除向量库中的数据 (这里暂时只删除了数据库记录和文件)
-        // 完善建议：Python端增加删除向量接口
         knowledgeService.deleteDoc(id);
         return Result.success(null);
     }
@@ -87,7 +83,6 @@ public class AdminController {
     @GetMapping("/logs")
     public Result<IPage<QaLog>> listLogs(@RequestParam(defaultValue = "1") Integer page,
                                          @RequestParam(defaultValue = "10") Integer size) {
-        // 按时间倒序查询，最新的在前面
         Page<QaLog> logPage = new Page<>(page, size);
         return Result.success(qaLogService.page(logPage, 
             new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<QaLog>()

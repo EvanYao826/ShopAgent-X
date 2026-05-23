@@ -13,24 +13,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.evanyao.shopagent.ui.screens.auth.LoginScreen
 import com.evanyao.shopagent.ui.screens.auth.ProfileSetupScreen
 import com.evanyao.shopagent.ui.screens.auth.RegisterScreen
 import com.evanyao.shopagent.ui.screens.chat.ChatScreen
+import com.evanyao.shopagent.ui.screens.product.ProductDetailScreen
 import com.evanyao.shopagent.ui.screens.product.ProductListScreen
 import com.evanyao.shopagent.ui.screens.profile.ProfileScreen
 import com.evanyao.shopagent.ui.screens.profile.SettingsScreen
 import com.evanyao.shopagent.viewmodel.AuthViewModel
+import com.evanyao.shopagent.viewmodel.ChatViewModel
+import com.evanyao.shopagent.viewmodel.ProductViewModel
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
 fun MainNavigation() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = koinViewModel()
+    val chatViewModel: ChatViewModel = koinViewModel()
+    val productViewModel: ProductViewModel = koinViewModel()
     val authState by authViewModel.uiState.collectAsState()
 
     val bottomNavItems = listOf(
@@ -42,7 +49,10 @@ fun MainNavigation() {
     // 监听登录状态变化，自动跳转
     LaunchedEffect(authState.isLoggedIn) {
         if (authState.isLoggedIn) {
+            chatViewModel.clearState()
+            chatViewModel.loadConversations()
             if (authState.isProfileSetupDone) {
+                chatViewModel.loadRecommendations()
                 navController.navigate(Screen.Chat.route) {
                     popUpTo(Screen.Login.route) { inclusive = true }
                 }
@@ -121,26 +131,50 @@ fun MainNavigation() {
                 )
             }
             composable(Screen.ProfileSetup.route) {
-                ProfileSetupScreen(
-                    onComplete = { gender, ageRange, skinType, tags ->
-                        authViewModel.saveProfileSetup(gender, ageRange, skinType, tags)
-                        navController.navigate(Screen.Chat.route) {
-                            popUpTo(Screen.ProfileSetup.route) { inclusive = true }
-                        }
-                    },
-                    onSkip = {
-                        authViewModel.skipProfileSetup()
+                // 监听引导页完成，异步保存成功后再加载推荐
+                LaunchedEffect(authState.isProfileSetupDone) {
+                    if (authState.isProfileSetupDone) {
+                        chatViewModel.loadRecommendations()
                         navController.navigate(Screen.Chat.route) {
                             popUpTo(Screen.ProfileSetup.route) { inclusive = true }
                         }
                     }
+                }
+                ProfileSetupScreen(
+                    onComplete = { gender, ageRange, skinType, tags ->
+                        authViewModel.saveProfileSetup(gender, ageRange, skinType, tags)
+                    },
+                    onSkip = {
+                        authViewModel.skipProfileSetup()
+                    }
                 )
             }
             composable(Screen.Chat.route) {
-                ChatScreen()
+                ChatScreen(
+                    viewModel = chatViewModel,
+                    onProductClick = { productId ->
+                        navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    }
+                )
             }
             composable(Screen.ProductList.route) {
-                ProductListScreen()
+                ProductListScreen(
+                    viewModel = productViewModel,
+                    onProductClick = { productId ->
+                        navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    }
+                )
+            }
+            composable(
+                route = Screen.ProductDetail.route,
+                arguments = listOf(navArgument("productId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val productId = backStackEntry.arguments?.getLong("productId") ?: return@composable
+                ProductDetailScreen(
+                    viewModel = productViewModel,
+                    productId = productId,
+                    onBack = { navController.popBackStack() }
+                )
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
@@ -158,6 +192,7 @@ fun MainNavigation() {
                     onBack = { navController.popBackStack() },
                     onLogout = {
                         authViewModel.logout()
+                        chatViewModel.clearState()
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }

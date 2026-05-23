@@ -60,3 +60,5 @@ jwt:
 
 upload:
   dir: ${UPLOAD_DIR:E:/Python_qb/DEmo/ShopAgent-X/uploads}
+
+# 静态资源配置（已移至 WebConfig.java 中通过 addResourceHandlers 配置）

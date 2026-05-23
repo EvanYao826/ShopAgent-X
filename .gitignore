@@ -33,6 +33,7 @@ android/local.properties
 .idea/
 *.iml
 .vscode/
+.claude/
 
 # === OS ===
 .DS_Store

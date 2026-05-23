@@ -46,6 +46,27 @@
   gap: 20px;
 }
 
+.charts-row {
+  display: flex;
+  gap: 20px;
+  height: 350px;
+  margin: 20px 0;
+}
+
+.chart-container {
+  flex: 1;
+  min-width: 0;
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.chart-canvas {
+  width: 100%;
+  height: 100%;
+}
+
 .dashboard-section {
   background: white;
   padding: 20px;
@@ -98,10 +119,16 @@
 }
 
 /* 新增：意图标签样式 */
-.intent-tag {
+.intent-tag,
+.intent-badge {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
+  white-space: nowrap;
+}
+
+.warning-text {
+  color: #ff4d4f;
 }
 
 /* 新增：响应式布局 */
@@ -117,5 +144,10 @@
   
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .charts-row {
+    flex-direction: column;
+    height: 700px;
   }
 }

@@ -14,7 +14,7 @@ class MySQLClient:
     def __init__(self):
         self.host = os.getenv("MYSQL_HOST", "localhost")
         self.port = int(os.getenv("MYSQL_PORT", "3306"))
-        self.database = os.getenv("MYSQL_DATABASE", "ai_knowledge_db")
+        self.database = os.getenv("MYSQL_DATABASE", "shop_agent_db")
         self.username = os.getenv("MYSQL_USERNAME", "root")
         self.password = os.getenv("MYSQL_PASSWORD", "123456")
         self.connection = None
@@ -232,7 +232,7 @@ class UserMemoryClient:
                 port=int(os.getenv("MYSQL_PORT", "3306")),
                 user=os.getenv("MYSQL_USERNAME", "root"),
                 password=os.getenv("MYSQL_PASSWORD", "123456"),
-                database=os.getenv("MYSQL_DATABASE", "ai_knowledge_db"),
+                database=os.getenv("MYSQL_DATABASE", "shop_agent_db"),
                 charset="utf8mb4",
                 autocommit=True
             )

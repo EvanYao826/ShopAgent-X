@@ -286,6 +286,9 @@ async def ask_question(request: ChatRequest):
                 "sources": result.get("sources", []),
                 "task_type": result.get("task_type", "unknown")
             }
+            # 如果有错误标记，传递给调用方
+            if result.get("error"):
+                response["error"] = True
             # 如果有商品卡片，一并返回
             if result.get("product_cards"):
                 response["product_cards"] = result["product_cards"]

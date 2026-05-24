@@ -2,6 +2,7 @@ package com.evanyao.shopagent.ui.screens.profile
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -135,7 +136,7 @@ private fun HistoryItemRow(item: HistoryItem, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {

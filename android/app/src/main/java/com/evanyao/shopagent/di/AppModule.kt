@@ -25,10 +25,10 @@ val appModule = module {
     single { AddressRepository(get()) }
     viewModel { AuthViewModel(get(), get()) }
     viewModel { ChatViewModel(get(), get()) }
-    viewModel { ProductViewModel(get(), get()) }
-    viewModel { CartViewModel(get(), get()) }
+    viewModel { ProductViewModel(get()) }
+    viewModel { CartViewModel(get()) }
     viewModel { ProfileViewModel(get(), get()) }
-    viewModel { FavoriteViewModel(get(), get()) }
-    viewModel { HistoryViewModel(get(), get()) }
-    viewModel { AddressViewModel(get(), get()) }
+    viewModel { FavoriteViewModel(get()) }
+    viewModel { HistoryViewModel(get()) }
+    viewModel { AddressViewModel(get()) }
 }

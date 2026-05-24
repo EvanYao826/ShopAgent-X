@@ -3,7 +3,6 @@ package com.evanyao.shopagent.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.evanyao.shopagent.data.TokenManager
 import com.evanyao.shopagent.data.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,8 +34,7 @@ data class HistoryUiState(
 )
 
 class HistoryViewModel(
-    private val productRepository: ProductRepository,
-    private val tokenManager: TokenManager
+    private val productRepository: ProductRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -51,8 +49,7 @@ class HistoryViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
-                val response = productRepository.getBrowseHistory(userId)
+                val response = productRepository.getBrowseHistory()
                 if (response.isSuccess && response.data != null) {
                     val items = response.data.mapNotNull { item ->
                         val timeStr = (item["createTime"] as? String ?: "").replace("T", " ").substringBefore(".")

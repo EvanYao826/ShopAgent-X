@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -334,7 +335,7 @@ private fun CartItemCard(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
-            .clickable(onClick = onProductClick)
+            .noFocusClickable(onClick = onProductClick)
             .padding(12.dp),
         verticalAlignment = Alignment.Top
     ) {

@@ -3,7 +3,6 @@ package com.evanyao.shopagent.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.evanyao.shopagent.data.TokenManager
 import com.evanyao.shopagent.data.model.Category
 import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.data.repository.ProductRepository
@@ -38,8 +37,7 @@ data class ProductUiState(
 )
 
 class ProductViewModel(
-    private val productRepository: ProductRepository,
-    private val tokenManager: TokenManager
+    private val productRepository: ProductRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProductUiState())
@@ -205,9 +203,7 @@ class ProductViewModel(
                         )
                     )
                     // 上报浏览记录
-                    tokenManager.getUserId()?.let {
-                        productRepository.recordBrowse(it, productId, "detail")
-                    }
+                    productRepository.recordBrowse(productId, "detail")
                 } else {
                     _uiState.value = _uiState.value.copy(
                         productDetail = ProductDetailState(
@@ -231,9 +227,7 @@ class ProductViewModel(
     fun recordBrowse(productId: Long, source: String = "detail") {
         viewModelScope.launch {
             try {
-                tokenManager.getUserId()?.let {
-                    productRepository.recordBrowse(it, productId, source)
-                }
+                productRepository.recordBrowse(productId, source)
             } catch (e: Exception) {
                 Log.e("ProductVM", "Record browse failed", e)
             }
@@ -243,8 +237,7 @@ class ProductViewModel(
     fun getFavoriteList() {
         viewModelScope.launch {
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
-                val response = productRepository.getFavoriteList(userId)
+                val response = productRepository.getFavoriteList()
                 if (response.isSuccess && response.data != null) {
                     val favoriteProductIds = response.data.map { (it["productId"] as? Number)?.toLong() }.filterNotNull()
                     _uiState.value = _uiState.value.copy(
@@ -270,11 +263,10 @@ class ProductViewModel(
         )
         viewModelScope.launch {
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
                 if (isFavorite) {
-                    productRepository.removeFavorite(userId, productId)
+                    productRepository.removeFavorite(productId)
                 } else {
-                    productRepository.addFavorite(userId, productId)
+                    productRepository.addFavorite(productId)
                 }
             } catch (e: Exception) {
                 Log.e("ProductVM", "Toggle favorite failed, rolling back", e)

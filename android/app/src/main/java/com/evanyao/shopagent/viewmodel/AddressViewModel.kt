@@ -3,7 +3,6 @@ package com.evanyao.shopagent.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.evanyao.shopagent.data.TokenManager
 import com.evanyao.shopagent.data.repository.AddressRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,8 +27,7 @@ data class AddressUiState(
 )
 
 class AddressViewModel(
-    private val addressRepository: AddressRepository,
-    private val tokenManager: TokenManager
+    private val addressRepository: AddressRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddressUiState())
@@ -39,8 +37,7 @@ class AddressViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
-                val response = addressRepository.list(userId)
+                val response = addressRepository.list()
                 if (response.isSuccess && response.data != null) {
                     val list = response.data.map { item ->
                         AddressItem(
@@ -72,9 +69,7 @@ class AddressViewModel(
     ) {
         viewModelScope.launch {
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
                 val response = addressRepository.add(mapOf(
-                    "userId" to userId,
                     "receiverName" to receiverName,
                     "phone" to phone,
                     "province" to province,
@@ -103,10 +98,8 @@ class AddressViewModel(
     ) {
         viewModelScope.launch {
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
                 val response = addressRepository.update(mapOf(
                     "id" to id,
-                    "userId" to userId,
                     "receiverName" to receiverName,
                     "phone" to phone,
                     "province" to province,
@@ -131,8 +124,7 @@ class AddressViewModel(
     fun deleteAddress(id: Long) {
         viewModelScope.launch {
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
-                addressRepository.delete(id, userId)
+                addressRepository.delete(id)
                 _uiState.value = _uiState.value.copy(
                     addressList = _uiState.value.addressList.filter { it.id != id }
                 )
@@ -146,8 +138,7 @@ class AddressViewModel(
     fun setDefault(id: Long) {
         viewModelScope.launch {
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
-                addressRepository.setDefault(id, userId)
+                addressRepository.setDefault(id)
                 _uiState.value = _uiState.value.copy(
                     addressList = _uiState.value.addressList.map { item ->
                         item.copy(isDefault = item.id == id)

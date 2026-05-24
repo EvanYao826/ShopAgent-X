@@ -33,9 +33,8 @@ class ProductRepository(
     }
 
     // 浏览历史
-    suspend fun recordBrowse(userId: Long, productId: Long, source: String = "detail") {
+    suspend fun recordBrowse(productId: Long, source: String = "detail") {
         val history = mapOf(
-            "userId" to userId,
             "productId" to productId,
             "source" to source
         )
@@ -43,19 +42,19 @@ class ProductRepository(
     }
 
     // 收藏
-    suspend fun addFavorite(userId: Long, productId: Long) {
-        productApi.addFavorite(userId, productId)
+    suspend fun addFavorite(productId: Long) {
+        productApi.addFavorite(productId)
     }
 
-    suspend fun removeFavorite(userId: Long, productId: Long) {
-        productApi.removeFavorite(userId, productId)
+    suspend fun removeFavorite(productId: Long) {
+        productApi.removeFavorite(productId)
     }
 
-    suspend fun getFavoriteList(userId: Long): ApiResult<List<Map<String, Any>>> {
-        return productApi.getFavoriteList(userId)
+    suspend fun getFavoriteList(): ApiResult<List<Map<String, Any>>> {
+        return productApi.getFavoriteList()
     }
 
-    suspend fun getBrowseHistory(userId: Long): ApiResult<List<Map<String, Any>>> {
-        return productApi.getBrowseHistory(userId)
+    suspend fun getBrowseHistory(): ApiResult<List<Map<String, Any>>> {
+        return productApi.getBrowseHistory()
     }
 }

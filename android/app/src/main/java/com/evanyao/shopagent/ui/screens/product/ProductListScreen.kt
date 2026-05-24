@@ -28,8 +28,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.ui.components.buildImageUrl
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import com.evanyao.shopagent.viewmodel.ProductViewModel
-import com.evanyao.shopagent.data.TokenManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -215,7 +215,7 @@ fun ProductListScreen(
 @Composable
 private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     ) {
@@ -238,7 +238,7 @@ private fun ProductGridCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {

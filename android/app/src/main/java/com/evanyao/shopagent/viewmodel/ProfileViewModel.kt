@@ -27,7 +27,9 @@ class ProfileViewModel(
 
     fun loadProfile() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+            // 已有数据时不显示loading，避免页面闪烁
+            val showLoading = _uiState.value.user == null
+            _uiState.value = _uiState.value.copy(isLoading = showLoading, errorMessage = null)
             try {
                 val response = authApi.getProfile()
                 if (response.isSuccess && response.data != null) {

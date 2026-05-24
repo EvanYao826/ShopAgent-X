@@ -1,6 +1,8 @@
 package com.evanyao.shopagent.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -22,12 +24,14 @@ import androidx.navigation.navArgument
 import com.evanyao.shopagent.ui.screens.auth.LoginScreen
 import com.evanyao.shopagent.ui.screens.auth.ProfileSetupScreen
 import com.evanyao.shopagent.ui.screens.auth.RegisterScreen
+import com.evanyao.shopagent.ui.screens.cart.CartScreen
 import com.evanyao.shopagent.ui.screens.chat.ChatScreen
 import com.evanyao.shopagent.ui.screens.product.ProductDetailScreen
 import com.evanyao.shopagent.ui.screens.product.ProductListScreen
 import com.evanyao.shopagent.ui.screens.profile.ProfileScreen
 import com.evanyao.shopagent.ui.screens.profile.SettingsScreen
 import com.evanyao.shopagent.viewmodel.AuthViewModel
+import com.evanyao.shopagent.viewmodel.CartViewModel
 import com.evanyao.shopagent.viewmodel.ChatViewModel
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -38,11 +42,14 @@ fun MainNavigation() {
     val authViewModel: AuthViewModel = koinViewModel()
     val chatViewModel: ChatViewModel = koinViewModel()
     val productViewModel: ProductViewModel = koinViewModel()
+    val cartViewModel: CartViewModel = koinViewModel()
     val authState by authViewModel.uiState.collectAsState()
+    val cartState by cartViewModel.uiState.collectAsState()
 
     val bottomNavItems = listOf(
         BottomNavItem.Chat,
         BottomNavItem.Product,
+        BottomNavItem.Cart,
         BottomNavItem.Profile
     )
 
@@ -53,7 +60,8 @@ fun MainNavigation() {
             chatViewModel.loadConversations()
             if (authState.isProfileSetupDone) {
                 chatViewModel.loadRecommendations()
-                navController.navigate(Screen.Chat.route) {
+                cartViewModel.refreshOnLogin()
+                navController.navigate(Screen.Cart.route) {
                     popUpTo(Screen.Login.route) { inclusive = true }
                 }
             } else {
@@ -74,12 +82,28 @@ fun MainNavigation() {
                 NavigationBar {
                     bottomNavItems.forEach { item ->
                         val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+                        val cartItemCount = cartState.cartItems.size
                         NavigationBarItem(
                             icon = {
-                                Icon(
-                                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                    contentDescription = item.title
-                                )
+                                if (item is BottomNavItem.Cart && cartItemCount > 0) {
+                                    BadgedBox(
+                                        badge = {
+                                            Badge {
+                                                Text(text = if (cartItemCount > 99) "99+" else "$cartItemCount")
+                                            }
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                            contentDescription = item.title
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                        contentDescription = item.title
+                                    )
+                                }
                             },
                             label = { Text(item.title) },
                             selected = selected,
@@ -135,7 +159,8 @@ fun MainNavigation() {
                 LaunchedEffect(authState.isProfileSetupDone) {
                     if (authState.isProfileSetupDone) {
                         chatViewModel.loadRecommendations()
-                        navController.navigate(Screen.Chat.route) {
+                        cartViewModel.refreshOnLogin()
+                        navController.navigate(Screen.Cart.route) {
                             popUpTo(Screen.ProfileSetup.route) { inclusive = true }
                         }
                     }
@@ -173,7 +198,17 @@ fun MainNavigation() {
                 ProductDetailScreen(
                     viewModel = productViewModel,
                     productId = productId,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onAddToCart = { id, skuId -> cartViewModel.addToCart(id, skuId) }
+                )
+            }
+            composable(Screen.Cart.route) {
+                CartScreen(
+                    viewModel = cartViewModel,
+                    onProductClick = { productId ->
+                        navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    },
+                    onCheckout = {}
                 )
             }
             composable(Screen.Profile.route) {
@@ -193,6 +228,7 @@ fun MainNavigation() {
                     onLogout = {
                         authViewModel.logout()
                         chatViewModel.clearState()
+                        cartViewModel.clearError()
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }

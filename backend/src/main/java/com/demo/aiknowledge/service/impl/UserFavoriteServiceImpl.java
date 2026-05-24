@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -53,10 +54,10 @@ public class UserFavoriteServiceImpl implements UserFavoriteService {
         // 批量查询商品信息，避免 N+1
         List<Long> productIds = favorites.stream()
                 .map(UserFavorite::getProductId)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
         if (!productIds.isEmpty()) {
             Map<Long, Product> productMap = productMapper.selectBatchIds(productIds).stream()
-                    .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+                    .collect(Collectors.toMap(Product::getId, p -> p));
             for (UserFavorite fav : favorites) {
                 Product product = productMap.get(fav.getProductId());
                 if (product != null) {

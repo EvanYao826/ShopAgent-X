@@ -3,7 +3,6 @@ package com.evanyao.shopagent.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.evanyao.shopagent.data.TokenManager
 import com.evanyao.shopagent.data.repository.ProductRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +24,7 @@ data class FavoriteItem(
 )
 
 class FavoriteViewModel(
-    private val productRepository: ProductRepository,
-    private val tokenManager: TokenManager
+    private val productRepository: ProductRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FavoriteUiState())
@@ -36,8 +34,7 @@ class FavoriteViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
-                val response = productRepository.getFavoriteList(userId)
+                val response = productRepository.getFavoriteList()
                 if (response.isSuccess && response.data != null) {
                     val favorites = response.data.map { item ->
                         FavoriteItem(
@@ -73,10 +70,10 @@ class FavoriteViewModel(
         }
     }
 
-    fun removeFavorite(userId: Long, productId: Long) {
+    fun removeFavorite(productId: Long) {
         viewModelScope.launch {
             try {
-                productRepository.removeFavorite(userId, productId)
+                productRepository.removeFavorite(productId)
                 // 更新本地状态
                 _uiState.value = _uiState.value.copy(
                     favorites = _uiState.value.favorites.filter { it.productId != productId }

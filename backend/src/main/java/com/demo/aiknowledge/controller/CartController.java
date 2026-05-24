@@ -5,6 +5,7 @@ import com.demo.aiknowledge.entity.Cart;
 import com.demo.aiknowledge.entity.CartItemVO;
 import com.demo.aiknowledge.service.CartService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,39 +17,42 @@ public class CartController {
 
     private final CartService cartService;
 
+    private Long getCurrentUserId() {
+        return Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+    }
+
     @PostMapping("/add")
-    public Result<Cart> add(@RequestParam Long userId, @RequestParam Long productId,
+    public Result<Cart> add(@RequestParam Long productId,
                             @RequestParam(required = false) Long skuId) {
-        return Result.success(cartService.addItem(userId, productId, skuId, 1));
+        return Result.success(cartService.addItem(getCurrentUserId(), productId, skuId, 1));
     }
 
     @DeleteMapping("/remove")
-    public Result<Void> remove(@RequestParam Long userId, @RequestParam Long productId) {
-        cartService.removeItem(userId, productId);
+    public Result<Void> remove(@RequestParam Long productId) {
+        cartService.removeItem(getCurrentUserId(), productId);
         return Result.success(null);
     }
 
     @PutMapping("/update")
     public Result<Cart> update(
-            @RequestParam Long userId,
             @RequestParam Long productId,
             @RequestParam Integer quantity) {
+        Long userId = getCurrentUserId();
         cartService.updateQuantity(userId, productId, quantity);
         return Result.success(cartService.getByUserIdAndProductId(userId, productId));
     }
 
     @PutMapping("/updateSku")
     public Result<Void> updateSku(
-            @RequestParam Long userId,
             @RequestParam Long productId,
             @RequestParam Long oldSkuId,
             @RequestParam Long newSkuId) {
-        cartService.updateSku(userId, productId, oldSkuId, newSkuId);
+        cartService.updateSku(getCurrentUserId(), productId, oldSkuId, newSkuId);
         return Result.success(null);
     }
 
     @GetMapping("/list")
-    public Result<List<CartItemVO>> list(@RequestParam Long userId) {
-        return Result.success(cartService.listWithProductByUserId(userId));
+    public Result<List<CartItemVO>> list() {
+        return Result.success(cartService.listWithProductByUserId(getCurrentUserId()));
     }
 }

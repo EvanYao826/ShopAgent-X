@@ -2,7 +2,6 @@ package com.evanyao.shopagent.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.evanyao.shopagent.data.TokenManager
 import com.evanyao.shopagent.data.model.CartItem
 import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.data.repository.CartRepository
@@ -30,8 +29,7 @@ data class CartUiState(
 }
 
 class CartViewModel(
-    private val cartRepository: CartRepository,
-    private val tokenManager: TokenManager
+    private val cartRepository: CartRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CartUiState())
@@ -43,10 +41,9 @@ class CartViewModel(
 
     fun loadCartList() {
         viewModelScope.launch {
-            val userId = tokenManager.getUserId() ?: return@launch
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val response = cartRepository.getCartList(userId)
+                val response = cartRepository.getCartList()
                 if (response.isSuccess && response.data != null) {
                     _uiState.value = _uiState.value.copy(
                         cartItems = response.data,
@@ -70,10 +67,9 @@ class CartViewModel(
 
     fun addToCart(productId: Long, skuId: Long? = null) {
         viewModelScope.launch {
-            val userId = tokenManager.getUserId() ?: return@launch
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val response = cartRepository.addItem(userId, productId, skuId)
+                val response = cartRepository.addItem(productId, skuId)
                 if (response.isSuccess) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -107,9 +103,8 @@ class CartViewModel(
         }
         // 同步到后端
         viewModelScope.launch {
-            val userId = tokenManager.getUserId() ?: return@launch
             try {
-                val response = cartRepository.updateQuantity(userId, productId, quantity)
+                val response = cartRepository.updateQuantity(productId, quantity)
                 if (!response.isSuccess) {
                     // 失败时回滚
                     loadCartList()
@@ -138,12 +133,9 @@ class CartViewModel(
         )
         // 同步到后端
         viewModelScope.launch {
-            val userId = tokenManager.getUserId() ?: return@launch
             try {
-                // 需要根据 cartItemId 删除，但后端接口是按 productId 删除
-                // 这里先使用 productId，后续可能需要修改后端接口
                 if (removedItem != null) {
-                    val response = cartRepository.removeItem(userId, removedItem.productId)
+                    val response = cartRepository.removeItem(removedItem.productId)
                     if (!response.isSuccess) {
                         loadCartList()
                         _uiState.value = _uiState.value.copy(errorMessage = response.message)
@@ -177,7 +169,6 @@ class CartViewModel(
     }
 
     fun toggleShopSelectAll() {
-        // 目前只有一个店铺，等同于全选
         toggleSelectAll()
     }
 
@@ -236,9 +227,8 @@ class CartViewModel(
 
         // 同步到后端
         viewModelScope.launch {
-            val userId = tokenManager.getUserId() ?: return@launch
             try {
-                val response = cartRepository.updateSku(userId, editingItem.productId, oldSkuId ?: 0L, newSkuId)
+                val response = cartRepository.updateSku(editingItem.productId, oldSkuId ?: 0L, newSkuId)
                 if (response.isSuccess) {
                     _uiState.value = _uiState.value.copy(toastMessage = "规格已更新")
                 } else {

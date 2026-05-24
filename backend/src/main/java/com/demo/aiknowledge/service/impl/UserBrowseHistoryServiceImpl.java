@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,10 +55,10 @@ public class UserBrowseHistoryServiceImpl implements UserBrowseHistoryService {
         // 批量查询商品信息，避免 N+1
         List<Long> productIds = histories.stream()
                 .map(UserBrowseHistory::getProductId)
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
         if (!productIds.isEmpty()) {
             Map<Long, Product> productMap = productMapper.selectBatchIds(productIds).stream()
-                    .collect(java.util.stream.Collectors.toMap(Product::getId, p -> p));
+                    .collect(Collectors.toMap(Product::getId, p -> p));
             for (UserBrowseHistory history : histories) {
                 Product product = productMap.get(history.getProductId());
                 if (product != null) {

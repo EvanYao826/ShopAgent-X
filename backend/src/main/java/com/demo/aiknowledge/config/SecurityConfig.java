@@ -57,6 +57,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/category/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/product/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/recommend/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/address/**").hasAnyRole("USER", "ADMIN")
                 // 其他请求需要认证
                 .anyRequest().authenticated()
             )

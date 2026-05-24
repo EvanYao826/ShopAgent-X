@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import com.evanyao.shopagent.viewmodel.FavoriteViewModel
 import com.evanyao.shopagent.viewmodel.FavoriteItem
 import com.evanyao.shopagent.ui.components.buildImageUrl
@@ -127,7 +128,7 @@ private fun FavoriteItemCard(item: FavoriteItem, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {

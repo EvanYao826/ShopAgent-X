@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,7 +50,6 @@ fun ProductDetailScreen(
     LaunchedEffect(productId) {
         viewModel.loadProductDetail(productId)
         viewModel.getFavoriteList()
-        viewModel.recordBrowse(productId, "detail")
     }
 
     LaunchedEffect(uiState.favoriteProductIds) {
@@ -220,20 +220,6 @@ fun ProductDetailScreen(
                 }
             }
 
-            // 收藏按钮（透明标题栏覆盖层右侧）
-            IconButton(
-                onClick = toggleFavorite,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp, start = 20.dp, end = 20.dp)
-            ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.Favorite,
-                    contentDescription = if (isFavorite) "取消收藏" else "收藏",
-                    tint = if (isFavorite) Color(0xFFFF6B35) else Color.White
-                )
-            }
-
             // 透明标题栏覆盖层
             Row(
                 modifier = Modifier
@@ -253,8 +239,16 @@ fun ProductDetailScreen(
                 Text(
                     text = "商品详情",
                     style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
+                    color = Color.White,
+                    modifier = Modifier.weight(1f)
                 )
+                IconButton(onClick = toggleFavorite) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = if (isFavorite) "取消收藏" else "收藏",
+                        tint = if (isFavorite) Color(0xFFFF6B35) else Color.White
+                    )
+                }
             }
         }
     }

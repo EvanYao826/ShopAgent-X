@@ -29,20 +29,14 @@ interface ProductApi {
 
     // 收藏
     @POST("api/recommend/favorite/add")
-    suspend fun addFavorite(
-        @Query("userId") userId: Long,
-        @Query("productId") productId: Long
-    ): Result<Void>
+    suspend fun addFavorite(@Query("productId") productId: Long): Result<Void>
 
     @POST("api/recommend/favorite/remove")
-    suspend fun removeFavorite(
-        @Query("userId") userId: Long,
-        @Query("productId") productId: Long
-    ): Result<Void>
+    suspend fun removeFavorite(@Query("productId") productId: Long): Result<Void>
 
     @GET("api/recommend/favorite/list")
-    suspend fun getFavoriteList(@Query("userId") userId: Long): Result<List<@JvmSuppressWildcards Map<String, Any>>>
+    suspend fun getFavoriteList(): Result<List<@JvmSuppressWildcards Map<String, Any>>>
 
     @GET("api/recommend/browse/history")
-    suspend fun getBrowseHistory(@Query("userId") userId: Long): Result<List<@JvmSuppressWildcards Map<String, Any>>>
+    suspend fun getBrowseHistory(): Result<List<@JvmSuppressWildcards Map<String, Any>>>
 }

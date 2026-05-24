@@ -8,6 +8,7 @@ import com.demo.aiknowledge.service.RecommendationLogService;
 import com.demo.aiknowledge.service.UserFavoriteService;
 import com.demo.aiknowledge.service.UserBrowseHistoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,10 @@ public class RecommendController {
     private final UserFavoriteService userFavoriteService;
     private final UserBrowseHistoryService userBrowseHistoryService;
 
+    private Long getCurrentUserId() {
+        return Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+    }
+
     @PostMapping("/feedback")
     public Result<Void> feedback(@RequestParam Long id, @RequestParam Integer feedback) {
         recommendationLogService.updateFeedback(id, feedback);
@@ -30,29 +35,30 @@ public class RecommendController {
 
     @PostMapping("/browse")
     public Result<Void> recordBrowse(@RequestBody UserBrowseHistory history) {
+        history.setUserId(getCurrentUserId());
         userBrowseHistoryService.saveOrUpdate(history);
         return Result.success(null);
     }
 
     @PostMapping("/favorite/add")
-    public Result<Void> addFavorite(@RequestParam Long userId, @RequestParam Long productId) {
-        userFavoriteService.addFavorite(userId, productId);
+    public Result<Void> addFavorite(@RequestParam Long productId) {
+        userFavoriteService.addFavorite(getCurrentUserId(), productId);
         return Result.success(null);
     }
 
     @PostMapping("/favorite/remove")
-    public Result<Void> removeFavorite(@RequestParam Long userId, @RequestParam Long productId) {
-        userFavoriteService.removeFavorite(userId, productId);
+    public Result<Void> removeFavorite(@RequestParam Long productId) {
+        userFavoriteService.removeFavorite(getCurrentUserId(), productId);
         return Result.success(null);
     }
 
     @GetMapping("/favorite/list")
-    public Result<List<UserFavorite>> listFavorites(@RequestParam Long userId) {
-        return Result.success(userFavoriteService.listByUserId(userId));
+    public Result<List<UserFavorite>> listFavorites() {
+        return Result.success(userFavoriteService.listByUserId(getCurrentUserId()));
     }
 
     @GetMapping("/browse/history")
-    public Result<List<UserBrowseHistory>> browseHistory(@RequestParam Long userId) {
-        return Result.success(userBrowseHistoryService.listByUserId(userId));
+    public Result<List<UserBrowseHistory>> browseHistory() {
+        return Result.success(userBrowseHistoryService.listByUserId(getCurrentUserId()));
     }
 }

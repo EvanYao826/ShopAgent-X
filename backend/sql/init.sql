@@ -399,8 +399,26 @@ CREATE TABLE `user_browse_history` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户浏览记录表——记录商品浏览行为';
 
 -- ------------------------------------------------------------
+-- 5.2 用户购物车表
+-- 存储用户购物车商品
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `user_cart`;
+CREATE TABLE `user_cart` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT              COMMENT '购物车ID',
+  `user_id`     BIGINT   NOT NULL                             COMMENT '用户ID',
+  `product_id`  BIGINT   NOT NULL                             COMMENT '商品ID',
+  `quantity`    INT      DEFAULT 1                          COMMENT '数量',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP            COMMENT '添加时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_product` (`user_id`, `product_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_product_id` (`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户购物车表';
+
+-- ------------------------------------------------------------
 -- 5.3 用户收藏表
--- 存储用户收藏/加入购物车的商品
+-- 存储用户收藏的商品
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `user_favorite`;
 CREATE TABLE `user_favorite` (

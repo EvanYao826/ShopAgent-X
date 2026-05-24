@@ -1,6 +1,7 @@
 package com.evanyao.shopagent.ui.screens.product
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,17 +30,34 @@ import coil.request.ImageRequest
 import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
     viewModel: ProductViewModel,
     productId: Long,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onAddToCart: (Long, Long?) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val detailState = uiState.productDetail
+    var showSkuSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(productId) {
         viewModel.loadProductDetail(productId)
+    }
+
+    // SKU 选择 BottomSheet
+    if (showSkuSheet && detailState.skus.isNotEmpty()) {
+        SkuSelectionBottomSheet(
+            skus = detailState.skus,
+            onDismiss = { showSkuSheet = false },
+            onConfirm = { skuId ->
+                showSkuSheet = false
+                onAddToCart(productId, skuId)
+                Toast.makeText(context, "已添加到购物车", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -164,7 +182,14 @@ fun ProductDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { /* 加入购物车 */ },
+                        onClick = {
+                            if (detailState.skus.isNotEmpty()) {
+                                showSkuSheet = true
+                            } else {
+                                onAddToCart(productId, null)
+                                Toast.makeText(context, "已添加到购物车", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                     ) {
@@ -501,6 +526,138 @@ private fun FaqItem(faq: Map<String, Any>) {
                 text = "A: $answer",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SkuSelectionBottomSheet(
+    skus: List<Map<String, Any>>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+    val sheetState = rememberModalBottomSheetState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            // 标题
+            Text(
+                text = "选择规格",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // SKU 列表
+            LazyColumn(
+                modifier = Modifier.weight(1f, false),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                itemsIndexed(skus) { index, sku ->
+                    val skuId = (sku["id"] as? Number)?.toLong() ?: 0L
+                    val properties = sku["properties"] as? Map<*, *>
+                    val price = (sku["price"] as? Number)?.toDouble() ?: 0.0
+                    val stock = (sku["stock"] as? Number)?.toInt() ?: 0
+                    val propertiesText = properties?.entries?.joinToString(" ") { "${it.key}: ${it.value}" } ?: "默认规格"
+
+                    SkuOptionItem(
+                        propertiesText = propertiesText,
+                        price = price,
+                        stock = stock,
+                        isSelected = index == selectedIndex,
+                        onClick = { selectedIndex = index }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 确认按钮
+            Button(
+                onClick = {
+                    val selectedSku = skus.getOrNull(selectedIndex)
+                    val skuId = (selectedSku?.get("id") as? Number)?.toLong() ?: 0L
+                    onConfirm(skuId)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(25.dp)
+            ) {
+                Text(
+                    text = "确定",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.navigationBarsPadding())
+        }
+    }
+}
+
+@Composable
+private fun SkuOptionItem(
+    propertiesText: String,
+    price: Double,
+    stock: Int,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val borderColor = if (isSelected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        Color.Transparent
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
+        border = BorderStroke(if (isSelected) 2.dp else 0.dp, borderColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = propertiesText,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "库存: $stock",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "¥${String.format("%.2f", price)}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
             )
         }
     }

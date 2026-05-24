@@ -10,9 +10,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,9 +44,21 @@ fun ProductDetailScreen(
     val context = LocalContext.current
     val detailState = uiState.productDetail
     var showSkuSheet by remember { mutableStateOf(false) }
+    var isFavorite by remember { mutableStateOf(uiState.favoriteProductIds?.contains(productId) == true) }
 
     LaunchedEffect(productId) {
         viewModel.loadProductDetail(productId)
+        viewModel.getFavoriteList()
+        viewModel.recordBrowse(productId, "detail")
+    }
+
+    LaunchedEffect(uiState.favoriteProductIds) {
+        isFavorite = uiState.favoriteProductIds?.contains(productId) == true
+    }
+
+    // 收藏按钮点击处理
+    val toggleFavorite = {
+        viewModel.toggleFavorite(productId)
     }
 
     // SKU 选择 BottomSheet
@@ -75,57 +89,59 @@ fun ProductDetailScreen(
                 state = listState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                    // 商品图片
+                // 商品图片
+                item {
+                    ProductImageSection(imageUrl = detailState.product.imageUrl)
+                }
+
+                // 商品基本信息
+                item {
+                    ProductInfoSection(
+                        title = detailState.product.title,
+                        brand = detailState.product.brand,
+                        price = detailState.product.basePrice.toString(),
+                        rating = detailState.product.rating?.toString(),
+                        salesCount = detailState.product.salesCount,
+                        isFavorite = isFavorite,
+                        toggleFavorite = toggleFavorite
+                    )
+                }
+
+                // 商品描述
+                if (!detailState.product.description.isNullOrBlank()) {
                     item {
-                        ProductImageSection(imageUrl = detailState.product.imageUrl)
-                    }
-
-                    // 商品基本信息
-                    item {
-                        ProductInfoSection(
-                            title = detailState.product.title,
-                            brand = detailState.product.brand,
-                            price = detailState.product.basePrice.toString(),
-                            rating = detailState.product.rating?.toString(),
-                            salesCount = detailState.product.salesCount
-                        )
-                    }
-
-                    // 商品描述
-                    if (!detailState.product.description.isNullOrBlank()) {
-                        item {
-                            DescriptionSection(description = detailState.product.description)
-                        }
-                    }
-
-                    // SKU 选择
-                    if (detailState.skus.isNotEmpty()) {
-                        item {
-                            SkuSection(skus = detailState.skus)
-                        }
-                    }
-
-                    // 用户评价
-                    if (detailState.reviews.isNotEmpty()) {
-                        item {
-                            ReviewsSection(reviews = detailState.reviews)
-                        }
-                    }
-
-                    // 常见问题
-                    if (detailState.faqs.isNotEmpty()) {
-                        item {
-                            FaqsSection(faqs = detailState.faqs)
-                        }
-                    }
-
-                    // 底部间距
-                    item {
-                        Spacer(modifier = Modifier.height(80.dp))
+                        DescriptionSection(description = detailState.product.description)
                     }
                 }
 
-                // 滚动条
+                // SKU 选择
+                if (detailState.skus.isNotEmpty()) {
+                    item {
+                        SkuSection(skus = detailState.skus)
+                    }
+                }
+
+                // 用户评价
+                if (detailState.reviews.isNotEmpty()) {
+                    item {
+                        ReviewsSection(reviews = detailState.reviews)
+                    }
+                }
+
+                // 常见问题
+                if (detailState.faqs.isNotEmpty()) {
+                    item {
+                        FaqsSection(faqs = detailState.faqs)
+                    }
+                }
+
+                // 底部间距
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+
+            // 滚动条
             val canScroll = listState.canScrollForward || listState.canScrollBackward
             if (canScroll) {
                 val density = LocalDensity.current
@@ -204,6 +220,20 @@ fun ProductDetailScreen(
                 }
             }
 
+            // 收藏按钮（透明标题栏覆盖层右侧）
+            IconButton(
+                onClick = toggleFavorite,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp, start = 20.dp, end = 20.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.Favorite,
+                    contentDescription = if (isFavorite) "取消收藏" else "收藏",
+                    tint = if (isFavorite) Color(0xFFFF6B35) else Color.White
+                )
+            }
+
             // 透明标题栏覆盖层
             Row(
                 modifier = Modifier
@@ -261,7 +291,9 @@ private fun ProductInfoSection(
     brand: String?,
     price: String,
     rating: String?,
-    salesCount: Int
+    salesCount: Int,
+    isFavorite: Boolean = false,
+    toggleFavorite: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -315,6 +347,14 @@ private fun ProductInfoSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // 收藏按钮
+            IconButton(onClick = toggleFavorite) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = if (isFavorite) "已收藏" else "收藏",
+                    tint = if (isFavorite) Color(0xFFFF6B35) else Color(0xFFB2BEC3)
+                )
+            }
         }
     }
 }

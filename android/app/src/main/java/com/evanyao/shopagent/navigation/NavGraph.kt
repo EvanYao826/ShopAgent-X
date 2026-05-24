@@ -28,12 +28,22 @@ import com.evanyao.shopagent.ui.screens.cart.CartScreen
 import com.evanyao.shopagent.ui.screens.chat.ChatScreen
 import com.evanyao.shopagent.ui.screens.product.ProductDetailScreen
 import com.evanyao.shopagent.ui.screens.product.ProductListScreen
+import com.evanyao.shopagent.ui.screens.profile.EditProfileScreen
+import com.evanyao.shopagent.ui.screens.profile.FavoritesScreen
+import com.evanyao.shopagent.ui.screens.profile.HistoryScreen
 import com.evanyao.shopagent.ui.screens.profile.ProfileScreen
 import com.evanyao.shopagent.ui.screens.profile.SettingsScreen
+import com.evanyao.shopagent.ui.screens.profile.AddressListScreen
+import com.evanyao.shopagent.ui.screens.profile.AddressEditScreen
+import com.evanyao.shopagent.ui.screens.profile.AboutScreen
 import com.evanyao.shopagent.viewmodel.AuthViewModel
 import com.evanyao.shopagent.viewmodel.CartViewModel
 import com.evanyao.shopagent.viewmodel.ChatViewModel
+import com.evanyao.shopagent.viewmodel.FavoriteViewModel
+import com.evanyao.shopagent.viewmodel.HistoryViewModel
 import com.evanyao.shopagent.viewmodel.ProductViewModel
+import com.evanyao.shopagent.viewmodel.AddressViewModel
+import com.evanyao.shopagent.viewmodel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -43,6 +53,10 @@ fun MainNavigation() {
     val chatViewModel: ChatViewModel = koinViewModel()
     val productViewModel: ProductViewModel = koinViewModel()
     val cartViewModel: CartViewModel = koinViewModel()
+    val profileViewModel: ProfileViewModel = koinViewModel()
+    val favoriteViewModel: FavoriteViewModel = koinViewModel()
+    val historyViewModel: HistoryViewModel = koinViewModel()
+    val addressViewModel: AddressViewModel = koinViewModel()
     val authState by authViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
 
@@ -213,13 +227,44 @@ fun MainNavigation() {
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    username = authState.username,
+                    viewModel = profileViewModel,
                     phone = authState.phone,
                     onSettingsClick = {
                         navController.navigate(Screen.Settings.route)
                     },
-                    onFavoritesClick = { },
-                    onHistoryClick = { }
+                    onEditProfileClick = {
+                        navController.navigate(Screen.EditProfile.route)
+                    },
+                    onFavoritesClick = {
+                        navController.navigate(Screen.Favorites.route)
+                    },
+                    onHistoryClick = {
+                        navController.navigate(Screen.History.route)
+                    },
+                    onAddressClick = {
+                        navController.navigate(Screen.AddressList.route)
+                    },
+                    onAboutClick = {
+                        navController.navigate(Screen.About.route)
+                    }
+                )
+            }
+            composable(Screen.Favorites.route) {
+                FavoritesScreen(
+                    viewModel = favoriteViewModel,
+                    onBack = { navController.popBackStack() },
+                    onProductClick = { productId ->
+                        navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    }
+                )
+            }
+            composable(Screen.History.route) {
+                HistoryScreen(
+                    viewModel = historyViewModel,
+                    onBack = { navController.popBackStack() },
+                    onProductClick = { productId ->
+                        navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    }
                 )
             }
             composable(Screen.Settings.route) {
@@ -233,6 +278,42 @@ fun MainNavigation() {
                             popUpTo(0) { inclusive = true }
                         }
                     }
+                )
+            }
+            composable(Screen.EditProfile.route) {
+                EditProfileScreen(
+                    viewModel = profileViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.AddressList.route) {
+                AddressListScreen(
+                    viewModel = addressViewModel,
+                    onBack = { navController.popBackStack() },
+                    onAddClick = {
+                        navController.navigate(Screen.AddressEdit.createRoute())
+                    },
+                    onEditClick = { addressId ->
+                        navController.navigate(Screen.AddressEdit.createRoute(addressId))
+                    }
+                )
+            }
+            composable(
+                route = Screen.AddressEdit.route,
+                arguments = listOf(navArgument("addressId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val addressId = backStackEntry.arguments?.getLong("addressId")?.let { id ->
+                    if (id == -1L) null else id
+                }
+                AddressEditScreen(
+                    viewModel = addressViewModel,
+                    editId = addressId,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.About.route) {
+                AboutScreen(
+                    onBack = { navController.popBackStack() }
                 )
             }
         }

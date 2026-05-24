@@ -30,8 +30,7 @@ public class RecommendController {
 
     @PostMapping("/browse")
     public Result<Void> recordBrowse(@RequestBody UserBrowseHistory history) {
-        history.setCreateTime(LocalDateTime.now());
-        userBrowseHistoryService.save(history);
+        userBrowseHistoryService.saveOrUpdate(history);
         return Result.success(null);
     }
 

@@ -35,8 +35,14 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // 允许OPTIONS预检请求
                 .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
-                // 允许所有/api/auth下的请求
-                .requestMatchers("/api/auth/**").permitAll()
+                // 登录注册相关接口允许匿名访问
+                .requestMatchers("/api/auth/sendCode").permitAll()
+                .requestMatchers("/api/auth/register").permitAll()
+                .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers("/api/auth/refresh").permitAll()
+                // 用户资料接口需要认证
+                .requestMatchers("/api/auth/profile").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/auth/update").hasAnyRole("USER", "ADMIN")
                 // 允许所有/api/admin/login请求
                 .requestMatchers("/api/admin/login").permitAll()
                 // 允许图片访问路径

@@ -168,9 +168,7 @@ class AuthViewModel(
     fun saveProfileSetup(gender: Int, ageRange: String, skinType: String, tags: List<String>) {
         viewModelScope.launch {
             try {
-                val userId = tokenManager.getUserId() ?: return@launch
                 val request = ProfileUpdateRequest(
-                    userId = userId,
                     gender = gender,
                     ageRange = ageRange,
                     skinType = skinType,

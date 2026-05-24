@@ -3,6 +3,7 @@ package com.evanyao.shopagent.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.evanyao.shopagent.data.TokenManager
 import com.evanyao.shopagent.data.model.Category
 import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.data.repository.ProductRepository
@@ -32,11 +33,13 @@ data class ProductUiState(
     val errorMessage: String? = null,
     val currentPage: Int = 1,
     val hasMore: Boolean = true,
-    val productDetail: ProductDetailState = ProductDetailState()
+    val productDetail: ProductDetailState = ProductDetailState(),
+    val favoriteProductIds: List<Long>? = null
 )
 
 class ProductViewModel(
-    private val productRepository: ProductRepository
+    private val productRepository: ProductRepository,
+    private val tokenManager: TokenManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProductUiState())
@@ -201,6 +204,10 @@ class ProductViewModel(
                             isLoading = false
                         )
                     )
+                    // 上报浏览记录
+                    tokenManager.getUserId()?.let {
+                        productRepository.recordBrowse(it, productId, "detail")
+                    }
                 } else {
                     _uiState.value = _uiState.value.copy(
                         productDetail = ProductDetailState(
@@ -217,6 +224,62 @@ class ProductViewModel(
                         errorMessage = "加载失败: ${e.message}"
                     )
                 )
+            }
+        }
+    }
+
+    fun recordBrowse(productId: Long, source: String = "detail") {
+        viewModelScope.launch {
+            try {
+                tokenManager.getUserId()?.let {
+                    productRepository.recordBrowse(it, productId, source)
+                }
+            } catch (e: Exception) {
+                Log.e("ProductVM", "Record browse failed", e)
+            }
+        }
+    }
+
+    fun getFavoriteList() {
+        viewModelScope.launch {
+            try {
+                val userId = tokenManager.getUserId() ?: return@launch
+                val response = productRepository.getFavoriteList(userId)
+                if (response.isSuccess && response.data != null) {
+                    val favoriteProductIds = response.data.map { (it["productId"] as? Number)?.toLong() }.filterNotNull()
+                    _uiState.value = _uiState.value.copy(
+                        favoriteProductIds = favoriteProductIds
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("ProductVM", "Get favorite list failed", e)
+            }
+        }
+    }
+
+    fun toggleFavorite(productId: Long) {
+        val currentIds = _uiState.value.favoriteProductIds
+        val isFavorite = currentIds?.contains(productId) == true
+        // 乐观更新 UI
+        _uiState.value = _uiState.value.copy(
+            favoriteProductIds = if (isFavorite) {
+                currentIds?.filter { it != productId }
+            } else {
+                (currentIds ?: emptyList()) + productId
+            }
+        )
+        viewModelScope.launch {
+            try {
+                val userId = tokenManager.getUserId() ?: return@launch
+                if (isFavorite) {
+                    productRepository.removeFavorite(userId, productId)
+                } else {
+                    productRepository.addFavorite(userId, productId)
+                }
+            } catch (e: Exception) {
+                Log.e("ProductVM", "Toggle favorite failed, rolling back", e)
+                // 回滚 UI 状态
+                _uiState.value = _uiState.value.copy(favoriteProductIds = currentIds)
             }
         }
     }

@@ -2,6 +2,7 @@ package com.evanyao.shopagent.di
 
 import com.evanyao.shopagent.data.network.AuthInterceptor
 import com.evanyao.shopagent.data.network.RetrofitClient
+import com.evanyao.shopagent.data.network.api.AddressApi
 import com.evanyao.shopagent.data.network.api.AuthApi
 import com.evanyao.shopagent.data.network.api.CartApi
 import com.evanyao.shopagent.data.network.api.CategoryApi
@@ -21,4 +22,5 @@ val networkModule = module {
     single { get<Retrofit>().create(CategoryApi::class.java) }
     single { get<Retrofit>().create(RecommendApi::class.java) }
     single { get<Retrofit>().create(CartApi::class.java) }
+    single { get<Retrofit>().create(AddressApi::class.java) }
 }

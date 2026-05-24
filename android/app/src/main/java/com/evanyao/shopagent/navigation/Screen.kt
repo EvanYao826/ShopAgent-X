@@ -14,4 +14,10 @@ sealed class Screen(val route: String) {
     object Favorites : Screen("favorites")
     object History : Screen("history")
     object Settings : Screen("settings")
+    object EditProfile : Screen("edit_profile")
+    object AddressList : Screen("address_list")
+    object AddressEdit : Screen("address_edit/{addressId}") {
+        fun createRoute(addressId: Long? = null) = if (addressId != null) "address_edit/$addressId" else "address_edit/-1"
+    }
+    object About : Screen("about")
 }

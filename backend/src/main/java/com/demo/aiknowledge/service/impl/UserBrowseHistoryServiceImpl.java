@@ -1,6 +1,7 @@
 package com.demo.aiknowledge.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.demo.aiknowledge.common.UrlUtil;
 import com.demo.aiknowledge.entity.Product;
 import com.demo.aiknowledge.entity.UserBrowseHistory;
 import com.demo.aiknowledge.mapper.ProductMapper;
@@ -22,6 +23,7 @@ public class UserBrowseHistoryServiceImpl implements UserBrowseHistoryService {
 
     private final UserBrowseHistoryMapper userBrowseHistoryMapper;
     private final ProductMapper productMapper;
+    private final UrlUtil urlUtil;
 
     @Override
     public void saveOrUpdate(UserBrowseHistory history) {
@@ -63,7 +65,7 @@ public class UserBrowseHistoryServiceImpl implements UserBrowseHistoryService {
                 Product product = productMap.get(history.getProductId());
                 if (product != null) {
                     history.setProductName(product.getTitle());
-                    history.setProductImage(product.getImageUrl());
+                    history.setProductImage(urlUtil.toAbsoluteUrl(product.getImageUrl()));
                     history.setProductPrice(product.getBasePrice());
                 }
             }

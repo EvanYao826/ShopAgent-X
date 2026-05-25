@@ -52,6 +52,9 @@ public class SecurityConfig {
                 // 管理员对话管理接口允许USER和ADMIN访问
                 .requestMatchers("/api/admin/conversations").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/admin/conversations/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/admin/products").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/admin/products/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/admin/recommend/**").hasAnyRole("USER", "ADMIN")
                 // 管理员接口需要ADMIN角色
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // 用户接口需要USER或ADMIN角色

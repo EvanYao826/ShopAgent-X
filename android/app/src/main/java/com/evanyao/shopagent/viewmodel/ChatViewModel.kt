@@ -359,10 +359,4 @@ class ChatViewModel(
     fun clearState() {
         _uiState.value = ChatUiState()
     }
-
-    fun refreshOnLogin() {
-        _uiState.value = ChatUiState()
-        loadConversations()
-        loadRecommendations()
-    }
 }

@@ -1,6 +1,7 @@
 package com.demo.aiknowledge.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -16,4 +17,11 @@ public class UserBrowseHistory {
     private String source;
     private Integer durationSec;
     private LocalDateTime createTime;
+
+    @TableField(exist = false)
+    private String productName;
+    @TableField(exist = false)
+    private String productImage;
+    @TableField(exist = false)
+    private java.math.BigDecimal productPrice;
 }

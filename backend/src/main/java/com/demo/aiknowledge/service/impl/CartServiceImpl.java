@@ -121,6 +121,21 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    public int getCount(Long userId) {
+        return Math.toIntExact(cartMapper.selectCount(
+                new LambdaQueryWrapper<Cart>()
+                        .eq(Cart::getUserId, userId)));
+    }
+
+    @Override
+    @Transactional
+    public void checkAll(Long userId, boolean checked) {
+        // 全选/取消全选目前只是标记，实际逻辑由前端控制
+        // 这里可以扩展为添加selected字段到cart表
+        // 暂时为空实现，前端维护选中状态
+    }
+
+    @Override
     public List<CartItemVO> listWithProductByUserId(Long userId) {
         List<Cart> cartList = listByUserId(userId);
         if (cartList.isEmpty()) {

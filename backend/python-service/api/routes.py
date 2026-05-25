@@ -170,6 +170,9 @@ class ChatRequest(BaseModel):
     conversation_id: str = None # Optional, for conversation memory
     username: str = None # Optional, if username is provided
     is_admin: bool = False # Optional, whether user is admin
+    gender: str = None # Optional, user gender: "男"/"女"
+    skin_type: str = None # Optional, user skin type
+    preference_tags: list = None # Optional, user preference tags
 
 class SummaryRequest(BaseModel):
     question: str
@@ -248,6 +251,20 @@ async def parse_document(request: ParseRequest):
         # 不返回具体错误信息，避免泄露内部实现细节
         raise HTTPException(status_code=500, detail="文档解析失败")
 
+def build_user_profile(request: ChatRequest) -> str:
+    """构建用户画像字符串"""
+    parts = []
+    if request.username:
+        parts.append(f"用户名：{request.username}")
+    if request.gender:
+        parts.append(f"性别：{request.gender}")
+    if request.skin_type:
+        parts.append(f"肤质：{request.skin_type}")
+    if request.preference_tags:
+        parts.append(f"偏好：{'、'.join(request.preference_tags)}")
+    return "；".join(parts) if parts else ""
+
+
 @router.post("/ask")
 async def ask_question(request: ChatRequest):
     """
@@ -261,7 +278,10 @@ async def ask_question(request: ChatRequest):
     error_message = None
 
     try:
-        logger.info(f"Received question: {request.question}, username: {request.username}, is_admin: {request.is_admin}")
+        logger.info(f"Received question: {request.question}, username: {request.username}, is_admin: {request.is_admin}, gender: {request.gender}")
+
+        # 构建用户画像
+        user_profile = build_user_profile(request)
 
         # 处理身份相关问题
         lower_question = request.question.lower()
@@ -277,7 +297,8 @@ async def ask_question(request: ChatRequest):
                 conversation_id=request.conversation_id,
                 context=request.context,
                 username=request.username,
-                is_admin=request.is_admin
+                is_admin=request.is_admin,
+                user_profile=user_profile
             )
 
             # 构建响应
@@ -388,10 +409,13 @@ async def ask_question_stream(request: ChatRequest):
     final_answer = ""
     final_task_type = "unknown"
 
+    # 构建用户画像
+    user_profile = build_user_profile(request)
+
     async def event_generator():
         nonlocal final_answer, final_task_type
         try:
-            logger.info(f"Streaming question: {request.question}, username: {request.username}, is_admin: {request.is_admin}")
+            logger.info(f"Streaming question: {request.question}, username: {request.username}, is_admin: {request.is_admin}, gender: {request.gender}")
 
             # 处理身份相关问题
             lower_question = request.question.lower()
@@ -409,9 +433,11 @@ async def ask_question_stream(request: ChatRequest):
             # 使用 RouterAgent 进行流式任务路由
             for event_data in router_agent.route_stream(
                 input_text=request.question,
+                conversation_id=request.conversation_id,
                 context=request.context,
                 username=request.username,
-                is_admin=request.is_admin
+                is_admin=request.is_admin,
+                user_profile=user_profile
             ):
                 # 从事件中提取最终答案和任务类型
                 try:

@@ -46,7 +46,7 @@ public class ChatController {
         return Result.success(chatService.getHistory(userId));
     }
 
-    @PostMapping("/messages")
+@PostMapping("/messages")
     public Result<Message> sendMessage(@RequestBody ChatRequest request) {
         return Result.success(chatService.sendMessage(request.getUserId(), request.getConversationId(), request.getContent()));
     }
@@ -64,7 +64,10 @@ public class ChatController {
                 request.getConversationId(),
                 request.getContent(),
                 request.getUsername(),
-                request.isAdmin()
+                request.isAdmin(),
+                request.getGender(),
+                request.getSkinType(),
+                request.getPreferenceTags()
         );
     }
 

@@ -239,6 +239,13 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public SseEmitter sendStreamMessage(Long userId, Long conversationId, String content, String username, boolean isAdmin) {
+        return sendStreamMessage(userId, conversationId, content, username, isAdmin, null, null, null);
+    }
+
+    @Override
+    public SseEmitter sendStreamMessage(Long userId, Long conversationId, String content,
+                                         String username, boolean isAdmin,
+                                         String gender, String skinType, List<String> preferenceTags) {
         // 设置超时时间（5分钟）
         SseEmitter emitter = new SseEmitter(5 * 60 * 1000L);
 
@@ -279,6 +286,16 @@ public class ChatServiceImpl implements ChatService {
                     requestBody.put("username", username);
                 }
                 requestBody.put("is_admin", isAdmin);
+                // 用户画像
+                if (gender != null) {
+                    requestBody.put("gender", gender);
+                }
+                if (skinType != null) {
+                    requestBody.put("skin_type", skinType);
+                }
+                if (preferenceTags != null && !preferenceTags.isEmpty()) {
+                    requestBody.put("preference_tags", preferenceTags);
+                }
 
                 // 4. 调用 Python SSE 流式接口并透传事件
                 WebClient webClient = webClientBuilder.baseUrl(aiServiceUrl).build();
@@ -322,7 +339,8 @@ public class ChatServiceImpl implements ChatService {
                                     taskTypeHolder[0] = (String) eventMap.get("task_type");
                                 }
                                 if ("product_cards".equals(type)) {
-                                    productCardsHolder[0] = eventMap.get("content");
+                                    productCardsHolder[0] = eventMap.get("product_cards");
+                                    log.info("SSE product_cards received: {}", eventMap.get("product_cards"));
                                 }
 
                                 // 透传事件给客户端

@@ -19,7 +19,7 @@ import org.koin.dsl.module
 
 val appModule = module {
     single { TokenManager(androidContext()) }
-    single { ChatRepository(get()) }
+    single { ChatRepository(get(), get()) }
     single { ProductRepository(get(), get()) }
     single { CartRepository(get()) }
     single { AddressRepository(get()) }

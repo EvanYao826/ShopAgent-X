@@ -43,7 +43,7 @@ class KnowledgeQAAgent(BaseAgent):
 
     def ask(self, question: str, conversation_id: Optional[str] = None,
             user_id: Optional[str] = None, context: str = "",
-            **kwargs) -> Dict[str, Any]:
+            user_profile: str = "", **kwargs) -> Dict[str, Any]:
         """
         处理知识问答 - 三级链路
 
@@ -80,7 +80,7 @@ class KnowledgeQAAgent(BaseAgent):
             logger.info(f"[KnowledgeQAAgent] Complexity: {complexity}")
 
             if complexity == "medium":
-                return self._ask_l2(question, conversation_id, full_context)
+                return self._ask_l2(question, conversation_id, full_context, user_profile)
             else:
                 return self._ask_l1(question, conversation_id, full_context)
 
@@ -105,13 +105,13 @@ class KnowledgeQAAgent(BaseAgent):
 
         if not docs:
             if full_context:
-                answer = self.llm_service.get_answer(question, [], full_context)
+                answer = self.llm_service.get_answer(question, [], full_context, user_profile)
             else:
                 answer = "抱歉，知识库中没有找到与您问题相关的内容。"
             self._save_to_memory(conversation_id, question, answer)
             return {"answer": answer, "sources": [], "has_sources": False, "task_type": "knowledge_qa"}
 
-        answer = self.llm_service.get_answer(question, docs, full_context)
+        answer = self.llm_service.get_answer(question, docs, full_context, user_profile)
         self._save_to_memory(conversation_id, question, answer)
         sources = self._build_sources(docs)
 
@@ -121,7 +121,7 @@ class KnowledgeQAAgent(BaseAgent):
         }
 
     def _ask_l2(self, question: str, conversation_id: Optional[str],
-                full_context: str) -> Dict[str, Any]:
+                full_context: str, user_profile: str = "") -> Dict[str, Any]:
         """L2 标准链路：问题改写+检索+重排序+生成"""
         retrieval_result = self.retrieval_agent.retrieve(
             query=question,
@@ -152,7 +152,7 @@ class KnowledgeQAAgent(BaseAgent):
                     metadata=doc.get('metadata', {})
                 ))
 
-        answer = self.llm_service.get_answer(question, llm_docs, full_context)
+        answer = self.llm_service.get_answer(question, llm_docs, full_context, user_profile)
         self._save_to_memory(conversation_id, question, answer)
 
         citation_sources = retrieval_result.citations.get("sources", []) if retrieval_result.citations else []
@@ -187,7 +187,7 @@ class KnowledgeQAAgent(BaseAgent):
 
     def ask_stream(self, question: str, conversation_id: Optional[str] = None,
                    user_id: Optional[str] = None, context: str = "",
-                   **kwargs) -> Generator[str, None, None]:
+                   user_profile: str = "", **kwargs) -> Generator[str, None, None]:
         """
         流式处理知识问答 - 精简RAG链路
 
@@ -213,7 +213,8 @@ class KnowledgeQAAgent(BaseAgent):
             for chunk in self.llm_service.get_answer_stream(
                 question=question,
                 context_docs=docs,
-                conversation_context=context
+                conversation_context=context,
+                user_profile=user_profile
             ):
                 yield chunk
 

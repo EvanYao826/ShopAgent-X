@@ -26,4 +26,11 @@ public interface ChatService {
      * @return SSE 发射器
      */
     SseEmitter sendStreamMessage(Long userId, Long conversationId, String content, String username, boolean isAdmin);
+
+    /**
+     * SSE 流式发送消息（带用户画像）
+     */
+    SseEmitter sendStreamMessage(Long userId, Long conversationId, String content,
+                                  String username, boolean isAdmin,
+                                  String gender, String skinType, java.util.List<String> preferenceTags);
 }

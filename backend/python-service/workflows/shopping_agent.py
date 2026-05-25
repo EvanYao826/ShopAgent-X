@@ -19,7 +19,7 @@ class ShoppingAgent(BaseAgent):
 
     def recommend(self, question: str, conversation_id: Optional[str] = None,
                   user_id: Optional[str] = None, context: str = "",
-                  **kwargs) -> Dict[str, Any]:
+                  user_profile: str = "", **kwargs) -> Dict[str, Any]:
         """处理导购请求：检索商品 → 生成推荐话术 + 商品卡片"""
         logger.info(f"[ShoppingAgent] Processing: {question[:50]}...")
 
@@ -64,7 +64,7 @@ class ShoppingAgent(BaseAgent):
             combined_context = f"{full_context}\n\n{product_context}" if full_context else product_context
 
             # 6. 用 LLM 生成推荐话术
-            answer = self._generate_recommendation(question, combined_context, products)
+            answer = self._generate_recommendation(question, combined_context, products, user_profile)
 
             # 7. 构建商品卡片
             product_cards = self._build_product_cards(products)
@@ -95,7 +95,7 @@ class ShoppingAgent(BaseAgent):
 
     def recommend_stream(self, question: str, conversation_id: Optional[str] = None,
                          user_id: Optional[str] = None, context: str = "",
-                         **kwargs) -> Generator[str, None, None]:
+                         user_profile: str = "", **kwargs) -> Generator[str, None, None]:
         """流式导购：先检索商品，再流式生成推荐话术"""
         logger.info(f"[ShoppingAgent] Stream processing: {question[:50]}...")
 
@@ -107,23 +107,29 @@ class ShoppingAgent(BaseAgent):
             products = self._search_products(question)
             product_context = self._build_product_context(products)
             sources = self._build_sources(docs)
+            logger.info(f"[ShoppingAgent] Stream: found {len(products)} products, {len(docs)} docs")
 
-            # 流式生成
+            # 流式生成 - 在 end 之前插入商品卡片
+            product_cards = self._build_product_cards(products)
             for chunk in self.llm_service.get_answer_stream(
                 question=question,
                 context_docs=docs,
-                conversation_context=f"{context}\n\n{product_context}" if context else product_context
+                conversation_context=f"{context}\n\n{product_context}" if context else product_context,
+                user_profile=user_profile
             ):
+                # 在 end 事件之前插入商品卡片
+                try:
+                    parsed = json.loads(chunk)
+                    if parsed.get("type") == "end":
+                        yield json.dumps({
+                            "type": "product_cards",
+                            "product_cards": product_cards,
+                            "sources": sources,
+                            "task_type": "shopping"
+                        })
+                except (json.JSONDecodeError, AttributeError):
+                    pass
                 yield chunk
-
-            # 发送商品卡片
-            product_cards = self._build_product_cards(products)
-            yield json.dumps({
-                "type": "product_cards",
-                "product_cards": product_cards,
-                "sources": sources,
-                "task_type": "shopping"
-            })
 
         except Exception as e:
             logger.error(f"[ShoppingAgent] Stream error: {e}", exc_info=True)
@@ -150,13 +156,48 @@ class ShoppingAgent(BaseAgent):
                     "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 5"
                 )
 
-            # 对中文关键词做子串拆分（"防晒霜" → ["防晒霜", "防晒", "晒霜"]）
+            # 同义词映射：用户常用泛称 → 数据库中的具体品类/关键词
+            SYNONYM_MAP = {
+                "衣服": ["卫衣", "T恤", "短袖", "速干"],
+                "裤子": ["户外裤", "瑜伽裤", "运动短裤", "运动长裤"],
+                "鞋": ["篮球鞋", "跑步鞋", "徒步鞋", "运动鞋"],
+                "鞋子": ["篮球鞋", "跑步鞋", "徒步鞋", "运动鞋", "鞋"],
+                "运动鞋": ["篮球鞋", "跑步鞋", "徒步鞋"],
+                "护肤品": ["精华", "面霜", "化妆水", "面膜", "眼霜", "防晒", "洁面"],
+                "护肤": ["精华", "面霜", "化妆水", "面膜", "眼霜", "防晒"],
+                "水乳": ["化妆水", "面霜", "精华"],
+                "彩妆": ["粉底液", "蜜粉", "唇釉", "眉笔"],
+                "化妆品": ["粉底液", "蜜粉", "唇釉", "眉笔", "卸妆"],
+                "数码": ["智能手机", "笔记本电脑", "平板电脑", "真无线耳机"],
+                "零食": ["坚果", "方便食品"],
+                "饮料": ["功能饮料", "碳酸饮料", "茶饮", "牛奶", "咖啡"],
+                "运动装备": ["运动短裤", "运动长裤", "速干T恤", "瑜伽裤"],
+                "户外装备": ["徒步鞋", "户外裤", "背包"],
+            }
+
             import re
             search_terms = []
             for kw in keywords:
                 search_terms.append(kw)
-                # 中文关键词拆出2字子串
+
+                # 同义词展开（"衣服" → "卫衣","T恤","短袖","速干"）
+                if kw in SYNONYM_MAP:
+                    for syn in SYNONYM_MAP[kw]:
+                        if syn not in search_terms:
+                            search_terms.append(syn)
+
                 cn_chars = re.findall(r'[一-鿿]', kw)
+                # 2字中文词：拆出首字 + 去掉"子/品/物"后缀的词根
+                if len(cn_chars) == 2:
+                    first_char = cn_chars[0]
+                    if first_char not in search_terms and len(first_char) >= 1:
+                        search_terms.append(first_char)
+                    # "鞋子"→"鞋"，"裤子"→"裤"，"杯子"→"杯"
+                    if cn_chars[1] in ('子', '品', '物'):
+                        root = cn_chars[0]
+                        if root not in search_terms:
+                            search_terms.append(root)
+                # 3字以上拆出所有2字子串
                 if len(cn_chars) >= 3:
                     for i in range(len(cn_chars) - 1):
                         sub = ''.join(cn_chars[i:i+2])
@@ -179,7 +220,18 @@ class ShoppingAgent(BaseAgent):
                 f"FROM product WHERE status = 1 AND ({conditions}) "
                 f"ORDER BY sales_count DESC LIMIT 5"
             )
-            return mysql_client.fetch_all(sql, tuple(params))
+            results = mysql_client.fetch_all(sql, tuple(params))
+
+            # 关键词搜索无结果时，fallback 返回热门商品
+            if not results:
+                logger.info(f"[ShoppingAgent] No match for keywords {keywords}, returning popular products")
+                results = mysql_client.fetch_all(
+                    "SELECT id, title, brand, base_price, image_url, rating, "
+                    "review_count, sales_count, tags, sub_category "
+                    "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 5"
+                )
+
+            return results
         except Exception as e:
             logger.error(f"[ShoppingAgent] Product search error: {e}")
             return []
@@ -295,22 +347,22 @@ class ShoppingAgent(BaseAgent):
         return "\n".join(lines)
 
     def _generate_recommendation(self, question: str, context: str,
-                                  products: List[Dict[str, Any]]) -> str:
+                                  products: List[Dict[str, Any]], user_profile: str = "") -> str:
         """用 LLM 生成推荐话术"""
         if not products:
-            return "抱歉，暂时没有找到完全匹配您需求的商品，您可以换个关键词试试。比如：\n- 推荐一款适合油皮的精华\n- 有没有好用的防晒霜\n- 敏感肌可以用什么面膜"
+            return "抱歉，暂时没有找到完全匹配您需求的商品，换个关键词试试吧～"
 
         prompt = (
-            f"你是智能导购助手「小智」。请根据用户需求和商品信息，给出专业、贴心的推荐。\n\n"
+            f"你是智能导购助手「小智」。根据用户需求和商品信息，给出简短推荐。\n\n"
+            f"用户画像：{user_profile or '（未知）'}\n"
             f"用户问题：{question}\n\n"
             f"商品信息：\n{context}\n\n"
-            f"推荐原则：\n"
-            f"1. 先了解用户需求（肤质/预算/使用场景）\n"
-            f"2. 推荐时说明理由（成分、功效、性价比）\n"
-            f"3. 如有多款可对比说明\n"
-            f"4. 主动提醒注意事项\n"
+            f"回复规则（严格遵守）：\n"
+            f"1. 控制在80字以内，简洁明了\n"
+            f"2. 根据用户性别调整称呼：男性用「兄弟/哥们」，女性用「姐妹/小姐姐」\n"
+            f"3. 不要用与用户性别不符的称呼\n"
+            f"4. 直接推荐2-3款，说明核心卖点即可\n"
             f"5. 不要编造商品不存在的功能\n"
-            f"6. 语气亲切自然，像朋友推荐一样\n"
         )
         try:
             return self.llm_service.llm.invoke(prompt).content

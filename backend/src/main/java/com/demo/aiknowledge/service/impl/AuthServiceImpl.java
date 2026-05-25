@@ -226,15 +226,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public User getProfile(Long userId) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
-        }
-        return user;
-    }
-
-    @Override
     public Map<String, Object> refreshToken(String token) {
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);

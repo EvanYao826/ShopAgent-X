@@ -8,6 +8,7 @@ import com.demo.aiknowledge.entity.Conversation;
 import com.demo.aiknowledge.entity.Message;
 import com.demo.aiknowledge.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -30,6 +31,9 @@ import java.util.UUID;
 public class ChatController {
 
     private final ChatService chatService;
+
+    @Value("${upload.temp-dir:D:/aiknowledge/temp}")
+    private String uploadTempDir;
 
     @PostMapping("/conversations")
     public Result<Conversation> createConversation(@RequestParam Long userId, @RequestParam(required = false) String title) {
@@ -93,7 +97,7 @@ public class ChatController {
 
         // 保存到本地临时目录
         try {
-            String uploadDir = "D:/aiknowledge/temp";
+            String uploadDir = uploadTempDir;
             File dir = new File(uploadDir);
             if (!dir.exists()) {
                 dir.mkdirs();
@@ -119,7 +123,7 @@ public class ChatController {
     @GetMapping("/view/image/{id}")
     public ResponseEntity<Resource> viewImage(@PathVariable String id) {
         try {
-            String uploadDir = "D:/aiknowledge/temp";
+            String uploadDir = uploadTempDir;
             File dir = new File(uploadDir);
             if (!dir.exists()) {
                 return ResponseEntity.notFound().build();
@@ -164,7 +168,7 @@ public class ChatController {
     @PostMapping("/cleanup/temp")
     public Result<String> cleanupTemp() {
         try {
-            String uploadDir = "D:/aiknowledge/temp";
+            String uploadDir = uploadTempDir;
             File dir = new File(uploadDir);
             if (dir.exists()) {
                 File[] files = dir.listFiles();

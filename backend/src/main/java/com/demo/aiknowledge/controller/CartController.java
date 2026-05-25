@@ -55,4 +55,15 @@ public class CartController {
     public Result<List<CartItemVO>> list() {
         return Result.success(cartService.listWithProductByUserId(getCurrentUserId()));
     }
+
+    @GetMapping("/count")
+    public Result<Integer> count() {
+        return Result.success(cartService.getCount(getCurrentUserId()));
+    }
+
+    @PostMapping("/checkAll")
+    public Result<Void> checkAll(@RequestParam boolean checked) {
+        cartService.checkAll(getCurrentUserId(), checked);
+        return Result.success(null);
+    }
 }

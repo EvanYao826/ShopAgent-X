@@ -12,4 +12,6 @@ public interface CartService {
     List<Cart> listByUserId(Long userId);
     List<CartItemVO> listWithProductByUserId(Long userId);
     Cart getByUserIdAndProductId(Long userId, Long productId);
+    int getCount(Long userId);
+    void checkAll(Long userId, boolean checked);
 }

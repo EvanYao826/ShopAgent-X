@@ -5,6 +5,7 @@ import com.demo.aiknowledge.dto.AiResponse;
 import com.demo.aiknowledge.entity.Conversation;
 import com.demo.aiknowledge.entity.KnowledgeDoc;
 import com.demo.aiknowledge.entity.User;
+import com.demo.aiknowledge.common.UrlUtil;
 import com.demo.aiknowledge.config.CacheConfig;
 import com.demo.aiknowledge.mapper.ConversationMapper;
 import com.demo.aiknowledge.mapper.KnowledgeDocMapper;
@@ -42,6 +43,7 @@ public class AiServiceImpl implements AiService {
     private final ObjectMapper objectMapper;
     private final UserService userService;
     private final CacheService cacheService;
+    private final UrlUtil urlUtil;
 
     @Value("${ai.service.url}")
     private String aiServiceUrl;
@@ -262,6 +264,13 @@ public class AiServiceImpl implements AiService {
                 if (body.containsKey("product_cards")) {
                     List<Map<String, Object>> productCards = (List<Map<String, Object>>) body.get("product_cards");
                     if (productCards != null && !productCards.isEmpty()) {
+                        // 转换image_url为完整URL
+                        for (Map<String, Object> card : productCards) {
+                            if (card.containsKey("image_url")) {
+                                String imageUrl = (String) card.get("image_url");
+                                card.put("image_url", urlUtil.toAbsoluteUrl(imageUrl));
+                            }
+                        }
                         aiResponse.setProductCards(productCards);
                     }
                 }

@@ -5,6 +5,7 @@ import com.demo.aiknowledge.common.Result;
 import com.demo.aiknowledge.entity.*;
 import com.demo.aiknowledge.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -56,6 +57,15 @@ public class ProductController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "10") int limit) {
         return Result.success(productReviewService.listByProductId(id, limit));
+    }
+
+    @PostMapping("/{id}/reviews")
+    public Result<ProductReview> submitReview(
+            @PathVariable Long id,
+            @RequestParam Integer rating,
+            @RequestParam String content) {
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+        return Result.success(productReviewService.submitReview(userId, id, rating, content));
     }
 
     @GetMapping("/{id}/faqs")

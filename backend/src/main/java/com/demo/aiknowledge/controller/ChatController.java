@@ -9,6 +9,7 @@ import com.demo.aiknowledge.entity.Message;
 import com.demo.aiknowledge.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -56,8 +57,10 @@ public class ChatController {
      */
     @PostMapping("/stream/messages")
     public SseEmitter streamMessages(@RequestBody StreamChatRequest request) {
+        // IDOR修复：从JWT获取userId，不信任客户端传入的值
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         return chatService.sendStreamMessage(
-                request.getUserId(),
+                userId,
                 request.getConversationId(),
                 request.getContent(),
                 request.getUsername(),

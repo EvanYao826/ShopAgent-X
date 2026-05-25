@@ -45,23 +45,16 @@ class LLMService:
             - 运动户外：运动鞋（Nike、HOKA）、冲锋衣（The North Face）、背包（Osprey）
             - 食品饮料：零食、坚果、牛奶
 
-            核心能力：
-            1. 根据用户需求、预算推荐合适的商品
-            2. 对比不同品牌/型号的优缺点
-            3. 解答商品使用场景和注意事项
-            4. 提供专业的选购建议
+            用户画像：
+            {user_profile}
 
-            回答风格：
-            - 亲切自然，像朋友推荐一样
-            - 主动询问用户需求（预算、使用场景、品牌偏好）
-            - 推荐时说明理由（性能、性价比、口碑）
-            - 不要编造商品不存在的功能
-
-            重要规则：
-            1. 如果有相关商品信息，请优先推荐
-            2. 如果没有相关信息，请根据你的知识给出建议
-            3. 如果是问候、闲聊，可以自然回复，引导用户咨询商品
-            4. 不要提及"AI服务不可用"、"系统错误"等技术问题
+            回答规则（严格遵守）：
+            1. 回复控制在80字以内，简洁明了，不要长篇大论
+            2. 根据用户画像调整称呼和推荐：如果用户是男性，用"兄弟/哥们"等称呼，推荐男性商品；如果是女性，用"姐妹/小姐姐"等称呼
+            3. 不要用与用户性别不符的称呼（如男性用户不要叫"姐妹"）
+            4. 如果有相关商品信息，直接推荐2-3款，说明核心卖点即可
+            5. 如果没有相关信息，简短告知并建议换个关键词
+            6. 不要提及"AI服务不可用"、"系统错误"等技术问题
 
             对话历史：
             {conversation_context}
@@ -72,7 +65,7 @@ class LLMService:
             用户当前问题：
             {question}
 
-            请给出贴心的导购回复：
+            请给出简短贴心的导购回复（80字以内）：
             """
         )
 
@@ -100,7 +93,7 @@ class LLMService:
      * @param conversation_context 对话上下文（可选）
      * @return LLM 的回答
      * """
-    def get_answer(self, question: str, context_docs: list, conversation_context: str = "") -> str:
+    def get_answer(self, question: str, context_docs: list, conversation_context: str = "", user_profile: str = "") -> str:
         import time
         start_time = time.time()
         
@@ -141,7 +134,8 @@ class LLMService:
             result = chain.invoke({
                 "conversation_context": cleaned_context,
                 "knowledge_context": knowledge_context,
-                "question": processed_question
+                "question": processed_question,
+                "user_profile": user_profile or "（未知）"
             })
             llm_time = time.time() - llm_start
             config.logger.info(f"LLM invocation completed in {llm_time:.4f}s")
@@ -188,7 +182,7 @@ class LLMService:
      * @param conversation_context 对话上下文（可选）
      * @return 流式生成器，逐个token返回
      * """
-    def get_answer_stream(self, question: str, context_docs: list, conversation_context: str = "") -> Generator[str, None, None]:
+    def get_answer_stream(self, question: str, context_docs: list, conversation_context: str = "", user_profile: str = "") -> Generator[str, None, None]:
         import time
         start_time = time.time()
         
@@ -235,7 +229,8 @@ class LLMService:
             for chunk in chain.stream({
                 "conversation_context": cleaned_context,
                 "knowledge_context": knowledge_context,
-                "question": processed_question
+                "question": processed_question,
+                "user_profile": user_profile or "（未知）"
             }):
                 full_response += chunk
                 yield json.dumps({"type": "token", "content": chunk})

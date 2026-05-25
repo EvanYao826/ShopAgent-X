@@ -47,7 +47,7 @@ class ChitChatAgent(BaseAgent):
 
     def chat(self, question: str, conversation_id: Optional[str] = None,
              user_id: Optional[str] = None, context: str = "",
-             **kwargs) -> Dict[str, Any]:
+             user_profile: str = "", **kwargs) -> Dict[str, Any]:
         """
         处理闲聊
 
@@ -83,7 +83,7 @@ class ChitChatAgent(BaseAgent):
                     logger.warning(f"[ChitChatAgent] Failed to read conversation memory: {e}")
 
             # 2. 生成回复（带会话上下文）
-            answer = self._generate_chitchat_response(question, conversation_history)
+            answer = self._generate_chitchat_response(question, conversation_history, user_profile)
 
             # 3. 写入会话记忆
             self._save_to_memory(conversation_id, question, answer)
@@ -106,7 +106,7 @@ class ChitChatAgent(BaseAgent):
 
     def chat_stream(self, question: str, conversation_id: Optional[str] = None,
                     user_id: Optional[str] = None, context: str = "",
-                    **kwargs) -> Generator[str, None, None]:
+                    user_profile: str = "", **kwargs) -> Generator[str, None, None]:
         """
         流式处理闲聊
 
@@ -123,7 +123,7 @@ class ChitChatAgent(BaseAgent):
         logger.info(f"[ChitChatAgent] Stream chitchat: {question[:50]}...")
 
         try:
-            answer = self._generate_chitchat_response(question)
+            answer = self._generate_chitchat_response(question, user_profile=user_profile)
 
             for char in answer:
                 yield json.dumps({
@@ -146,7 +146,8 @@ class ChitChatAgent(BaseAgent):
                 "content": str(e)
             })
 
-    def _generate_chitchat_response(self, question: str, conversation_history: str = "") -> str:
+    def _generate_chitchat_response(self, question: str, conversation_history: str = "",
+                                    user_profile: str = "") -> str:
         """
         生成闲聊回复
 
@@ -170,11 +171,11 @@ class ChitChatAgent(BaseAgent):
 
         # "你知道X吗" 类 — 用LLM给出有内容的回复，而不是机械重定向
         if any(kw in lower_question for kw in ["你知道", "你了解", "你认识", "听说过", "你听过"]):
-            return self._llm_chitchat(question, conversation_history)
+            return self._llm_chitchat(question, conversation_history, user_profile)
 
         # 天气类 — 用LLM给出更自然的回复
         if any(kw in lower_question for kw in ["天气", "下雨", "晴天", "温度"]):
-            return self._llm_chitchat(question, conversation_history)
+            return self._llm_chitchat(question, conversation_history, user_profile)
 
         # 时间类
         if any(kw in lower_question for kw in ["几点", "时间", "日期", "今天是"]):
@@ -182,28 +183,29 @@ class ChitChatAgent(BaseAgent):
 
         # 笑话类 — 用LLM讲笑话，比预设的更有趣
         if any(kw in lower_question for kw in ["笑话", "讲个笑话", "笑", "搞笑"]):
-            return self._llm_chitchat(question, conversation_history)
+            return self._llm_chitchat(question, conversation_history, user_profile)
 
         # 日常闲聊类 — 用LLM自然回复
         if any(kw in lower_question for kw in ["在干嘛", "在做什么", "忙吗", "累不累", "无聊", "睡不着"]):
-            return self._llm_chitchat(question, conversation_history)
+            return self._llm_chitchat(question, conversation_history, user_profile)
 
         # 引导类 — 用LLM自然回复
         if any(kw in lower_question for kw in ["聊聊", "聊天", "陪我", "有空吗", "最近怎么样", "最近好吗"]):
-            return self._llm_chitchat(question, conversation_history)
+            return self._llm_chitchat(question, conversation_history, user_profile)
 
         # 情感类 — 用LLM给出有共情的回复
         if any(kw in lower_question for kw in ["开心", "高兴", "难过", "伤心", "郁闷", "烦", "累", "困", "饿"]):
-            return self._llm_chitchat(question, conversation_history)
+            return self._llm_chitchat(question, conversation_history, user_profile)
 
         # 确认/反问类
         if any(kw in lower_question for kw in ["可以吗", "行吗", "好吗", "对不对", "是不是", "会不会"]):
-            return self._llm_chitchat(question, conversation_history)
+            return self._llm_chitchat(question, conversation_history, user_profile)
 
         # 其他所有闲聊 — 调LLM生成自然回复
-        return self._llm_chitchat(question, conversation_history)
+        return self._llm_chitchat(question, conversation_history, user_profile)
 
-    def _llm_chitchat(self, question: str, conversation_history: str = "") -> str:
+    def _llm_chitchat(self, question: str, conversation_history: str = "",
+                      user_profile: str = "") -> str:
         """调用LLM生成自然的闲聊回复"""
         try:
             # 构建上下文
@@ -215,9 +217,15 @@ class ChitChatAgent(BaseAgent):
 
 请基于对话历史，理解上下文后回复用户。"""
 
+            profile_section = ""
+            if user_profile:
+                profile_section = f"\n用户画像：{user_profile}"
+
             prompt = f"""你是智能导购助手「小智」，请用自然、亲切的方式回复用户，就像朋友之间聊天一样。
-回复要简短有趣，100字以内。
+回复要简短有趣，80字以内。
+根据用户画像调整称呼：男性用「兄弟/哥们」，女性用「姐妹/小姐姐」，不要用与性别不符的称呼。
 可以在回复中自然地引导用户咨询商品相关问题，但不要生硬地推销。
+{profile_section}
 {context_section}
 
 用户说：{question}"""

@@ -61,7 +61,10 @@ public class ChatController {
                 request.getConversationId(),
                 request.getContent(),
                 request.getUsername(),
-                request.isAdmin()
+                request.isAdmin(),
+                request.getGender(),
+                request.getSkinType(),
+                request.getPreferenceTags()
         );
     }
 

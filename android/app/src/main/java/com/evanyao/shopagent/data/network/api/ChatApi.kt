@@ -31,4 +31,14 @@ interface ChatApi {
         @Path("id") id: Long,
         @Body conversation: Conversation
     ): Result<Conversation>
+
+    @POST("api/chat/messages/feedback")
+    suspend fun submitFeedback(
+        @Body request: FeedbackRequest
+    ): Result<Message>
 }
+
+data class FeedbackRequest(
+    val messageId: Long,
+    val feedbackType: Int
+)

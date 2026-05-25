@@ -1,6 +1,7 @@
 package com.demo.aiknowledge.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.demo.aiknowledge.common.UrlUtil;
 import com.demo.aiknowledge.entity.Product;
 import com.demo.aiknowledge.entity.UserFavorite;
 import com.demo.aiknowledge.mapper.ProductMapper;
@@ -20,6 +21,7 @@ public class UserFavoriteServiceImpl implements UserFavoriteService {
 
     private final UserFavoriteMapper userFavoriteMapper;
     private final ProductMapper productMapper;
+    private final UrlUtil urlUtil;
 
     @Override
     public void addFavorite(Long userId, Long productId) {
@@ -62,7 +64,7 @@ public class UserFavoriteServiceImpl implements UserFavoriteService {
                 Product product = productMap.get(fav.getProductId());
                 if (product != null) {
                     fav.setProductName(product.getTitle());
-                    fav.setProductImage(product.getImageUrl());
+                    fav.setProductImage(urlUtil.toAbsoluteUrl(product.getImageUrl()));
                     fav.setProductPrice(product.getBasePrice());
                 }
             }

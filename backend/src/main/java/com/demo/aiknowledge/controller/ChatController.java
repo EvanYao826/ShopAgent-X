@@ -9,6 +9,7 @@ import com.demo.aiknowledge.entity.Message;
 import com.demo.aiknowledge.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -45,7 +46,7 @@ public class ChatController {
         return Result.success(chatService.getHistory(userId));
     }
 
-    @PostMapping("/messages")
+@PostMapping("/messages")
     public Result<Message> sendMessage(@RequestBody ChatRequest request) {
         return Result.success(chatService.sendMessage(request.getUserId(), request.getConversationId(), request.getContent()));
     }
@@ -56,8 +57,10 @@ public class ChatController {
      */
     @PostMapping("/stream/messages")
     public SseEmitter streamMessages(@RequestBody StreamChatRequest request) {
+        // IDOR修复：从JWT获取userId，不信任客户端传入的值
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         return chatService.sendStreamMessage(
-                request.getUserId(),
+                userId,
                 request.getConversationId(),
                 request.getContent(),
                 request.getUsername(),
@@ -87,6 +90,42 @@ public class ChatController {
     @GetMapping("/test-auth")
     public Result<String> testAuth() {
         return Result.success("Authentication successful - you have USER role access");
+    }
+
+    /**
+     * 拍照搜图接口 - 上传图片+提问一步到位
+     * 返回SSE流式响应，AI识别图片内容并推荐商品
+     */
+    @PostMapping("/photo/search")
+    public SseEmitter photoSearch(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam Long conversationId,
+            @RequestParam(required = false) String question) {
+        // IDOR修复：从JWT获取userId
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+
+        // 1. 保存图片
+        String fileName = file.getOriginalFilename();
+        if (fileName == null) fileName = "unknown";
+        String uuid = UUID.randomUUID().toString();
+        String savedFileName = uuid + "_" + fileName;
+        String imageUrl;
+        try {
+            File dir = new File(uploadTempDir);
+            if (!dir.exists()) dir.mkdirs();
+            File savedFile = new File(dir, savedFileName);
+            file.transferTo(savedFile);
+            imageUrl = "/api/chat/view/image/" + uuid;
+        } catch (IOException e) {
+            throw new RuntimeException("图片上传失败");
+        }
+
+        // 2. 构建带图片URL的问题
+        String fullQuestion = (question != null && !question.isEmpty()) ? question : "请识别这张图片中的商品并推荐类似商品";
+        fullQuestion += "\n\n图片URL: " + imageUrl;
+
+        // 3. 调用SSI流式接口
+        return chatService.sendStreamMessage(userId, conversationId, fullQuestion, null, false);
     }
 
     // 临时图片上传API，用于用户端上传图片，不会添加到知识库

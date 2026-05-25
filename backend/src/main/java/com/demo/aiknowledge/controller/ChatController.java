@@ -3,6 +3,7 @@ package com.demo.aiknowledge.controller;
 import com.demo.aiknowledge.common.Result;
 import com.demo.aiknowledge.dto.ChatRequest;
 import com.demo.aiknowledge.dto.FeedbackRequest;
+import com.demo.aiknowledge.dto.StreamChatRequest;
 import com.demo.aiknowledge.entity.Conversation;
 import com.demo.aiknowledge.entity.Message;
 import com.demo.aiknowledge.service.ChatService;
@@ -14,6 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,6 +44,21 @@ public class ChatController {
     @PostMapping("/messages")
     public Result<Message> sendMessage(@RequestBody ChatRequest request) {
         return Result.success(chatService.sendMessage(request.getUserId(), request.getConversationId(), request.getContent()));
+    }
+
+    /**
+     * SSE 流式消息接口 - 透传 Python AI 服务的 SSE 事件流
+     * 支持事件类型: routed, token, product_cards, end, error
+     */
+    @PostMapping("/stream/messages")
+    public SseEmitter streamMessages(@RequestBody StreamChatRequest request) {
+        return chatService.sendStreamMessage(
+                request.getUserId(),
+                request.getConversationId(),
+                request.getContent(),
+                request.getUsername(),
+                request.isAdmin()
+        );
     }
 
     @GetMapping("/messages")

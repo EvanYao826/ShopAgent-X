@@ -217,15 +217,9 @@ class ChitChatAgent(BaseAgent):
 
 请基于对话历史，理解上下文后回复用户。"""
 
-            profile_section = ""
-            if user_profile:
-                profile_section = f"\n用户画像：{user_profile}"
-
             prompt = f"""你是智能导购助手「小智」，请用自然、亲切的方式回复用户，就像朋友之间聊天一样。
-回复要简短有趣，80字以内。
-根据用户画像调整称呼：男性用「兄弟/哥们」，女性用「姐妹/小姐姐」，不要用与性别不符的称呼。
+回复要简短有趣，100字以内。
 可以在回复中自然地引导用户咨询商品相关问题，但不要生硬地推销。
-{profile_section}
 {context_section}
 
 用户说：{question}"""

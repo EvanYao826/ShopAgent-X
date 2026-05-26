@@ -21,9 +21,6 @@ interface AuthApi {
     @POST("api/auth/update")
     suspend fun updateUserInfo(@Body request: ProfileUpdateRequest): Result<User>
 
-    @GET("api/auth/profile")
-    suspend fun getProfile(): Result<User>
-
     @POST("api/auth/refresh")
     suspend fun refreshToken(@Header("Authorization") token: String): Result<Map<String, Any>>
 }

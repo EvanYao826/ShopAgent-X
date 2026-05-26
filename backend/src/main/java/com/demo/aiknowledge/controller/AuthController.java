@@ -7,7 +7,6 @@ import com.demo.aiknowledge.dto.UpdateUserRequest;
 import com.demo.aiknowledge.entity.User;
 import com.demo.aiknowledge.service.AuthService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -39,17 +38,7 @@ public class AuthController {
 
     @PostMapping("/update")
     public Result<User> updateUserInfo(@RequestBody UpdateUserRequest request) {
-        // 从 token 中获取 userId，不信任客户端传入
-        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
-        request.setUserId(userId);
         User user = authService.updateUserInfo(request);
-        return Result.success(user);
-    }
-
-    @GetMapping("/profile")
-    public Result<User> getProfile() {
-        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
-        User user = authService.getUserById(userId);
         return Result.success(user);
     }
 

@@ -77,16 +77,6 @@ class AuthViewModel(
                         if (skinType != null) {
                             tokenManager.saveSkinType(skinType)
                         }
-                        val genderVal = userMap?.get("gender")
-                        if (genderVal != null) {
-                            val genderStr = when (genderVal) {
-                                is Number -> if (genderVal.toInt() == 1) "男" else if (genderVal.toInt() == 2) "女" else genderVal.toString()
-                                else -> genderVal.toString()
-                            }
-                            if (genderStr.isNotBlank()) {
-                                tokenManager.saveGender(genderStr)
-                            }
-                        }
                         if (!preferenceTags.isNullOrEmpty()) {
                             tokenManager.savePreferenceTags(preferenceTags.map { it.toString() })
                         }
@@ -178,7 +168,9 @@ class AuthViewModel(
     fun saveProfileSetup(gender: Int, ageRange: String, skinType: String, tags: List<String>) {
         viewModelScope.launch {
             try {
+                val userId = tokenManager.getUserId() ?: return@launch
                 val request = ProfileUpdateRequest(
+                    userId = userId,
                     gender = gender,
                     ageRange = ageRange,
                     skinType = skinType,
@@ -187,15 +179,6 @@ class AuthViewModel(
                 val response = authApi.updateUserInfo(request)
                 if (response.isSuccess) {
                     tokenManager.setProfileCompleted()
-                    // 保存性别（Int转String）
-                    val genderStr = when (gender) {
-                        1 -> "男"
-                        2 -> "女"
-                        else -> ""
-                    }
-                    if (genderStr.isNotBlank()) {
-                        tokenManager.saveGender(genderStr)
-                    }
                     tokenManager.saveSkinType(skinType)
                     tokenManager.savePreferenceTags(tags)
                     _uiState.value = _uiState.value.copy(isProfileSetupDone = true)

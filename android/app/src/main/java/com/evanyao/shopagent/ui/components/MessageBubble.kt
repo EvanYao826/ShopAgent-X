@@ -1,19 +1,7 @@
 package com.evanyao.shopagent.ui.components
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,16 +17,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.evanyao.shopagent.data.model.Message
 import com.evanyao.shopagent.ui.theme.Primary
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
     message: Message,
@@ -64,9 +47,6 @@ fun MessageBubble(
         Arrangement.Start
     }
 
-    var showMenu by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -82,7 +62,7 @@ fun MessageBubble(
         Column(
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
-            // 消息气泡（长按弹出菜单）
+            // 消息气泡
             Box(
                 modifier = Modifier
                     .clip(
@@ -94,33 +74,12 @@ fun MessageBubble(
                         )
                     )
                     .background(bubbleColor)
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = { showMenu = true }
-                    )
                     .padding(12.dp)
             ) {
-                if (isStreaming) {
-                    StreamingText(
-                        text = message.content,
-                        color = textColor
-                    )
-                } else {
-                    Text(
-                        text = message.content,
-                        color = textColor,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            }
-
-            // 反馈状态显示
-            if (!isUser && message.feedbackType != null) {
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = if (message.feedbackType == 1) "已点赞" else "已踩",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    text = message.content,
+                    color = textColor,
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
 

@@ -3,8 +3,6 @@ package com.evanyao.shopagent.navigation
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -26,26 +24,14 @@ import androidx.navigation.navArgument
 import com.evanyao.shopagent.ui.screens.auth.LoginScreen
 import com.evanyao.shopagent.ui.screens.auth.ProfileSetupScreen
 import com.evanyao.shopagent.ui.screens.auth.RegisterScreen
-import com.evanyao.shopagent.ui.screens.cart.CartScreen
 import com.evanyao.shopagent.ui.screens.chat.ChatScreen
 import com.evanyao.shopagent.ui.screens.product.ProductDetailScreen
 import com.evanyao.shopagent.ui.screens.product.ProductListScreen
-import com.evanyao.shopagent.ui.screens.profile.EditProfileScreen
-import com.evanyao.shopagent.ui.screens.profile.FavoritesScreen
-import com.evanyao.shopagent.ui.screens.profile.HistoryScreen
 import com.evanyao.shopagent.ui.screens.profile.ProfileScreen
 import com.evanyao.shopagent.ui.screens.profile.SettingsScreen
-import com.evanyao.shopagent.ui.screens.profile.AddressListScreen
-import com.evanyao.shopagent.ui.screens.profile.AddressEditScreen
-import com.evanyao.shopagent.ui.screens.profile.AboutScreen
 import com.evanyao.shopagent.viewmodel.AuthViewModel
-import com.evanyao.shopagent.viewmodel.CartViewModel
 import com.evanyao.shopagent.viewmodel.ChatViewModel
-import com.evanyao.shopagent.viewmodel.FavoriteViewModel
-import com.evanyao.shopagent.viewmodel.HistoryViewModel
 import com.evanyao.shopagent.viewmodel.ProductViewModel
-import com.evanyao.shopagent.viewmodel.AddressViewModel
-import com.evanyao.shopagent.viewmodel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
 
 private const val ANIM_DURATION = 300
@@ -79,18 +65,11 @@ fun MainNavigation() {
     val authViewModel: AuthViewModel = koinViewModel()
     val chatViewModel: ChatViewModel = koinViewModel()
     val productViewModel: ProductViewModel = koinViewModel()
-    val cartViewModel: CartViewModel = koinViewModel()
-    val profileViewModel: ProfileViewModel = koinViewModel()
-    val favoriteViewModel: FavoriteViewModel = koinViewModel()
-    val historyViewModel: HistoryViewModel = koinViewModel()
-    val addressViewModel: AddressViewModel = koinViewModel()
     val authState by authViewModel.uiState.collectAsState()
-    val cartState by cartViewModel.uiState.collectAsState()
 
     val bottomNavItems = listOf(
         BottomNavItem.Chat,
         BottomNavItem.Product,
-        BottomNavItem.Cart,
         BottomNavItem.Profile
     )
 
@@ -101,8 +80,7 @@ fun MainNavigation() {
             chatViewModel.loadConversations()
             if (authState.isProfileSetupDone) {
                 chatViewModel.loadRecommendations()
-                cartViewModel.refreshOnLogin()
-                navController.navigate(Screen.Cart.route) {
+                navController.navigate(Screen.Chat.route) {
                     popUpTo(Screen.Login.route) { inclusive = true }
                 }
             } else {
@@ -123,28 +101,12 @@ fun MainNavigation() {
                 NavigationBar {
                     bottomNavItems.forEach { item ->
                         val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
-                        val cartItemCount = cartState.cartItems.size
                         NavigationBarItem(
                             icon = {
-                                if (item is BottomNavItem.Cart && cartItemCount > 0) {
-                                    BadgedBox(
-                                        badge = {
-                                            Badge {
-                                                Text(text = if (cartItemCount > 99) "99+" else "$cartItemCount")
-                                            }
-                                        }
-                                    ) {
-                                        Icon(
-                                            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                            contentDescription = item.title
-                                        )
-                                    }
-                                } else {
-                                    Icon(
-                                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                        contentDescription = item.title
-                                    )
-                                }
+                                Icon(
+                                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                    contentDescription = item.title
+                                )
                             },
                             label = { Text(item.title) },
                             selected = selected,
@@ -210,8 +172,7 @@ fun MainNavigation() {
                 LaunchedEffect(authState.isProfileSetupDone) {
                     if (authState.isProfileSetupDone) {
                         chatViewModel.loadRecommendations()
-                        cartViewModel.refreshOnLogin()
-                        navController.navigate(Screen.Cart.route) {
+                        navController.navigate(Screen.Chat.route) {
                             popUpTo(Screen.ProfileSetup.route) { inclusive = true }
                         }
                     }
@@ -253,22 +214,12 @@ fun MainNavigation() {
                 ProductDetailScreen(
                     viewModel = productViewModel,
                     productId = productId,
-                    onBack = { navController.popBackStack() },
-                    onAddToCart = { id, skuId -> cartViewModel.addToCart(id, skuId) }
-                )
-            }
-            composable(Screen.Cart.route) {
-                CartScreen(
-                    viewModel = cartViewModel,
-                    onProductClick = { productId ->
-                        navController.navigate(Screen.ProductDetail.createRoute(productId))
-                    },
-                    onCheckout = {}
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    viewModel = profileViewModel,
+                    username = authState.username,
                     phone = authState.phone,
                     onSettingsClick = {
                         navController.navigate(Screen.Settings.route)
@@ -332,7 +283,6 @@ fun MainNavigation() {
                     onLogout = {
                         authViewModel.logout()
                         chatViewModel.clearState()
-                        cartViewModel.clearError()
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }

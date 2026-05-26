@@ -1,48 +1,30 @@
 package com.evanyao.shopagent.ui.screens.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,29 +32,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.evanyao.shopagent.ui.components.noFocusClickable
-import com.evanyao.shopagent.viewmodel.ProfileViewModel
+import androidx.compose.ui.unit.sp
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
-    viewModel: ProfileViewModel,
+    username: String? = null,
     phone: String? = null,
     onSettingsClick: () -> Unit = {},
-    onEditProfileClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {},
-    onHistoryClick: () -> Unit,
-    onAddressClick: () -> Unit = {},
-    onAboutClick: () -> Unit = {}
+    onHistoryClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val primaryColor = com.evanyao.shopagent.ui.theme.Primary
-
-    LaunchedEffect(Unit) {
-        viewModel.loadProfile()
-    }
-
-    val user = uiState.user
 
     Column(
         modifier = Modifier
@@ -80,62 +51,56 @@ fun ProfileScreen(
             .background(com.evanyao.shopagent.ui.theme.Background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
-        TopAppBar(
-            title = {
-                Text(
-                    "我的",
-                    fontWeight = FontWeight.SemiBold
+        // 顶部用户信息区域
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .padding(horizontal = 20.dp, vertical = 24.dp)
+        ) {
+            // 设置齿轮 - 右上角
+            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.align(Alignment.TopEnd)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "设置",
+                    tint = Color(0xFF636E72),
+                    modifier = Modifier.size(24.dp)
                 )
-            },
-            actions = {
-                IconButton(onClick = onSettingsClick) {
+            }
+
+            // 用户头像和信息
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 头像
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(primaryColor.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "设置",
                         tint = com.evanyao.shopagent.ui.theme.TextSecondary
                     )
                 }
-            },
-            windowInsets = WindowInsets(0, 0, 0, 0),
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.White
-            )
-        )
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-            ) {
-                // User info card
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White)
-                        .noFocusClickable(onClick = onEditProfileClick)
-                        .padding(horizontal = 20.dp, vertical = 20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Avatar
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(primaryColor.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = primaryColor,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
+                Spacer(modifier = Modifier.width(16.dp))
 
-                    Spacer(modifier = Modifier.width(16.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
+                Column {
+                    Text(
+                        text = username ?: "未设置昵称",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = Color(0xFF2D3436)
+                    )
+                    if (phone != null) {
                         Text(
                             text = user?.username ?: "未设置昵称",
                             style = MaterialTheme.typography.titleLarge.copy(
@@ -255,27 +220,27 @@ fun ProfileScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 功能列表
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+        ) {
+            ProfileMenuItem(
+                icon = Icons.Default.Favorite,
+                title = "我的收藏",
+                onClick = onFavoritesClick
+            )
+            ProfileMenuItem(
+                icon = Icons.Default.History,
+                title = "浏览历史",
+                onClick = onHistoryClick
+            )
+        }
     }
-}
-
-@Composable
-private fun ProfileTag(text: String, color: Color) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = color,
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.1f))
-            .padding(horizontal = 10.dp, vertical = 4.dp)
-    )
-}
-
-private fun hasProfileInfo(user: com.evanyao.shopagent.data.model.User): Boolean {
-    return user.gender != null ||
-            user.ageRange != null ||
-            user.skinType != null ||
-            !user.preferenceTags.isNullOrEmpty()
 }
 
 @Composable
@@ -288,7 +253,7 @@ private fun ProfileMenuItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .noFocusClickable(onClick = onClick)
+                .clickable(onClick = onClick)
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

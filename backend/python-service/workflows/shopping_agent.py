@@ -53,7 +53,7 @@ class ShoppingAgent(BaseAgent):
             logger.info(f"[ShoppingAgent] Found {len(products)} products from DB")
 
             # 4. 构建商品信息上下文
-            product_context = self._build_product_context(products)
+            product_context = self._build_product_context(products, question)
 
             # 5. 合并所有上下文
             rag_context = "\n".join([
@@ -105,7 +105,7 @@ class ShoppingAgent(BaseAgent):
                 query=question, k=8, similarity_threshold=0.6, use_rerank=False
             )
             products = self._search_products(question)
-            product_context = self._build_product_context(products)
+            product_context = self._build_product_context(products, question)
             sources = self._build_sources(docs)
             logger.info(f"[ShoppingAgent] Stream: found {len(products)} products, {len(docs)} docs")
 
@@ -150,11 +150,14 @@ class ShoppingAgent(BaseAgent):
 
             if not keywords:
                 # 无关键词时返回热门商品
-                return mysql_client.fetch_all(
+                results = mysql_client.fetch_all(
                     "SELECT id, title, brand, base_price, image_url, rating, "
                     "review_count, sales_count, tags, sub_category "
                     "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 5"
                 )
+                for r in results:
+                    r['_fallback'] = True
+                return results
 
             # 同义词映射：用户常用泛称 → 数据库中的具体品类/关键词
             SYNONYM_MAP = {
@@ -222,14 +225,31 @@ class ShoppingAgent(BaseAgent):
             )
             results = mysql_client.fetch_all(sql, tuple(params))
 
-            # 关键词搜索无结果时，fallback 返回热门商品
+            # 关键词搜索无结果时，先尝试品类匹配，再 fallback 热门
             if not results:
-                logger.info(f"[ShoppingAgent] No match for keywords {keywords}, returning popular products")
-                results = mysql_client.fetch_all(
-                    "SELECT id, title, brand, base_price, image_url, rating, "
-                    "review_count, sales_count, tags, sub_category "
-                    "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 5"
-                )
+                logger.info(f"[ShoppingAgent] No match for keywords {keywords}, trying category fallback")
+                # 用原始关键词中的中文词匹配品类
+                cn_keywords = [kw for kw in keywords if re.search(r'[一-鿿]', kw)]
+                if cn_keywords:
+                    cat_conditions = " OR ".join(["sub_category LIKE %s" for _ in cn_keywords])
+                    cat_params = [f"%{kw}%" for kw in cn_keywords]
+                    results = mysql_client.fetch_all(
+                        f"SELECT id, title, brand, base_price, image_url, rating, "
+                        f"review_count, sales_count, tags, sub_category "
+                        f"FROM product WHERE status = 1 AND ({cat_conditions}) "
+                        f"ORDER BY sales_count DESC LIMIT 5",
+                        tuple(cat_params)
+                    )
+                if not results:
+                    logger.info(f"[ShoppingAgent] Category fallback also empty, returning popular products")
+                    results = mysql_client.fetch_all(
+                        "SELECT id, title, brand, base_price, image_url, rating, "
+                        "review_count, sales_count, tags, sub_category "
+                        "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 5"
+                    )
+                    # 标记为热门推荐
+                    for r in results:
+                        r['_fallback'] = True
 
             return results
         except Exception as e:
@@ -333,11 +353,15 @@ class ShoppingAgent(BaseAgent):
             logger.error(f"[ShoppingAgent] Brand/category match error: {e}")
             return []
 
-    def _build_product_context(self, products: List[Dict[str, Any]]) -> str:
+    def _build_product_context(self, products: List[Dict[str, Any]], question: str = "") -> str:
         """构建商品信息上下文，供 LLM 生成推荐话术"""
         if not products:
             return ""
-        lines = ["以下是匹配到的商品信息："]
+        is_fallback = any(p.get('_fallback') for p in products)
+        if is_fallback:
+            lines = [f"注意：没有找到与「{question}」完全匹配的商品，以下是平台热门商品（不是用户要的品类）："]
+        else:
+            lines = ["以下是匹配到的商品信息："]
         for p in products:
             lines.append(
                 f"- {p.get('title', '未知')} | 品牌: {p.get('brand', '未知')} | "

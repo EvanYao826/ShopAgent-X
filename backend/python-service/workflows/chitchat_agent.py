@@ -230,7 +230,7 @@ class ChitChatAgent(BaseAgent):
 
 用户说：{question}"""
 
-            response = llm.generate(prompt, temperature=0.7, max_tokens=150)
+            response = llm.generate(prompt, temperature=0.7, max_tokens=80)
             return response.strip()
         except:
             return self.chitchat_prompts["default"][0]

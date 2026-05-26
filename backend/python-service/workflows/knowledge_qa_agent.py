@@ -82,7 +82,7 @@ class KnowledgeQAAgent(BaseAgent):
             if complexity == "medium":
                 return self._ask_l2(question, conversation_id, full_context, user_profile)
             else:
-                return self._ask_l1(question, conversation_id, full_context)
+                return self._ask_l1(question, conversation_id, full_context, user_profile)
 
         except Exception as e:
             logger.error(f"[KnowledgeQAAgent] QA failed: {e}", exc_info=True)
@@ -95,7 +95,7 @@ class KnowledgeQAAgent(BaseAgent):
             }
 
     def _ask_l1(self, question: str, conversation_id: Optional[str],
-                full_context: str) -> Dict[str, Any]:
+                full_context: str, user_profile: str = "") -> Dict[str, Any]:
         """L1 简化链路：直接检索+生成"""
         # 直接向量检索
         docs = self.vector_store.search(

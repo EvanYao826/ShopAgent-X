@@ -12,11 +12,13 @@ import androidx.compose.ui.platform.LocalFocusManager
  * 用于解决点击列表项时页面往上跳一下的问题。
  */
 fun Modifier.noFocusClickable(
+    enabled: Boolean = true,
     onClick: () -> Unit
 ): Modifier = composed {
     val focusManager = LocalFocusManager.current
     val interactionSource = remember { MutableInteractionSource() }
     clickable(
+        enabled = enabled,
         interactionSource = interactionSource,
         indication = null,
         onClick = {

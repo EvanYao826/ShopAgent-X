@@ -1,7 +1,7 @@
 package com.evanyao.shopagent.ui.screens.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,7 +49,7 @@ fun SettingsScreen(
     onLogout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
-    val primaryColor = Color(0xFFFF6B35)
+    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -66,7 +66,7 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("取消", color = Color(0xFF636E72))
+                    Text("取消", color = com.evanyao.shopagent.ui.theme.TextSecondary)
                 }
             }
         )
@@ -75,7 +75,7 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(com.evanyao.shopagent.ui.theme.Background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
@@ -117,7 +117,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.AutoMirrored.Filled.ExitToApp,
                 title = "退出登录",
-                titleColor = Color(0xFFE17055),
+                titleColor = com.evanyao.shopagent.ui.theme.Error,
                 onClick = { showLogoutDialog = true }
             )
         }
@@ -133,7 +133,7 @@ private fun SettingsSection(
         Text(
             text = title,
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF636E72),
+            color = com.evanyao.shopagent.ui.theme.TextSecondary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
         Column(
@@ -150,14 +150,14 @@ private fun SettingsSection(
 private fun SettingsItem(
     icon: ImageVector,
     title: String,
-    titleColor: Color = Color(0xFF2D3436),
+    titleColor: Color = com.evanyao.shopagent.ui.theme.TextPrimary,
     onClick: () -> Unit
 ) {
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
+                .noFocusClickable(onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -177,13 +177,13 @@ private fun SettingsItem(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFFB2BEC3),
+                tint = com.evanyao.shopagent.ui.theme.TextHint,
                 modifier = Modifier.size(20.dp)
             )
         }
         HorizontalDivider(
             modifier = Modifier.padding(start = 50.dp),
-            color = Color(0xFFF1F3F5)
+            color = com.evanyao.shopagent.ui.theme.SurfaceVariant
         )
     }
 }

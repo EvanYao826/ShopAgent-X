@@ -66,7 +66,7 @@ fun ProfileScreen(
     onAboutClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val primaryColor = Color(0xFFFF6B35)
+    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
 
     LaunchedEffect(Unit) {
         viewModel.loadProfile()
@@ -77,7 +77,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(com.evanyao.shopagent.ui.theme.Background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
@@ -92,7 +92,7 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "设置",
-                        tint = Color(0xFF636E72)
+                        tint = com.evanyao.shopagent.ui.theme.TextSecondary
                     )
                 }
             },
@@ -141,12 +141,12 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = com.evanyao.shopagent.ui.theme.TextPrimary
                         )
                         Text(
                             text = phone ?: user?.phone ?: "",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF636E72),
+                            color = com.evanyao.shopagent.ui.theme.TextSecondary,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
@@ -154,7 +154,7 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = Color(0xFFB2BEC3),
+                        tint = com.evanyao.shopagent.ui.theme.TextHint,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -174,7 +174,7 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = com.evanyao.shopagent.ui.theme.TextPrimary
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -193,10 +193,10 @@ fun ProfileScreen(
                                 ProfileTag(text = genderText, color = primaryColor)
                             }
                             user.ageRange?.let { age ->
-                                ProfileTag(text = "${age}岁", color = Color(0xFF6C5CE7))
+                                ProfileTag(text = "${age}岁", color = com.evanyao.shopagent.ui.theme.TagPurple)
                             }
                             user.skinType?.let { skin ->
-                                ProfileTag(text = skin, color = Color(0xFF00B894))
+                                ProfileTag(text = skin, color = com.evanyao.shopagent.ui.theme.TagGreen)
                             }
                         }
 
@@ -209,7 +209,7 @@ fun ProfileScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 user.preferenceTags.forEach { tag ->
-                                    ProfileTag(text = tag, color = Color(0xFF636E72))
+                                    ProfileTag(text = tag, color = com.evanyao.shopagent.ui.theme.TextSecondary)
                                 }
                             }
                         }
@@ -295,26 +295,26 @@ private fun ProfileMenuItem(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color(0xFF636E72),
+                tint = com.evanyao.shopagent.ui.theme.TextSecondary,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF2D3436),
+                color = com.evanyao.shopagent.ui.theme.TextPrimary,
                 modifier = Modifier.weight(1f)
             )
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFFB2BEC3),
+                tint = com.evanyao.shopagent.ui.theme.TextHint,
                 modifier = Modifier.size(20.dp)
             )
         }
         HorizontalDivider(
             modifier = Modifier.padding(start = 52.dp),
-            color = Color(0xFFF1F3F5)
+            color = com.evanyao.shopagent.ui.theme.SurfaceVariant
         )
     }
 }

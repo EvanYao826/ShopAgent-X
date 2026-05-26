@@ -7,7 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evanyao.shopagent.data.model.Conversation
 import com.evanyao.shopagent.data.model.Message
+import com.evanyao.shopagent.ui.components.AiAvatar
 import com.evanyao.shopagent.ui.components.MessageBubble
 import com.evanyao.shopagent.ui.components.RecommendSection
 import com.evanyao.shopagent.viewmodel.ChatViewModel
@@ -238,6 +239,7 @@ fun ChatScreen(
                 items(uiState.messages) { message ->
                     MessageBubble(
                         message = message,
+                        userGender = uiState.userGender,
                         onProductClick = onProductClick,
                         onFeedback = { messageId, feedbackType ->
                             viewModel.submitFeedback(messageId, feedbackType)
@@ -257,6 +259,7 @@ fun ChatScreen(
                         MessageBubble(
                             message = streamingMessage,
                             isStreaming = true,
+                            userGender = uiState.userGender,
                             onProductClick = onProductClick
                         )
                     }
@@ -422,13 +425,7 @@ fun TypingIndicator() {
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // AI 头像占位
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-        )
+        AiAvatar()
         Spacer(modifier = Modifier.width(8.dp))
 
         // 三个跳动的点
@@ -481,7 +478,7 @@ fun ConversationDrawerItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         color = backgroundColor
     ) {
         Row(

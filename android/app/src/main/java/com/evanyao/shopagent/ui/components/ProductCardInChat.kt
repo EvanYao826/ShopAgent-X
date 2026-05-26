@@ -1,7 +1,7 @@
 package com.evanyao.shopagent.ui.components
 
 import android.util.Log
-import androidx.compose.foundation.clickable
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -45,7 +45,7 @@ fun encodeImageUrl(imageUrl: String?): String? {
 fun buildImageUrl(imageUrl: String?): String? {
     if (imageUrl.isNullOrBlank()) return null
     val url = when {
-        imageUrl.startsWith("http") -> imageUrl
+        imageUrl.startsWith("http") -> imageUrl.replace("localhost", "10.0.2.2")
         imageUrl.startsWith("/product-images/") -> "$BASE_URL$imageUrl"
         else -> "$BASE_URL/product-images/$imageUrl"
     }
@@ -79,7 +79,7 @@ fun ProductCardInChat(
     Card(
         modifier = Modifier
             .width(160.dp)
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {

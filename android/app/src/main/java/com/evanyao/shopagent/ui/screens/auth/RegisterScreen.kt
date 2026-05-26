@@ -64,9 +64,9 @@ fun RegisterScreen(
     var username by remember { mutableStateOf("") }
     var countdown by remember { mutableIntStateOf(0) }
 
-    val primaryColor = Color(0xFFFF6B35)
-    val primaryLight = Color(0xFFFF8F62)
-    val primaryPale = Color(0xFFFFCDB2)
+    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
+    val primaryLight = com.evanyao.shopagent.ui.theme.PrimaryLight
+    val primaryPale = com.evanyao.shopagent.ui.theme.PrimaryPale
 
     LaunchedEffect(countdown) {
         if (countdown > 0) {
@@ -213,7 +213,7 @@ fun RegisterScreen(
                         ) {
                             Text(
                                 text = if (countdown > 0) "${countdown}s" else "获取验证码",
-                                color = if (phone.isNotBlank() && countdown == 0) primaryColor else Color(0xFFB2BEC3),
+                                color = if (phone.isNotBlank() && countdown == 0) primaryColor else com.evanyao.shopagent.ui.theme.TextHint,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -264,7 +264,7 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = errorMessage,
-                        color = Color(0xFFE17055),
+                        color = com.evanyao.shopagent.ui.theme.Error,
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()

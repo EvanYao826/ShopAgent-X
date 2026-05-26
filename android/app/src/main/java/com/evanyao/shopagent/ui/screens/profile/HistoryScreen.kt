@@ -1,7 +1,10 @@
 package com.evanyao.shopagent.ui.screens.profile
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.filled.History
+import com.evanyao.shopagent.ui.components.AppLoadingIndicator
+import com.evanyao.shopagent.ui.components.EmptyState
+import com.evanyao.shopagent.ui.components.ErrorState
 import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -55,7 +58,7 @@ fun HistoryScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
-                        tint = Color(0xFF2D3436)
+                        tint = com.evanyao.shopagent.ui.theme.TextPrimary
                     )
                 }
             },
@@ -67,32 +70,19 @@ fun HistoryScreen(
 
         when {
             uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Color(0xFFFF6B35))
-                }
+                AppLoadingIndicator()
             }
             uiState.errorMessage != null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = { viewModel.loadHistory() }) { Text("重试") }
-                    }
-                }
+                ErrorState(
+                    message = uiState.errorMessage!!,
+                    onRetry = { viewModel.loadHistory() }
+                )
             }
             uiState.groups.isEmpty() -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("暂无浏览历史", color = Color(0xFF636E72))
-                }
+                EmptyState(
+                    icon = Icons.Default.History,
+                    message = "暂无浏览历史"
+                )
             }
             else -> {
                 LazyColumn(
@@ -117,7 +107,7 @@ fun HistoryScreen(
 @Composable
 private fun GroupHeader(group: HistoryGroup) {
     Surface(
-        color = Color(0xFFF5F5F5),
+        color = com.evanyao.shopagent.ui.theme.SurfaceElevated,
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(
@@ -125,7 +115,7 @@ private fun GroupHeader(group: HistoryGroup) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF636E72)
+            color = com.evanyao.shopagent.ui.theme.TextSecondary
         )
     }
 }
@@ -160,7 +150,7 @@ private fun HistoryItemRow(item: HistoryItem, onClick: () -> Unit) {
                     text = item.productName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF2D3436),
+                    color = com.evanyao.shopagent.ui.theme.TextPrimary,
                     maxLines = 1
                 )
                 Spacer(Modifier.height(4.dp))
@@ -168,13 +158,13 @@ private fun HistoryItemRow(item: HistoryItem, onClick: () -> Unit) {
                     text = item.productPrice,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF6B35)
+                    color = com.evanyao.shopagent.ui.theme.Primary
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = item.browseTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                     style = MaterialTheme.typography.bodySmall,
-                    color= Color(0xFF636E72)
+                    color= com.evanyao.shopagent.ui.theme.TextSecondary
                 )
             }
         }

@@ -2,7 +2,6 @@ package com.evanyao.shopagent.ui.screens.profile
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +20,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.evanyao.shopagent.ui.components.AppLoadingIndicator
+import com.evanyao.shopagent.ui.components.EmptyState
 import com.evanyao.shopagent.viewmodel.AddressItem
 import com.evanyao.shopagent.viewmodel.AddressViewModel
 
@@ -47,12 +48,12 @@ fun AddressListScreen(
             title = { Text("收货地址", fontWeight = FontWeight.SemiBold) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF2D3436))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = com.evanyao.shopagent.ui.theme.TextPrimary)
                 }
             },
             actions = {
                 IconButton(onClick = onAddClick) {
-                    Icon(Icons.Default.Add, "新增地址", tint = Color(0xFFFF6B35))
+                    Icon(Icons.Default.Add, "新增地址", tint = com.evanyao.shopagent.ui.theme.Primary)
                 }
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
@@ -60,21 +61,14 @@ fun AddressListScreen(
         )
 
         if (uiState.isLoading && uiState.addressList.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color(0xFFFF6B35))
-            }
+            AppLoadingIndicator()
         } else if (uiState.addressList.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(48.dp), tint = Color(0xFFB2BEC3))
-                    Spacer(Modifier.height(8.dp))
-                    Text("暂无收货地址", color = Color(0xFF636E72))
-                    Spacer(Modifier.height(16.dp))
-                    Button(onClick = onAddClick, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B35))) {
-                        Text("添加地址")
-                    }
-                }
-            }
+            EmptyState(
+                icon = Icons.Default.LocationOn,
+                message = "暂无收货地址",
+                actionText = "添加地址",
+                onAction = onAddClick
+            )
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -101,7 +95,7 @@ private fun AddressCard(
     onDelete: () -> Unit,
     onSetDefault: () -> Unit
 ) {
-    val borderColor = if (item.isDefault) Color(0xFFFF6B35) else Color.Transparent
+    val borderColor = if (item.isDefault) com.evanyao.shopagent.ui.theme.Primary else Color.Transparent
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -111,19 +105,19 @@ private fun AddressCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(item.receiverName, fontWeight = FontWeight.SemiBold, color = Color(0xFF2D3436))
+                Text(item.receiverName, fontWeight = FontWeight.SemiBold, color = com.evanyao.shopagent.ui.theme.TextPrimary)
                 Spacer(Modifier.width(12.dp))
-                Text(item.phone, color = Color(0xFF636E72))
+                Text(item.phone, color = com.evanyao.shopagent.ui.theme.TextSecondary)
                 if (item.isDefault) {
                     Spacer(Modifier.width(8.dp))
                     Text(
                         "默认",
                         fontSize = androidx.compose.ui.unit.TextUnit(12f, androidx.compose.ui.unit.TextUnitType.Sp),
-                        color = Color(0xFFFF6B35),
+                        color = com.evanyao.shopagent.ui.theme.Primary,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFFF6B35).copy(alpha = 0.1f))
+                            .background(com.evanyao.shopagent.ui.theme.Primary.copy(alpha = 0.1f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
@@ -131,7 +125,7 @@ private fun AddressCard(
             Spacer(Modifier.height(8.dp))
             Text(
                 "${item.province}${item.city}${item.district}${item.detail}",
-                color = Color(0xFF2D3436),
+                color = com.evanyao.shopagent.ui.theme.TextPrimary,
                 fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp)
             )
             Spacer(Modifier.height(12.dp))
@@ -141,14 +135,14 @@ private fun AddressCard(
             ) {
                 if (!item.isDefault) {
                     TextButton(onClick = onSetDefault) {
-                        Text("设为默认", color = Color(0xFFFF6B35), fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp))
+                        Text("设为默认", color = com.evanyao.shopagent.ui.theme.Primary, fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp))
                     }
                 }
                 IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Edit, "编辑", tint = Color(0xFF636E72), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Edit, "编辑", tint = com.evanyao.shopagent.ui.theme.TextSecondary, modifier = Modifier.size(18.dp))
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Delete, "删除", tint = Color(0xFFE17055), modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Delete, "删除", tint = com.evanyao.shopagent.ui.theme.Error, modifier = Modifier.size(18.dp))
                 }
             }
         }

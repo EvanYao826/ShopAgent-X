@@ -4,7 +4,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.evanyao.shopagent.ui.components.AppLoadingIndicator
+import com.evanyao.shopagent.ui.components.ErrorState
 import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
@@ -76,12 +78,11 @@ fun ProductDetailScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (detailState.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            AppLoadingIndicator()
         } else if (detailState.errorMessage != null) {
-            Text(
-                text = detailState.errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.align(Alignment.Center)
+            ErrorState(
+                message = detailState.errorMessage,
+                onRetry = { viewModel.loadProductDetail(productId) }
             )
         } else if (detailState.product != null) {
             val listState = rememberLazyListState()
@@ -246,7 +247,7 @@ fun ProductDetailScreen(
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (isFavorite) "取消收藏" else "收藏",
-                        tint = if (isFavorite) Color(0xFFFF6B35) else Color.White
+                        tint = if (isFavorite) com.evanyao.shopagent.ui.theme.Primary else Color.White
                     )
                 }
             }
@@ -346,7 +347,7 @@ private fun ProductInfoSection(
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = if (isFavorite) "已收藏" else "收藏",
-                    tint = if (isFavorite) Color(0xFFFF6B35) else Color(0xFFB2BEC3)
+                    tint = if (isFavorite) com.evanyao.shopagent.ui.theme.Primary else Color(0xFFB2BEC3)
                 )
             }
         }
@@ -426,7 +427,7 @@ private fun SkuChip(
     Card(
         modifier = Modifier
             .width(IntrinsicSize.Min)
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         border = BorderStroke(if (isSelected) 2.dp else 0.dp, borderColor)
@@ -662,7 +663,7 @@ private fun SkuOptionItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         border = BorderStroke(if (isSelected) 2.dp else 0.dp, borderColor)

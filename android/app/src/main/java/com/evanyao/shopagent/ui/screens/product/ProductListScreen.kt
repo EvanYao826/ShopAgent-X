@@ -1,7 +1,6 @@
 package com.evanyao.shopagent.ui.screens.product
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -28,6 +27,11 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.ui.components.buildImageUrl
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.ShoppingBag
+import com.evanyao.shopagent.ui.components.AppLoadingIndicator
+import com.evanyao.shopagent.ui.components.EmptyState
+import com.evanyao.shopagent.ui.components.ErrorState
 import com.evanyao.shopagent.ui.components.noFocusClickable
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
@@ -96,31 +100,19 @@ fun ProductListScreen(
         // 商品列表
         when {
             uiState.isLoading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                AppLoadingIndicator()
             }
             uiState.products.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = when {
-                                uiState.errorMessage != null -> "加载失败"
-                                uiState.searchQuery.isNotBlank() -> "没有找到相关商品"
-                                else -> "暂无商品"
-                            },
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (uiState.errorMessage != null) {
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = uiState.errorMessage!!,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
+                if (uiState.errorMessage != null) {
+                    ErrorState(
+                        message = uiState.errorMessage!!,
+                        onRetry = { viewModel.loadProducts() }
+                    )
+                } else {
+                    EmptyState(
+                        icon = if (uiState.searchQuery.isNotBlank()) Icons.Default.SearchOff else Icons.Default.ShoppingBag,
+                        message = if (uiState.searchQuery.isNotBlank()) "没有找到相关商品" else "暂无商品"
+                    )
                 }
             }
             else -> {
@@ -315,7 +307,7 @@ private fun FavoriteButton(
             androidx.compose.material3.Icon(
                 imageVector = androidx.compose.material.icons.Icons.Default.Favorite,
                 contentDescription = if (isFavorite) "已收藏" else "收藏",
-                tint = if (isFavorite) Color(0xFFFF6B35) else Color(0x80FFFFFF)
+                tint = if (isFavorite) com.evanyao.shopagent.ui.theme.Primary else Color(0x80FFFFFF)
             )
         }
     }

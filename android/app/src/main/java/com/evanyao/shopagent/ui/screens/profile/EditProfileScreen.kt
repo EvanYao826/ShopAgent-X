@@ -2,7 +2,7 @@ package com.evanyao.shopagent.ui.screens.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -75,7 +75,7 @@ fun EditProfileScreen(
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
     var isInitialized by remember { mutableStateOf(false) }
 
-    val primaryColor = Color(0xFFFF6B35)
+    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
 
     val genderOptions = listOf(
         1 to "男",
@@ -127,7 +127,7 @@ fun EditProfileScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(com.evanyao.shopagent.ui.theme.Background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
     Column(
@@ -206,7 +206,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = com.evanyao.shopagent.ui.theme.TextPrimary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
@@ -233,7 +233,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = com.evanyao.shopagent.ui.theme.TextPrimary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
@@ -247,19 +247,19 @@ fun EditProfileScreen(
                                     .weight(1f)
                                     .height(44.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color(0xFFF8F9FA))
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else com.evanyao.shopagent.ui.theme.Background)
                                     .border(
                                         width = if (isSelected) 1.5.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.SurfaceVariant,
                                         shape = RoundedCornerShape(12.dp)
                                     )
-                                    .clickable { selectedGender = value },
+                                    .noFocusClickable { selectedGender = value },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = label,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.TextPrimary,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -281,7 +281,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = com.evanyao.shopagent.ui.theme.TextPrimary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
@@ -295,19 +295,19 @@ fun EditProfileScreen(
                                     .weight(1f)
                                     .height(40.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color(0xFFF8F9FA))
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else com.evanyao.shopagent.ui.theme.Background)
                                     .border(
                                         width = if (isSelected) 1.5.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.SurfaceVariant,
                                         shape = RoundedCornerShape(10.dp)
                                     )
-                                    .clickable { selectedAgeRange = age },
+                                    .noFocusClickable { selectedAgeRange = age },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = age,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.TextPrimary,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -329,7 +329,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = com.evanyao.shopagent.ui.theme.TextPrimary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     FlowRow(
@@ -343,20 +343,20 @@ fun EditProfileScreen(
                                 modifier = Modifier
                                     .height(36.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color(0xFFF8F9FA))
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else com.evanyao.shopagent.ui.theme.Background)
                                     .border(
                                         width = if (isSelected) 1.5.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.SurfaceVariant,
                                         shape = RoundedCornerShape(10.dp)
                                     )
-                                    .clickable { selectedSkinType = skinType }
+                                    .noFocusClickable { selectedSkinType = skinType }
                                     .padding(horizontal = 16.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = skinType,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.TextPrimary,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -378,12 +378,12 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = com.evanyao.shopagent.ui.theme.TextPrimary
                     )
                     Text(
                         text = "选择你感兴趣的标签（可多选）",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF636E72),
+                        color = com.evanyao.shopagent.ui.theme.TextSecondary,
                         modifier = Modifier.padding(top = 4.dp)
                     )
 
@@ -395,7 +395,7 @@ fun EditProfileScreen(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = Color(0xFF2D3436),
+                            color = com.evanyao.shopagent.ui.theme.TextPrimary,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 

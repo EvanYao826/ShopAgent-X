@@ -1,5 +1,7 @@
 package com.evanyao.shopagent.navigation
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -45,6 +47,31 @@ import com.evanyao.shopagent.viewmodel.ProductViewModel
 import com.evanyao.shopagent.viewmodel.AddressViewModel
 import com.evanyao.shopagent.viewmodel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
+
+private const val ANIM_DURATION = 300
+
+private fun slideInFromRight() = slideInHorizontally(
+    initialOffsetX = { it },
+    animationSpec = tween(ANIM_DURATION)
+) + fadeIn(animationSpec = tween(ANIM_DURATION))
+
+private fun slideOutToLeft() = slideOutHorizontally(
+    targetOffsetX = { -it },
+    animationSpec = tween(ANIM_DURATION)
+) + fadeOut(animationSpec = tween(ANIM_DURATION))
+
+private fun slideInFromLeft() = slideInHorizontally(
+    initialOffsetX = { -it },
+    animationSpec = tween(ANIM_DURATION)
+) + fadeIn(animationSpec = tween(ANIM_DURATION))
+
+private fun slideOutToRight() = slideOutHorizontally(
+    targetOffsetX = { it },
+    animationSpec = tween(ANIM_DURATION)
+) + fadeOut(animationSpec = tween(ANIM_DURATION))
+
+private fun fadeIn() = fadeIn(animationSpec = tween(ANIM_DURATION))
+private fun fadeOut() = fadeOut(animationSpec = tween(ANIM_DURATION))
 
 @Composable
 fun MainNavigation() {
@@ -139,7 +166,11 @@ fun MainNavigation() {
         NavHost(
             navController = navController,
             startDestination = Screen.Login.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = { fadeIn() },
+            exitTransition = { fadeOut() },
+            popEnterTransition = { fadeIn() },
+            popExitTransition = { fadeOut() }
         ) {
             composable(Screen.Login.route) {
                 LoginScreen(
@@ -168,7 +199,13 @@ fun MainNavigation() {
                     errorMessage = authState.errorMessage
                 )
             }
-            composable(Screen.ProfileSetup.route) {
+            composable(
+                Screen.ProfileSetup.route,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
+            ) {
                 // 监听引导页完成，异步保存成功后再加载推荐
                 LaunchedEffect(authState.isProfileSetupDone) {
                     if (authState.isProfileSetupDone) {
@@ -206,7 +243,11 @@ fun MainNavigation() {
             }
             composable(
                 route = Screen.ProductDetail.route,
-                arguments = listOf(navArgument("productId") { type = NavType.LongType })
+                arguments = listOf(navArgument("productId") { type = NavType.LongType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
             ) { backStackEntry ->
                 val productId = backStackEntry.arguments?.getLong("productId") ?: return@composable
                 ProductDetailScreen(
@@ -249,7 +290,13 @@ fun MainNavigation() {
                     }
                 )
             }
-            composable(Screen.Favorites.route) {
+            composable(
+                Screen.Favorites.route,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
+            ) {
                 FavoritesScreen(
                     viewModel = favoriteViewModel,
                     onBack = { navController.popBackStack() },
@@ -258,7 +305,13 @@ fun MainNavigation() {
                     }
                 )
             }
-            composable(Screen.History.route) {
+            composable(
+                Screen.History.route,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
+            ) {
                 HistoryScreen(
                     viewModel = historyViewModel,
                     onBack = { navController.popBackStack() },
@@ -267,7 +320,13 @@ fun MainNavigation() {
                     }
                 )
             }
-            composable(Screen.Settings.route) {
+            composable(
+                Screen.Settings.route,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
+            ) {
                 SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onLogout = {
@@ -280,13 +339,25 @@ fun MainNavigation() {
                     }
                 )
             }
-            composable(Screen.EditProfile.route) {
+            composable(
+                Screen.EditProfile.route,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
+            ) {
                 EditProfileScreen(
                     viewModel = profileViewModel,
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(Screen.AddressList.route) {
+            composable(
+                Screen.AddressList.route,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
+            ) {
                 AddressListScreen(
                     viewModel = addressViewModel,
                     onBack = { navController.popBackStack() },
@@ -300,7 +371,11 @@ fun MainNavigation() {
             }
             composable(
                 route = Screen.AddressEdit.route,
-                arguments = listOf(navArgument("addressId") { type = NavType.LongType })
+                arguments = listOf(navArgument("addressId") { type = NavType.LongType }),
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
             ) { backStackEntry ->
                 val addressId = backStackEntry.arguments?.getLong("addressId")?.let { id ->
                     if (id == -1L) null else id
@@ -311,7 +386,13 @@ fun MainNavigation() {
                     onBack = { navController.popBackStack() }
                 )
             }
-            composable(Screen.About.route) {
+            composable(
+                Screen.About.route,
+                enterTransition = { slideInFromRight() },
+                exitTransition = { slideOutToLeft() },
+                popEnterTransition = { slideInFromLeft() },
+                popExitTransition = { slideOutToRight() }
+            ) {
                 AboutScreen(
                     onBack = { navController.popBackStack() }
                 )

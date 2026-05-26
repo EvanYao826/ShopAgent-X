@@ -15,28 +15,11 @@ interface ProductApi {
     ): Result<PageResponse<Product>>
 
     @GET("api/product/{id}")
-    suspend fun getProductDetail(@Path("id") id: Long): Result<@JvmSuppressWildcards Map<String, Any>>
+    suspend fun getProductDetail(@Path("id") id: Long): Result<Map<String, Any>>
 
     @GET("api/product/search")
     suspend fun searchProducts(
         @Query("keyword") keyword: String,
         @Query("limit") limit: Int = 20
     ): Result<List<Product>>
-
-    // 浏览历史
-    @POST("api/recommend/browse")
-    suspend fun recordBrowse(@Body history: @JvmSuppressWildcards Map<String, Any>): Result<Void>
-
-    // 收藏
-    @POST("api/recommend/favorite/add")
-    suspend fun addFavorite(@Query("productId") productId: Long): Result<Void>
-
-    @POST("api/recommend/favorite/remove")
-    suspend fun removeFavorite(@Query("productId") productId: Long): Result<Void>
-
-    @GET("api/recommend/favorite/list")
-    suspend fun getFavoriteList(): Result<List<@JvmSuppressWildcards Map<String, Any>>>
-
-    @GET("api/recommend/browse/history")
-    suspend fun getBrowseHistory(): Result<List<@JvmSuppressWildcards Map<String, Any>>>
 }

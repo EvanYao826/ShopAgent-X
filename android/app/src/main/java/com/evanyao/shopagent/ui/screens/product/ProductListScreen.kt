@@ -9,10 +9,8 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.ui.components.buildImageUrl
-import com.evanyao.shopagent.ui.components.noFocusClickable
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,10 +36,6 @@ fun ProductListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
-
-    LaunchedEffect(Unit) {
-        viewModel.getFavoriteList()
-    }
 
     // 上拉加载更多
     LaunchedEffect(gridState) {
@@ -135,11 +128,7 @@ fun ProductListScreen(
                         items(uiState.products) { product ->
                             ProductGridCard(
                                 product = product,
-                                isFavorite = uiState.favoriteProductIds?.contains(product.id) == true,
-                                onClick = { onProductClick(product.id) },
-                                onToggleFavorite = { productId ->
-                                    viewModel.toggleFavorite(productId)
-                                }
+                                onClick = { onProductClick(product.id) }
                             )
                         }
                         // 底部加载指示器
@@ -215,7 +204,7 @@ fun ProductListScreen(
 @Composable
 private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.noFocusClickable(onClick = onClick),
+        modifier = Modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     ) {
@@ -229,37 +218,24 @@ private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProductGridCard(
-    product: Product,
-    isFavorite: Boolean,
-    onClick: () -> Unit,
-    onToggleFavorite: (Long) -> Unit
-) {
+private fun ProductGridCard(product: Product, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .noFocusClickable(onClick = onClick),
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            Box {
-                AsyncImage(
-                    model = buildImageUrl(product.imageUrl),
-                    contentDescription = product.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-                // 收藏按钮
-                FavoriteButton(
-                    isFavorite = isFavorite,
-                    productId = product.id,
-                    onClick = onToggleFavorite
-                )
-            }
+            AsyncImage(
+                model = buildImageUrl(product.imageUrl),
+                contentDescription = product.title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                contentScale = ContentScale.Crop
+            )
             Column(modifier = Modifier.padding(8.dp)) {
                 Text(
                     text = product.title,
@@ -293,30 +269,6 @@ private fun ProductGridCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun FavoriteButton(
-    isFavorite: Boolean,
-    productId: Long,
-    onClick: (Long) -> Unit
-) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        androidx.compose.material3.IconButton(
-            onClick = { onClick(productId) },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp)
-                .clip(CircleShape)
-                .background(Color(0x80000000))
-        ) {
-            androidx.compose.material3.Icon(
-                imageVector = androidx.compose.material.icons.Icons.Default.Favorite,
-                contentDescription = if (isFavorite) "已收藏" else "收藏",
-                tint = if (isFavorite) Color(0xFFFF6B35) else Color(0x80FFFFFF)
-            )
         }
     }
 }

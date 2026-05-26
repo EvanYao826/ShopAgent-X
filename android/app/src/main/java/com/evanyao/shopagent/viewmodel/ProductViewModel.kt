@@ -32,8 +32,7 @@ data class ProductUiState(
     val errorMessage: String? = null,
     val currentPage: Int = 1,
     val hasMore: Boolean = true,
-    val productDetail: ProductDetailState = ProductDetailState(),
-    val favoriteProductIds: List<Long>? = null
+    val productDetail: ProductDetailState = ProductDetailState()
 )
 
 class ProductViewModel(
@@ -202,8 +201,6 @@ class ProductViewModel(
                             isLoading = false
                         )
                     )
-                    // 上报浏览记录
-                    productRepository.recordBrowse(productId, "detail")
                 } else {
                     _uiState.value = _uiState.value.copy(
                         productDetail = ProductDetailState(
@@ -220,58 +217,6 @@ class ProductViewModel(
                         errorMessage = "加载失败: ${e.message}"
                     )
                 )
-            }
-        }
-    }
-
-    fun recordBrowse(productId: Long, source: String = "detail") {
-        viewModelScope.launch {
-            try {
-                productRepository.recordBrowse(productId, source)
-            } catch (e: Exception) {
-                Log.e("ProductVM", "Record browse failed", e)
-            }
-        }
-    }
-
-    fun getFavoriteList() {
-        viewModelScope.launch {
-            try {
-                val response = productRepository.getFavoriteList()
-                if (response.isSuccess && response.data != null) {
-                    val favoriteProductIds = response.data.map { (it["productId"] as? Number)?.toLong() }.filterNotNull()
-                    _uiState.value = _uiState.value.copy(
-                        favoriteProductIds = favoriteProductIds
-                    )
-                }
-            } catch (e: Exception) {
-                Log.e("ProductVM", "Get favorite list failed", e)
-            }
-        }
-    }
-
-    fun toggleFavorite(productId: Long) {
-        val currentIds = _uiState.value.favoriteProductIds
-        val isFavorite = currentIds?.contains(productId) == true
-        // 乐观更新 UI
-        _uiState.value = _uiState.value.copy(
-            favoriteProductIds = if (isFavorite) {
-                currentIds?.filter { it != productId }
-            } else {
-                (currentIds ?: emptyList()) + productId
-            }
-        )
-        viewModelScope.launch {
-            try {
-                if (isFavorite) {
-                    productRepository.removeFavorite(productId)
-                } else {
-                    productRepository.addFavorite(productId)
-                }
-            } catch (e: Exception) {
-                Log.e("ProductVM", "Toggle favorite failed, rolling back", e)
-                // 回滚 UI 状态
-                _uiState.value = _uiState.value.copy(favoriteProductIds = currentIds)
             }
         }
     }

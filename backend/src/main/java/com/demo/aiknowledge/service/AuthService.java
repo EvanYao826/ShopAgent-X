@@ -9,7 +9,6 @@ public interface AuthService {
     void sendSmsCode(String phone);
     Map<String, Object> register(String phone, String code, String password, String username);
     Map<String, Object> login(String phone, String password);
-    User getUserById(Long userId);
     User updateUserInfo(UpdateUserRequest request);
     Map<String, Object> refreshToken(String token);
 }

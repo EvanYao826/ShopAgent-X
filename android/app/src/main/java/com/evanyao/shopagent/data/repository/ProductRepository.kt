@@ -31,30 +31,4 @@ class ProductRepository(
     suspend fun getCategories(): ApiResult<List<Category>> {
         return categoryApi.getCategories()
     }
-
-    // 浏览历史
-    suspend fun recordBrowse(productId: Long, source: String = "detail") {
-        val history = mapOf(
-            "productId" to productId,
-            "source" to source
-        )
-        productApi.recordBrowse(history)
-    }
-
-    // 收藏
-    suspend fun addFavorite(productId: Long) {
-        productApi.addFavorite(productId)
-    }
-
-    suspend fun removeFavorite(productId: Long) {
-        productApi.removeFavorite(productId)
-    }
-
-    suspend fun getFavoriteList(): ApiResult<List<Map<String, Any>>> {
-        return productApi.getFavoriteList()
-    }
-
-    suspend fun getBrowseHistory(): ApiResult<List<Map<String, Any>>> {
-        return productApi.getBrowseHistory()
-    }
 }

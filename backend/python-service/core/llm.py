@@ -45,14 +45,11 @@ class LLMService:
             - 运动户外：运动鞋（Nike、HOKA）、冲锋衣（The North Face）、背包（Osprey）
             - 食品饮料：零食、坚果、牛奶
 
-            核心能力：
-            1. 根据用户需求、预算推荐合适的商品
-            2. 对比不同品牌/型号的优缺点
-            3. 解答商品使用场景和注意事项
-            4. 提供专业的选购建议
+            用户画像：
+            {user_profile}
 
-            回答规则（严格遵守，违反规则将被拒绝）：
-            1. 回复必须控制在80字以内，超出部分无效，简洁明了，不要长篇大论
+            回答规则（严格遵守）：
+            1. 回复控制在80字以内，简洁明了，不要长篇大论
             2. 根据用户画像调整称呼和推荐：如果用户是男性，用"兄弟/哥们"等称呼，推荐男性商品；如果是女性，用"姐妹/小姐姐"等称呼
             3. 不要用与用户性别不符的称呼（如男性用户不要叫"姐妹"）
             4. 如果有相关商品信息，直接推荐2-3款，说明核心卖点即可
@@ -68,7 +65,7 @@ class LLMService:
             用户当前问题：
             {question}
 
-            请给出贴心的导购回复：
+            请给出简短贴心的导购回复（80字以内）：
             """
         )
 
@@ -141,31 +138,13 @@ class LLMService:
                 "user_profile": user_profile or "（未知）"
             })
             llm_time = time.time() - llm_start
-            result = self._truncate_response(result)
             config.logger.info(f"LLM invocation completed in {llm_time:.4f}s")
-            config.logger.info(f"LLM get_answer completed in {time.time() - start_time:.4f}s (len={len(result)})")
+            config.logger.info(f"LLM get_answer completed in {time.time() - start_time:.4f}s")
             return result
         except Exception as e:
             config.logger.error(f"LLM Error: {e}")
             config.logger.info(f"LLM get_answer completed in {time.time() - start_time:.4f}s (error)")
             return "抱歉，我暂时无法回答这个问题，请稍后再试。"
-
-    def _truncate_response(self, text: str, max_chars: int = 80) -> str:
-        """
-        截断回复到指定字数，保留最后一个完整句子。
-        作为 prompt 约束的兜底，防止 LLM 忽略长度限制。
-        """
-        if len(text) <= max_chars:
-            return text
-
-        # 按句子截断，在 max_chars 范围内找最后一个句号/感叹号/问号
-        truncated = text[:max_chars]
-        for sep in ['。', '！', '？', '～', '!', '?', '~', '…']:
-            idx = truncated.rfind(sep)
-            if idx > max_chars // 3:  # 至少保留 1/3 内容
-                return truncated[:idx + 1]
-        # 找不到合适断句点，直接截断加省略号
-        return truncated.rstrip() + '～'
 
     def clean_conversation_context(self, context: str) -> str:
         """
@@ -244,11 +223,9 @@ class LLMService:
             # 发送开始信号
             yield json.dumps({"type": "start", "content": ""})
 
-            # 流式调用 - token 级别截断，超过 80 字停止输出
+            # 流式调用
             llm_start = time.time()
             full_response = ""
-            sent_length = 0
-            max_chars = 80
             for chunk in chain.stream({
                 "conversation_context": cleaned_context,
                 "knowledge_context": knowledge_context,
@@ -256,27 +233,13 @@ class LLMService:
                 "user_profile": user_profile or "（未知）"
             }):
                 full_response += chunk
-                if sent_length < max_chars:
-                    # 还在限额内，判断这个 chunk 能输出多少
-                    if len(full_response) <= max_chars:
-                        # 整个 chunk 都在限额内
-                        yield json.dumps({"type": "token", "content": chunk})
-                        sent_length = len(full_response)
-                    else:
-                        # 这个 chunk 超过限额，截断到句子边界
-                        truncated = self._truncate_response(full_response, max_chars)
-                        remaining = truncated[sent_length:]
-                        if remaining:
-                            yield json.dumps({"type": "token", "content": remaining})
-                        sent_length = len(truncated)
-                # 超过限额后不再输出 token，但继续消费 stream 以避免连接错误
+                yield json.dumps({"type": "token", "content": chunk})
             llm_time = time.time() - llm_start
             config.logger.info(f"LLM stream invocation completed in {llm_time:.4f}s")
 
             # 发送结束信号
-            final_response = self._truncate_response(full_response, max_chars)
-            yield json.dumps({"type": "end", "content": final_response})
-            config.logger.info(f"LLM get_answer_stream completed in {time.time() - start_time:.4f}s (len={len(final_response)})")
+            yield json.dumps({"type": "end", "content": full_response})
+            config.logger.info(f"LLM get_answer_stream completed in {time.time() - start_time:.4f}s")
 
         except Exception as e:
             config.logger.error(f"LLM Stream Error: {e}")

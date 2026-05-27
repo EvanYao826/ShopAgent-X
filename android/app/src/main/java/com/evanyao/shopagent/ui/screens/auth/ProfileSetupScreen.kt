@@ -2,12 +2,11 @@ package com.evanyao.shopagent.ui.screens.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import com.evanyao.shopagent.ui.components.noFocusClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -56,7 +55,7 @@ fun ProfileSetupScreen(
     var selectedSkinType by remember { mutableStateOf("") }
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
 
-    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
+    val primaryColor = Color(0xFFFF6B35)
     val backgroundLight = Color(0xFFFFF8F5)
 
     val genderOptions = listOf(
@@ -96,13 +95,13 @@ fun ProfileSetupScreen(
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
                     color = primaryColor,
-                    trackColor = com.evanyao.shopagent.ui.theme.SurfaceVariant
+                    trackColor = Color(0xFFE8ECEF)
                 )
                 TextButton(
                     onClick = onSkip,
                     modifier = Modifier.align(Alignment.CenterEnd)
                 ) {
-                    Text("跳过", color = com.evanyao.shopagent.ui.theme.TextSecondary)
+                    Text("跳过", color = Color(0xFF636E72))
                 }
             }
 
@@ -123,12 +122,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = com.evanyao.shopagent.ui.theme.TextPrimary
+                            color = Color(0xFF2D3436)
                         )
                         Text(
                             text = "帮助我们为你推荐更合适的内容",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = com.evanyao.shopagent.ui.theme.TextSecondary,
+                            color = Color(0xFF636E72),
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -145,16 +144,16 @@ fun ProfileSetupScreen(
                                     .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color.White)
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.SurfaceVariant,
+                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
                                         shape = RoundedCornerShape(16.dp)
                                     )
-                                    .noFocusClickable { selectedGender = value },
+                                    .clickable { selectedGender = value },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = label,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.TextPrimary,
+                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -168,12 +167,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = com.evanyao.shopagent.ui.theme.TextPrimary
+                            color = Color(0xFF2D3436)
                         )
                         Text(
                             text = "不同年龄有不同的潮流趋势",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = com.evanyao.shopagent.ui.theme.TextSecondary,
+                            color = Color(0xFF636E72),
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -190,16 +189,16 @@ fun ProfileSetupScreen(
                                     .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color.White)
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.SurfaceVariant,
+                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
                                         shape = RoundedCornerShape(16.dp)
                                     )
-                                    .noFocusClickable { selectedAgeRange = age },
+                                    .clickable { selectedAgeRange = age },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = "${age}岁",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.TextPrimary,
+                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -213,12 +212,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = com.evanyao.shopagent.ui.theme.TextPrimary
+                            color = Color(0xFF2D3436)
                         )
                         Text(
                             text = "帮助我们推荐适合你的护肤美妆产品",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = com.evanyao.shopagent.ui.theme.TextSecondary,
+                            color = Color(0xFF636E72),
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -235,16 +234,16 @@ fun ProfileSetupScreen(
                                     .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color.White)
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.SurfaceVariant,
+                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
                                         shape = RoundedCornerShape(16.dp)
                                     )
-                                    .noFocusClickable { selectedSkinType = skinType },
+                                    .clickable { selectedSkinType = skinType },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = skinType,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = if (isSelected) primaryColor else com.evanyao.shopagent.ui.theme.TextPrimary,
+                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -258,12 +257,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = com.evanyao.shopagent.ui.theme.TextPrimary
+                            color = Color(0xFF2D3436)
                         )
                         Text(
                             text = "选择你感兴趣的标签（可多选）",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = com.evanyao.shopagent.ui.theme.TextSecondary,
+                            color = Color(0xFF636E72),
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -275,7 +274,7 @@ fun ProfileSetupScreen(
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.SemiBold
                                 ),
-                                color = com.evanyao.shopagent.ui.theme.TextPrimary,
+                                color = Color(0xFF2D3436),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 12.dp)

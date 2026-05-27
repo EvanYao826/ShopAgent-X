@@ -1,32 +1,42 @@
 package com.evanyao.shopagent.ui.components
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Man
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.ThumbDown
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.filled.Woman
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.evanyao.shopagent.data.model.Message
-import com.evanyao.shopagent.ui.theme.Primary
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
     message: Message,
     isStreaming: Boolean = false,
-    userGender: Int? = null,
     onProductClick: ((Long) -> Unit)? = null,
     onFeedback: ((Long, Int) -> Unit)? = null
 ) {
@@ -47,6 +57,9 @@ fun MessageBubble(
         Arrangement.Start
     }
 
+    var showMenu by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -54,15 +67,19 @@ fun MessageBubble(
         horizontalArrangement = alignment
     ) {
         if (!isUser) {
-            // AI 助手头像
-            AiAvatar()
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+            )
             Spacer(modifier = Modifier.width(8.dp))
         }
 
         Column(
             modifier = Modifier.widthIn(max = 280.dp)
         ) {
-            // 消息气泡
+            // 消息气泡（长按弹出菜单）
             Box(
                 modifier = Modifier
                     .clip(
@@ -74,12 +91,33 @@ fun MessageBubble(
                         )
                     )
                     .background(bubbleColor)
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = { showMenu = true }
+                    )
                     .padding(12.dp)
             ) {
+                if (isStreaming) {
+                    StreamingText(
+                        text = message.content,
+                        color = textColor
+                    )
+                } else {
+                    Text(
+                        text = message.content,
+                        color = textColor,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+
+            // 反馈状态显示
+            if (!isUser && message.feedbackType != null) {
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = message.content,
-                    color = textColor,
-                    style = MaterialTheme.typography.bodyLarge
+                    text = if (message.feedbackType == 1) "已点赞" else "已踩",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }
 
@@ -95,8 +133,12 @@ fun MessageBubble(
 
         if (isUser) {
             Spacer(modifier = Modifier.width(8.dp))
-            // 用户头像
-            UserAvatar(gender = userGender)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+            )
         }
     }
 
@@ -107,53 +149,6 @@ fun MessageBubble(
             context = context,
             onDismiss = { showMenu = false },
             onFeedback = onFeedback
-        )
-    }
-}
-
-@Composable
-fun AiAvatar() {
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(Primary),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.SmartToy,
-            contentDescription = "AI助手",
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(20.dp)
-        )
-    }
-}
-
-@Composable
-private fun UserAvatar(gender: Int?) {
-    val (icon, bgColor) = when (gender) {
-        1 -> Icons.Default.Man to MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-        2 -> Icons.Default.Woman to MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
-        else -> Icons.Default.Face to MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-    }
-    val iconTint = when (gender) {
-        1 -> MaterialTheme.colorScheme.primary
-        2 -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.primary
-    }
-
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(bgColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = "用户",
-            tint = iconTint,
-            modifier = Modifier.size(20.dp)
         )
     }
 }

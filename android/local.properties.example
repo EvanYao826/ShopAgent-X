@@ -10,10 +10,3 @@
 # sdk.dir=C\\:\\\\Users\\\\YourUsername\\\\AppData\\\\Local\\\\Android\\\\Sdk
 
 # sdk.dir=/path/to/your/android/sdk
-
-# Release 签名配置（可选）
-# 生成 keystore: keytool -genkey -v -keystore release.keystore -alias shopagent -keyalg RSA -keysize 2048 -validity 10000
-# keystore.storeFile=release.keystore
-# keystore.storePassword=your_store_password
-# keystore.keyAlias=shopagent
-# keystore.keyPassword=your_key_password

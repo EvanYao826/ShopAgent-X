@@ -284,9 +284,8 @@ class Executor:
                 docs.append(doc)
 
         # 如果有文档且应该返回来源，传入文档；否则传空列表
-        user_profile = state.context.get("user_profile", "") if isinstance(state.context, dict) else ""
         answer = self.llm_service.get_answer(
-            question, docs if (docs and should_return_sources) else [], full_context, user_profile
+            question, docs if (docs and should_return_sources) else [], full_context
         )
 
         # 2. 写入会话记忆

@@ -1,19 +1,28 @@
 package com.evanyao.shopagent.ui.screens.chat
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import com.evanyao.shopagent.ui.components.noFocusClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,12 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evanyao.shopagent.data.model.Conversation
 import com.evanyao.shopagent.data.model.Message
-import com.evanyao.shopagent.ui.components.AiAvatar
 import com.evanyao.shopagent.ui.components.MessageBubble
 import com.evanyao.shopagent.ui.components.RecommendSection
 import com.evanyao.shopagent.viewmodel.ChatViewModel
@@ -47,13 +56,15 @@ fun ChatScreen(
     var showRenameDialog by remember { mutableStateOf<Conversation?>(null) }
     var renameText by remember { mutableStateOf("") }
 
-    // 推荐问题列表（从 ViewModel 获取个性化推荐）
     val recommendations = uiState.recommendations
 
-    // 自动滚动到底部
-    LaunchedEffect(uiState.messages.size, uiState.isSending) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    // 自动滚动到底部（包括流式输出时）
+    LaunchedEffect(uiState.messages.size, uiState.isSending, uiState.streamingContent) {
+        if (uiState.messages.isNotEmpty() || uiState.isStreaming) {
+            val targetIndex = uiState.messages.size
+            if (targetIndex > 0) {
+                listState.animateScrollToItem(targetIndex - 1)
+            }
         }
     }
 
@@ -64,7 +75,6 @@ fun ChatScreen(
                 modifier = Modifier.width(280.dp),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             ) {
-                // 侧边栏标题 + 新对话按钮
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -91,7 +101,6 @@ fun ChatScreen(
 
                 HorizontalDivider()
 
-                // 会话列表（带滚动条）
                 val drawerListState = rememberLazyListState()
 
                 if (uiState.conversations.isEmpty()) {
@@ -133,7 +142,6 @@ fun ChatScreen(
                             }
                         }
 
-                        // 滚动条（内容超出视口时显示）
                         val canScroll = drawerListState.canScrollForward || drawerListState.canScrollBackward
 
                         if (canScroll) {
@@ -143,7 +151,6 @@ fun ChatScreen(
                             val thumbHeightPx = 40f
                             val trackHeightPx = viewportHeight.toFloat() - thumbHeightPx
 
-                            // 用已渲染 item 估算总高度
                             val visibleItems = layoutInfo.visibleItemsInfo
                             val avgItemHeight = if (visibleItems.isNotEmpty()) {
                                 visibleItems.sumOf { it.size } / visibleItems.size
@@ -151,7 +158,6 @@ fun ChatScreen(
                             val totalContentHeight = avgItemHeight * uiState.conversations.size
                             val maxScroll = (totalContentHeight - viewportHeight).coerceAtLeast(1)
 
-                            // 当前滚动位置
                             val firstItem = visibleItems.firstOrNull()
                             val scrolledPast = if (firstItem != null) {
                                 firstItem.index * avgItemHeight + drawerListState.firstVisibleItemScrollOffset
@@ -159,7 +165,6 @@ fun ChatScreen(
                             val fraction = (scrolledPast.toFloat() / maxScroll).coerceIn(0f, 1f)
                             val thumbOffsetDp = density.run { (trackHeightPx * fraction).toDp() }
 
-                            // 轨道
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.CenterEnd)
@@ -169,7 +174,6 @@ fun ChatScreen(
                                     .clip(RoundedCornerShape(2.dp))
                                     .background(Color(0x33FDD835))
                             ) {
-                                // 滑块
                                 Box(
                                     modifier = Modifier
                                         .width(4.dp)
@@ -185,13 +189,11 @@ fun ChatScreen(
             }
         }
     ) {
-        // 主界面
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.navigationBars)
         ) {
-            // 固定的标题栏（状态栏间距由 TopAppBar 自动处理）
             TopAppBar(
                 title = {
                     Text(
@@ -212,7 +214,7 @@ fun ChatScreen(
                 windowInsets = WindowInsets(0, 0, 0, 0)
             )
 
-            // 消息列表（自动填充剩余空间）
+            // 消息列表
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
@@ -220,7 +222,7 @@ fun ChatScreen(
                 state = listState,
                 contentPadding = PaddingValues(vertical = 8.dp)
             ) {
-                // 推荐问题（首次进入且无消息时显示）
+                // 推荐问题
                 if (uiState.messages.isEmpty() && uiState.currentConversation == null) {
                     item {
                         RecommendSection(
@@ -232,11 +234,10 @@ fun ChatScreen(
                     }
                 }
 
-                // 消息列表
+                // 历史消息
                 items(uiState.messages) { message ->
                     MessageBubble(
                         message = message,
-                        userGender = uiState.userGender,
                         onProductClick = onProductClick,
                         onFeedback = { messageId, feedbackType ->
                             viewModel.submitFeedback(messageId, feedbackType)
@@ -244,8 +245,8 @@ fun ChatScreen(
                     )
                 }
 
-                // 加载指示器
-                if (uiState.isSending) {
+                // 流式输出中的消息（实时更新）
+                if (uiState.isStreaming && uiState.streamingContent.isNotBlank()) {
                     item {
                         val streamingMessage = Message(
                             id = -1,
@@ -256,7 +257,6 @@ fun ChatScreen(
                         MessageBubble(
                             message = streamingMessage,
                             isStreaming = true,
-                            userGender = uiState.userGender,
                             onProductClick = onProductClick
                         )
                     }
@@ -270,7 +270,7 @@ fun ChatScreen(
                 }
             }
 
-            // 输入区域（固定在底部，贴在键盘上方）
+            // 输入区域
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -281,7 +281,7 @@ fun ChatScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Bottom
                 ) {
                     OutlinedTextField(
                         value = inputText,
@@ -295,29 +295,47 @@ fun ChatScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    IconButton(
-                        onClick = {
-                            if (inputText.isNotBlank()) {
-                                val text = inputText.trim()
-                                inputText = ""
-                                if (uiState.currentConversation == null) {
-                                    viewModel.createConversationAndSendMessage(text)
-                                } else {
-                                    viewModel.sendMessage(text)
+                    if (uiState.isStreaming) {
+                        // 流式输出中显示停止按钮
+                        IconButton(
+                            onClick = { viewModel.cancelStream() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Stop,
+                                contentDescription = "停止",
+                                tint = MaterialTheme.colorScheme.onError
+                            )
+                        }
+                    } else {
+                        // 发送按钮
+                        IconButton(
+                            onClick = {
+                                if (inputText.isNotBlank()) {
+                                    val text = inputText.trim()
+                                    inputText = ""
+                                    if (uiState.currentConversation == null) {
+                                        viewModel.createConversationAndSendMessage(text)
+                                    } else {
+                                        viewModel.sendMessage(text)
+                                    }
                                 }
-                            }
-                        },
-                        enabled = inputText.isNotBlank() && !uiState.isSending
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "发送",
-                            tint = if (inputText.isNotBlank()) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
+                            },
+                            enabled = inputText.isNotBlank() && !uiState.isSending
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "发送",
+                                tint = if (inputText.isNotBlank()) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -404,7 +422,13 @@ fun TypingIndicator() {
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        AiAvatar()
+        // AI 头像占位
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+        )
         Spacer(modifier = Modifier.width(8.dp))
 
         // 三个跳动的点
@@ -457,7 +481,7 @@ fun ConversationDrawerItem(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .noFocusClickable(onClick = onClick),
+            .clickable(onClick = onClick),
         color = backgroundColor
     ) {
         Row(
@@ -467,7 +491,6 @@ fun ConversationDrawerItem(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 置顶标记
             if (conversation.isPinned) {
                 Icon(
                     imageVector = Icons.Default.PushPin,
@@ -506,7 +529,6 @@ fun ConversationDrawerItem(
                 }
             }
 
-            // 三点菜单
             Box {
                 IconButton(
                     onClick = { showMenu = true },

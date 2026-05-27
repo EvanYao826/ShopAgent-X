@@ -1,5 +1,6 @@
 package com.evanyao.shopagent.ui.screens.profile
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,9 +39,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import androidx.compose.material.icons.filled.FavoriteBorder
-import com.evanyao.shopagent.ui.components.AppLoadingIndicator
-import com.evanyao.shopagent.ui.components.EmptyState
 import com.evanyao.shopagent.ui.components.noFocusClickable
 import com.evanyao.shopagent.viewmodel.FavoriteViewModel
 import com.evanyao.shopagent.viewmodel.FavoriteItem
@@ -76,7 +74,7 @@ fun FavoritesScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
-                        tint = com.evanyao.shopagent.ui.theme.TextPrimary
+                        tint = Color(0xFF2D3436)
                     )
                 }
             },
@@ -87,12 +85,28 @@ fun FavoritesScreen(
         )
 
         if (uiState.isLoading && uiState.favorites.isEmpty()) {
-            AppLoadingIndicator()
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFFFF6B35))
+            }
         } else if (uiState.favorites.isEmpty()) {
-            EmptyState(
-                icon = Icons.Default.FavoriteBorder,
-                message = "暂无收藏"
-            )
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        "暂无收藏",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color(0xFF636E72)
+                    )
+                }
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize()
@@ -139,19 +153,19 @@ private fun FavoriteItemCard(item: FavoriteItem, onClick: () -> Unit) {
                     text = item.productName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = com.evanyao.shopagent.ui.theme.TextPrimary
+                    color = Color(0xFF2D3436)
                 )
                 Text(
                     text = item.productPrice,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = com.evanyao.shopagent.ui.theme.Primary,
+                    color = Color(0xFFFF6B35),
                     modifier = Modifier.padding(top = 4.dp)
                 )
                 Text(
                     text = "收藏时间: ${item.createTime}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = com.evanyao.shopagent.ui.theme.TextSecondary,
+                    color = Color(0xFF636E72),
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }

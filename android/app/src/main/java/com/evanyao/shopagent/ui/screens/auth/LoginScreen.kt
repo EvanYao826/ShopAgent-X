@@ -57,9 +57,9 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
-    val primaryLight = com.evanyao.shopagent.ui.theme.PrimaryLight
-    val primaryPale = com.evanyao.shopagent.ui.theme.PrimaryPale
+    val primaryColor = Color(0xFFFF6B35)
+    val primaryLight = Color(0xFFFF8F62)
+    val primaryPale = Color(0xFFFFCDB2)
 
     Box(
         modifier = Modifier
@@ -117,12 +117,12 @@ fun LoginScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = com.evanyao.shopagent.ui.theme.TextPrimary
+                    color = Color(0xFF2D3436)
                 )
                 Text(
                     text = "登录你的账号，开启智能购物之旅",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = com.evanyao.shopagent.ui.theme.TextSecondary,
+                    color = Color(0xFF636E72),
                     modifier = Modifier.padding(top = 8.dp)
                 )
 
@@ -173,7 +173,7 @@ fun LoginScreen(
                             Icon(
                                 imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                 contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
-                                tint = com.evanyao.shopagent.ui.theme.TextHint
+                                tint = Color(0xFFB2BEC3)
                             )
                         }
                     },
@@ -195,7 +195,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = errorMessage,
-                        color = com.evanyao.shopagent.ui.theme.Error,
+                        color = Color(0xFFE17055),
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()

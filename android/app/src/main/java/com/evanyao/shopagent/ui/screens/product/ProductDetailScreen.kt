@@ -1,17 +1,21 @@
 package com.evanyao.shopagent.ui.screens.product
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import com.evanyao.shopagent.ui.components.noFocusClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,31 +30,58 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.evanyao.shopagent.ui.components.AppLoadingIndicator
-import com.evanyao.shopagent.ui.components.ErrorState
 import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductDetailScreen(
     viewModel: ProductViewModel,
     productId: Long,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onAddToCart: (Long, Long?) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val detailState = uiState.productDetail
+    var showSkuSheet by remember { mutableStateOf(false) }
+    var isFavorite by remember { mutableStateOf(uiState.favoriteProductIds?.contains(productId) == true) }
 
     LaunchedEffect(productId) {
         viewModel.loadProductDetail(productId)
+        viewModel.getFavoriteList()
+    }
+
+    LaunchedEffect(uiState.favoriteProductIds) {
+        isFavorite = uiState.favoriteProductIds?.contains(productId) == true
+    }
+
+    // 收藏按钮点击处理
+    val toggleFavorite = {
+        viewModel.toggleFavorite(productId)
+    }
+
+    // SKU 选择 BottomSheet
+    if (showSkuSheet && detailState.skus.isNotEmpty()) {
+        SkuSelectionBottomSheet(
+            skus = detailState.skus,
+            onDismiss = { showSkuSheet = false },
+            onConfirm = { skuId ->
+                showSkuSheet = false
+                onAddToCart(productId, skuId)
+                Toast.makeText(context, "已添加到购物车", Toast.LENGTH_SHORT).show()
+            }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (detailState.isLoading) {
-            AppLoadingIndicator()
+            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else if (detailState.errorMessage != null) {
-            ErrorState(
-                message = detailState.errorMessage,
-                onRetry = { viewModel.loadProductDetail(productId) }
+            Text(
+                text = detailState.errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.align(Alignment.Center)
             )
         } else if (detailState.product != null) {
             val listState = rememberLazyListState()
@@ -58,57 +89,59 @@ fun ProductDetailScreen(
                 state = listState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                    // 商品图片
+                // 商品图片
+                item {
+                    ProductImageSection(imageUrl = detailState.product.imageUrl)
+                }
+
+                // 商品基本信息
+                item {
+                    ProductInfoSection(
+                        title = detailState.product.title,
+                        brand = detailState.product.brand,
+                        price = detailState.product.basePrice.toString(),
+                        rating = detailState.product.rating?.toString(),
+                        salesCount = detailState.product.salesCount,
+                        isFavorite = isFavorite,
+                        toggleFavorite = toggleFavorite
+                    )
+                }
+
+                // 商品描述
+                if (!detailState.product.description.isNullOrBlank()) {
                     item {
-                        ProductImageSection(imageUrl = detailState.product.imageUrl)
-                    }
-
-                    // 商品基本信息
-                    item {
-                        ProductInfoSection(
-                            title = detailState.product.title,
-                            brand = detailState.product.brand,
-                            price = detailState.product.basePrice.toString(),
-                            rating = detailState.product.rating?.toString(),
-                            salesCount = detailState.product.salesCount
-                        )
-                    }
-
-                    // 商品描述
-                    if (!detailState.product.description.isNullOrBlank()) {
-                        item {
-                            DescriptionSection(description = detailState.product.description)
-                        }
-                    }
-
-                    // SKU 选择
-                    if (detailState.skus.isNotEmpty()) {
-                        item {
-                            SkuSection(skus = detailState.skus)
-                        }
-                    }
-
-                    // 用户评价
-                    if (detailState.reviews.isNotEmpty()) {
-                        item {
-                            ReviewsSection(reviews = detailState.reviews)
-                        }
-                    }
-
-                    // 常见问题
-                    if (detailState.faqs.isNotEmpty()) {
-                        item {
-                            FaqsSection(faqs = detailState.faqs)
-                        }
-                    }
-
-                    // 底部间距
-                    item {
-                        Spacer(modifier = Modifier.height(80.dp))
+                        DescriptionSection(description = detailState.product.description)
                     }
                 }
 
-                // 滚动条
+                // SKU 选择
+                if (detailState.skus.isNotEmpty()) {
+                    item {
+                        SkuSection(skus = detailState.skus)
+                    }
+                }
+
+                // 用户评价
+                if (detailState.reviews.isNotEmpty()) {
+                    item {
+                        ReviewsSection(reviews = detailState.reviews)
+                    }
+                }
+
+                // 常见问题
+                if (detailState.faqs.isNotEmpty()) {
+                    item {
+                        FaqsSection(faqs = detailState.faqs)
+                    }
+                }
+
+                // 底部间距
+                item {
+                    Spacer(modifier = Modifier.height(80.dp))
+                }
+            }
+
+            // 滚动条
             val canScroll = listState.canScrollForward || listState.canScrollBackward
             if (canScroll) {
                 val density = LocalDensity.current
@@ -165,7 +198,14 @@ fun ProductDetailScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { /* 加入购物车 */ },
+                        onClick = {
+                            if (detailState.skus.isNotEmpty()) {
+                                showSkuSheet = true
+                            } else {
+                                onAddToCart(productId, null)
+                                Toast.makeText(context, "已添加到购物车", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
                     ) {
@@ -199,13 +239,14 @@ fun ProductDetailScreen(
                 Text(
                     text = "商品详情",
                     style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
+                    color = Color.White,
+                    modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = toggleFavorite) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (isFavorite) "取消收藏" else "收藏",
-                        tint = if (isFavorite) com.evanyao.shopagent.ui.theme.Primary else Color.White
+                        tint = if (isFavorite) Color(0xFFFF6B35) else Color.White
                     )
                 }
             }
@@ -244,7 +285,9 @@ private fun ProductInfoSection(
     brand: String?,
     price: String,
     rating: String?,
-    salesCount: Int
+    salesCount: Int,
+    isFavorite: Boolean = false,
+    toggleFavorite: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -303,7 +346,7 @@ private fun ProductInfoSection(
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = if (isFavorite) "已收藏" else "收藏",
-                    tint = if (isFavorite) com.evanyao.shopagent.ui.theme.Primary else Color(0xFFB2BEC3)
+                    tint = if (isFavorite) Color(0xFFFF6B35) else Color(0xFFB2BEC3)
                 )
             }
         }
@@ -383,7 +426,7 @@ private fun SkuChip(
     Card(
         modifier = Modifier
             .width(IntrinsicSize.Min)
-            .noFocusClickable(onClick = onClick),
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         border = BorderStroke(if (isSelected) 2.dp else 0.dp, borderColor)
@@ -619,7 +662,7 @@ private fun SkuOptionItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .noFocusClickable(onClick = onClick),
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         border = BorderStroke(if (isSelected) 2.dp else 0.dp, borderColor)

@@ -61,5 +61,6 @@ jwt:
 
 upload:
   dir: ${UPLOAD_DIR:E:/Python_qb/DEmo/ShopAgent-X/uploads}
+  temp-dir: ${UPLOAD_TEMP_DIR:D:/aiknowledge/temp}
 
 # 静态资源配置（已移至 WebConfig.java 中通过 addResourceHandlers 配置）

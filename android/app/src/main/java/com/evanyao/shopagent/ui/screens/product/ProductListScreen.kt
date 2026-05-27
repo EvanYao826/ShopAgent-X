@@ -1,6 +1,7 @@
 package com.evanyao.shopagent.ui.screens.product
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -8,8 +9,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,11 +28,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.ui.components.buildImageUrl
-import androidx.compose.material.icons.filled.SearchOff
-import androidx.compose.material.icons.filled.ShoppingBag
-import com.evanyao.shopagent.ui.components.AppLoadingIndicator
-import com.evanyao.shopagent.ui.components.EmptyState
-import com.evanyao.shopagent.ui.components.ErrorState
 import com.evanyao.shopagent.ui.components.noFocusClickable
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
@@ -41,6 +39,10 @@ fun ProductListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val gridState = rememberLazyGridState()
+
+    LaunchedEffect(Unit) {
+        viewModel.getFavoriteList()
+    }
 
     // 上拉加载更多
     LaunchedEffect(gridState) {
@@ -94,19 +96,31 @@ fun ProductListScreen(
         // 商品列表
         when {
             uiState.isLoading -> {
-                AppLoadingIndicator()
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
             }
             uiState.products.isEmpty() -> {
-                if (uiState.errorMessage != null) {
-                    ErrorState(
-                        message = uiState.errorMessage!!,
-                        onRetry = { viewModel.loadProducts() }
-                    )
-                } else {
-                    EmptyState(
-                        icon = if (uiState.searchQuery.isNotBlank()) Icons.Default.SearchOff else Icons.Default.ShoppingBag,
-                        message = if (uiState.searchQuery.isNotBlank()) "没有找到相关商品" else "暂无商品"
-                    )
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = when {
+                                uiState.errorMessage != null -> "加载失败"
+                                uiState.searchQuery.isNotBlank() -> "没有找到相关商品"
+                                else -> "暂无商品"
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (uiState.errorMessage != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = uiState.errorMessage!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
             }
             else -> {
@@ -121,7 +135,11 @@ fun ProductListScreen(
                         items(uiState.products) { product ->
                             ProductGridCard(
                                 product = product,
-                                onClick = { onProductClick(product.id) }
+                                isFavorite = uiState.favoriteProductIds?.contains(product.id) == true,
+                                onClick = { onProductClick(product.id) },
+                                onToggleFavorite = { productId ->
+                                    viewModel.toggleFavorite(productId)
+                                }
                             )
                         }
                         // 底部加载指示器
@@ -197,7 +215,7 @@ fun ProductListScreen(
 @Composable
 private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     ) {
@@ -211,24 +229,37 @@ private fun CategoryChip(name: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProductGridCard(product: Product, onClick: () -> Unit) {
+private fun ProductGridCard(
+    product: Product,
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    onToggleFavorite: (Long) -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            AsyncImage(
-                model = buildImageUrl(product.imageUrl),
-                contentDescription = product.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
-                contentScale = ContentScale.Crop
-            )
+            Box {
+                AsyncImage(
+                    model = buildImageUrl(product.imageUrl),
+                    contentDescription = product.title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                // 收藏按钮
+                FavoriteButton(
+                    isFavorite = isFavorite,
+                    productId = product.id,
+                    onClick = onToggleFavorite
+                )
+            }
             Column(modifier = Modifier.padding(8.dp)) {
                 Text(
                     text = product.title,
@@ -284,7 +315,7 @@ private fun FavoriteButton(
             androidx.compose.material3.Icon(
                 imageVector = androidx.compose.material.icons.Icons.Default.Favorite,
                 contentDescription = if (isFavorite) "已收藏" else "收藏",
-                tint = if (isFavorite) com.evanyao.shopagent.ui.theme.Primary else Color(0x80FFFFFF)
+                tint = if (isFavorite) Color(0xFFFF6B35) else Color(0x80FFFFFF)
             )
         }
     }

@@ -19,19 +19,19 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
-    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
+    val primaryColor = Color(0xFFFF6B35)
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(com.evanyao.shopagent.ui.theme.Background)
+            .background(Color(0xFFF8F9FA))
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
             title = { Text("关于我们", fontWeight = FontWeight.SemiBold) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = com.evanyao.shopagent.ui.theme.TextPrimary)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF2D3436))
                 }
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
@@ -59,8 +59,8 @@ fun AboutScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(16.dp))
 
-            Text("ShopAgent-X", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = com.evanyao.shopagent.ui.theme.TextPrimary)
-            Text("智能导购助手", style = MaterialTheme.typography.bodyMedium, color = com.evanyao.shopagent.ui.theme.TextSecondary)
+            Text("ShopAgent-X", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFF2D3436))
+            Text("智能导购助手", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF636E72))
 
             Spacer(Modifier.height(32.dp))
 
@@ -71,11 +71,11 @@ fun AboutScreen(onBack: () -> Unit) {
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 AboutRow("应用名称", "ShopAgent-X")
-                HorizontalDivider(color = com.evanyao.shopagent.ui.theme.SurfaceVariant)
+                HorizontalDivider(color = Color(0xFFF1F3F5))
                 AboutRow("版本号", "1.0.0")
-                HorizontalDivider(color = com.evanyao.shopagent.ui.theme.SurfaceVariant)
+                HorizontalDivider(color = Color(0xFFF1F3F5))
                 AboutRow("技术栈", "Kotlin + Spring Boot")
-                HorizontalDivider(color = com.evanyao.shopagent.ui.theme.SurfaceVariant)
+                HorizontalDivider(color = Color(0xFFF1F3F5))
                 AboutRow("开发者", "EvanYao")
             }
 
@@ -84,7 +84,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Text(
                 "基于 AI 大模型的智能购物导购应用，为用户提供个性化的商品推荐和购物咨询体验。",
                 style = MaterialTheme.typography.bodyMedium,
-                color = com.evanyao.shopagent.ui.theme.TextSecondary,
+                color = Color(0xFF636E72),
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
@@ -99,7 +99,7 @@ private fun AboutRow(label: String, value: String) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = com.evanyao.shopagent.ui.theme.TextSecondary)
-        Text(value, color = com.evanyao.shopagent.ui.theme.TextPrimary, fontWeight = FontWeight.Medium)
+        Text(label, color = Color(0xFF636E72))
+        Text(value, color = Color(0xFF2D3436), fontWeight = FontWeight.Medium)
     }
 }

@@ -35,7 +35,7 @@ fun AddressEditScreen(
     var isDefault by remember { mutableStateOf(false) }
     var initialized by remember { mutableStateOf(false) }
 
-    val primaryColor = com.evanyao.shopagent.ui.theme.Primary
+    val primaryColor = Color(0xFFFF6B35)
 
     LaunchedEffect(uiState.addressList) {
         if (editId != null && !initialized) {
@@ -63,14 +63,14 @@ fun AddressEditScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(com.evanyao.shopagent.ui.theme.Background)
+            .background(Color(0xFFF8F9FA))
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
             title = { Text(if (editId != null) "编辑地址" else "新增地址", fontWeight = FontWeight.SemiBold) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = com.evanyao.shopagent.ui.theme.TextPrimary)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF2D3436))
                 }
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
@@ -168,7 +168,7 @@ fun AddressEditScreen(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("设为默认地址", modifier = Modifier.weight(1f), color = com.evanyao.shopagent.ui.theme.TextPrimary)
+                Text("设为默认地址", modifier = Modifier.weight(1f), color = Color(0xFF2D3436))
                 Switch(checked = isDefault, onCheckedChange = { isDefault = it }, colors = SwitchDefaults.colors(checkedTrackColor = primaryColor))
             }
 
@@ -207,7 +207,7 @@ private fun FormSection(label: String, content: @Composable () -> Unit) {
             .clip(RoundedCornerShape(12.dp))
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Text(label, fontWeight = FontWeight.SemiBold, color = com.evanyao.shopagent.ui.theme.TextPrimary, fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp))
+        Text(label, fontWeight = FontWeight.SemiBold, color = Color(0xFF2D3436), fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp))
         Spacer(Modifier.height(8.dp))
         content()
     }

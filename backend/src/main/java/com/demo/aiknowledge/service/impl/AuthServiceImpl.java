@@ -186,6 +186,15 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public User getUserById(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        return user;
+    }
+
+    @Override
     public User updateUserInfo(UpdateUserRequest request) {
         User user = userMapper.selectById(request.getUserId());
         if (user == null) {

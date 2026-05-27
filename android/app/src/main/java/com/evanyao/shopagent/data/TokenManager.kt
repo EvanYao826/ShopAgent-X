@@ -22,6 +22,7 @@ class TokenManager(
         private val USER_ID_KEY = stringPreferencesKey("user_id")
         private val USERNAME_KEY = stringPreferencesKey("username")
         private val PHONE_KEY = stringPreferencesKey("phone")
+        private val GENDER_KEY = stringPreferencesKey("gender")
         private val SKIN_TYPE_KEY = stringPreferencesKey("skin_type")
         private val PREFERENCE_TAGS_KEY = stringPreferencesKey("preference_tags")
     }
@@ -92,6 +93,16 @@ class TokenManager(
         context.dataStore.edit { preferences ->
             preferences[key] = true
         }
+    }
+
+    suspend fun saveGender(gender: String) {
+        context.dataStore.edit { preferences ->
+            preferences[GENDER_KEY] = gender
+        }
+    }
+
+    suspend fun getGender(): String? {
+        return context.dataStore.data.first()[GENDER_KEY]
     }
 
     suspend fun saveSkinType(skinType: String) {

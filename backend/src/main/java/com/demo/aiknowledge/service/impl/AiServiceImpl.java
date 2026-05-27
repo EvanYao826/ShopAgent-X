@@ -264,6 +264,13 @@ public class AiServiceImpl implements AiService {
                 if (body.containsKey("product_cards")) {
                     List<Map<String, Object>> productCards = (List<Map<String, Object>>) body.get("product_cards");
                     if (productCards != null && !productCards.isEmpty()) {
+                        // 转换image_url为完整URL
+                        for (Map<String, Object> card : productCards) {
+                            if (card.containsKey("image_url")) {
+                                String imageUrl = (String) card.get("image_url");
+                                card.put("image_url", urlUtil.toAbsoluteUrl(imageUrl));
+                            }
+                        }
                         aiResponse.setProductCards(productCards);
                     }
                 }

@@ -49,7 +49,7 @@ fun SettingsScreen(
     onLogout: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
-    val primaryColor = Color(0xFFFF6B35)
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     if (showLogoutDialog) {
         AlertDialog(
@@ -66,7 +66,7 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("取消", color = Color(0xFF636E72))
+                    Text("取消", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         )
@@ -75,7 +75,7 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
@@ -95,7 +95,7 @@ fun SettingsScreen(
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.White
+                containerColor = MaterialTheme.colorScheme.surface
             )
         )
 
@@ -117,7 +117,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.AutoMirrored.Filled.ExitToApp,
                 title = "退出登录",
-                titleColor = Color(0xFFE17055),
+                titleColor = MaterialTheme.colorScheme.error,
                 onClick = { showLogoutDialog = true }
             )
         }
@@ -133,13 +133,13 @@ private fun SettingsSection(
         Text(
             text = title,
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF636E72),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White)
+                .background(MaterialTheme.colorScheme.surface)
         ) {
             content()
         }
@@ -150,7 +150,7 @@ private fun SettingsSection(
 private fun SettingsItem(
     icon: ImageVector,
     title: String,
-    titleColor: Color = Color(0xFF2D3436),
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
     onClick: () -> Unit
 ) {
     Column {
@@ -177,13 +177,13 @@ private fun SettingsItem(
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFFB2BEC3),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
         }
         HorizontalDivider(
             modifier = Modifier.padding(start = 50.dp),
-            color = Color(0xFFF1F3F5)
+            color = MaterialTheme.colorScheme.outlineVariant
         )
     }
 }

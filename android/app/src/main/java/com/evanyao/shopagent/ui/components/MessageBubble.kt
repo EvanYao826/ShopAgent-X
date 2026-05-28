@@ -37,6 +37,7 @@ import com.evanyao.shopagent.data.model.Message
 fun MessageBubble(
     message: Message,
     isStreaming: Boolean = false,
+    userGender: Int? = null,
     onProductClick: ((Long) -> Unit)? = null,
     onFeedback: ((Long, Int) -> Unit)? = null
 ) {
@@ -67,12 +68,7 @@ fun MessageBubble(
         horizontalArrangement = alignment
     ) {
         if (!isUser) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-            )
+            AiAvatar(size = 36.dp)
             Spacer(modifier = Modifier.width(8.dp))
         }
 
@@ -133,12 +129,7 @@ fun MessageBubble(
 
         if (isUser) {
             Spacer(modifier = Modifier.width(8.dp))
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-            )
+            UserAvatar(size = 36.dp, gender = userGender)
         }
     }
 

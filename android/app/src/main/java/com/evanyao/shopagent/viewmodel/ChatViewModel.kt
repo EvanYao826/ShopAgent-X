@@ -25,6 +25,7 @@ data class ChatUiState(
     val isStreaming: Boolean = false,
     val streamingContent: String = "",
     val errorMessage: String? = null,
+    val userGender: Int? = null,
     val recommendations: List<String> = listOf(
         "推荐一款适合油皮的精华",
         "敏感肌可以用什么面膜？",
@@ -52,6 +53,19 @@ class ChatViewModel(
     init {
         loadConversations()
         loadRecommendations()
+        loadUserGender()
+    }
+
+    private fun loadUserGender() {
+        viewModelScope.launch {
+            val genderStr = tokenManager.getGender()
+            val genderInt = when (genderStr) {
+                "男" -> 1
+                "女" -> 2
+                else -> 0
+            }
+            _uiState.value = _uiState.value.copy(userGender = genderInt)
+        }
     }
 
     fun loadConversations() {
@@ -216,7 +230,7 @@ class ChatViewModel(
                 val response = chatRepository.getMessages(conversationId)
                 if (response.isSuccess && response.data != null) {
                     _uiState.value = _uiState.value.copy(
-                        messages = response.data,
+                        messages = response.data.reversed(),
                         isLoading = false
                     )
                 } else {

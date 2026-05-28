@@ -1,5 +1,7 @@
 package com.evanyao.shopagent.navigation
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -67,6 +69,14 @@ fun MainNavigation() {
         BottomNavItem.Profile
     )
 
+    // tab路由 -> 索引，用于判断滑动方向
+    val tabIndexMap = mapOf(
+        Screen.Chat.route to 0,
+        Screen.ProductList.route to 1,
+        Screen.Cart.route to 2,
+        Screen.Profile.route to 3
+    )
+
     // 监听登录状态变化，自动跳转
     LaunchedEffect(authState.isLoggedIn) {
         if (authState.isLoggedIn) {
@@ -75,7 +85,7 @@ fun MainNavigation() {
             if (authState.isProfileSetupDone) {
                 chatViewModel.loadRecommendations()
                 cartViewModel.refreshOnLogin()
-                navController.navigate(Screen.Cart.route) {
+                navController.navigate(Screen.Chat.route) {
                     popUpTo(Screen.Login.route) { inclusive = true }
                 }
             } else {
@@ -139,7 +149,41 @@ fun MainNavigation() {
         NavHost(
             navController = navController,
             startDestination = Screen.Login.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = {
+                val fromIndex = tabIndexMap[initialState.destination.route]
+                val toIndex = tabIndexMap[targetState.destination.route]
+                if (fromIndex != null && toIndex != null) {
+                    // tab间切换：根据位置决定方向
+                    val direction = if (toIndex > fromIndex) 1 else -1
+                    slideInHorizontally(initialOffsetX = { it * direction }, animationSpec = tween(300)) +
+                            fadeIn(animationSpec = tween(300))
+                } else {
+                    // 非tab页面（详情、设置等）：默认从右滑入
+                    slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(300)) +
+                            fadeIn(animationSpec = tween(300))
+                }
+            },
+            exitTransition = {
+                val fromIndex = tabIndexMap[initialState.destination.route]
+                val toIndex = tabIndexMap[targetState.destination.route]
+                if (fromIndex != null && toIndex != null) {
+                    val direction = if (toIndex > fromIndex) -1 else 1
+                    slideOutHorizontally(targetOffsetX = { it * direction }, animationSpec = tween(300)) +
+                            fadeOut(animationSpec = tween(300))
+                } else {
+                    slideOutHorizontally(targetOffsetX = { -it }, animationSpec = tween(300)) +
+                            fadeOut(animationSpec = tween(300))
+                }
+            },
+            popEnterTransition = {
+                slideInHorizontally(initialOffsetX = { -it }, animationSpec = tween(300)) +
+                        fadeIn(animationSpec = tween(300))
+            },
+            popExitTransition = {
+                slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(300)) +
+                        fadeOut(animationSpec = tween(300))
+            }
         ) {
             composable(Screen.Login.route) {
                 LoginScreen(
@@ -174,7 +218,7 @@ fun MainNavigation() {
                     if (authState.isProfileSetupDone) {
                         chatViewModel.loadRecommendations()
                         cartViewModel.refreshOnLogin()
-                        navController.navigate(Screen.Cart.route) {
+                        navController.navigate(Screen.Chat.route) {
                             popUpTo(Screen.ProfileSetup.route) { inclusive = true }
                         }
                     }
@@ -222,7 +266,16 @@ fun MainNavigation() {
                     onProductClick = { productId ->
                         navController.navigate(Screen.ProductDetail.createRoute(productId))
                     },
-                    onCheckout = {}
+                    onCheckout = {},
+                    onNavigateToProducts = {
+                        navController.navigate(Screen.ProductList.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 )
             }
             composable(Screen.Profile.route) {

@@ -19,23 +19,23 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutScreen(onBack: () -> Unit) {
-    val primaryColor = Color(0xFFFF6B35)
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
             title = { Text("关于我们", fontWeight = FontWeight.SemiBold) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF2D3436))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = MaterialTheme.colorScheme.onSurface)
                 }
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
         )
 
         Column(
@@ -59,23 +59,23 @@ fun AboutScreen(onBack: () -> Unit) {
 
             Spacer(Modifier.height(16.dp))
 
-            Text("ShopAgent-X", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color(0xFF2D3436))
-            Text("智能导购助手", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF636E72))
+            Text("ShopAgent-X", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text("智能导购助手", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             Spacer(Modifier.height(32.dp))
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 AboutRow("应用名称", "ShopAgent-X")
-                HorizontalDivider(color = Color(0xFFF1F3F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 AboutRow("版本号", "1.0.0")
-                HorizontalDivider(color = Color(0xFFF1F3F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 AboutRow("技术栈", "Kotlin + Spring Boot")
-                HorizontalDivider(color = Color(0xFFF1F3F5))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 AboutRow("开发者", "EvanYao")
             }
 
@@ -84,7 +84,7 @@ fun AboutScreen(onBack: () -> Unit) {
             Text(
                 "基于 AI 大模型的智能购物导购应用，为用户提供个性化的商品推荐和购物咨询体验。",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFF636E72),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
@@ -99,7 +99,7 @@ private fun AboutRow(label: String, value: String) {
             .padding(horizontal = 16.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(label, color = Color(0xFF636E72))
-        Text(value, color = Color(0xFF2D3436), fontWeight = FontWeight.Medium)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
     }
 }

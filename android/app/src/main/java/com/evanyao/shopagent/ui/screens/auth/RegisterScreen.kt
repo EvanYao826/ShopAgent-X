@@ -64,9 +64,9 @@ fun RegisterScreen(
     var username by remember { mutableStateOf("") }
     var countdown by remember { mutableIntStateOf(0) }
 
-    val primaryColor = Color(0xFFFF6B35)
-    val primaryLight = Color(0xFFFF8F62)
-    val primaryPale = Color(0xFFFFCDB2)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryLight = MaterialTheme.colorScheme.primaryContainer
+    val primaryPale = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
 
     LaunchedEffect(countdown) {
         if (countdown > 0) {
@@ -131,7 +131,7 @@ fun RegisterScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.92f))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
                     .padding(horizontal = 24.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -213,7 +213,7 @@ fun RegisterScreen(
                         ) {
                             Text(
                                 text = if (countdown > 0) "${countdown}s" else "获取验证码",
-                                color = if (phone.isNotBlank() && countdown == 0) primaryColor else Color(0xFFB2BEC3),
+                                color = if (phone.isNotBlank() && countdown == 0) primaryColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -264,7 +264,7 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = errorMessage,
-                        color = Color(0xFFE17055),
+                        color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()

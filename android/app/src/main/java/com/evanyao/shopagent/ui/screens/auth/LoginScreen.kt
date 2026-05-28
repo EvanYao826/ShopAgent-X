@@ -57,9 +57,9 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    val primaryColor = Color(0xFFFF6B35)
-    val primaryLight = Color(0xFFFF8F62)
-    val primaryPale = Color(0xFFFFCDB2)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryLight = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+    val primaryPale = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
 
     Box(
         modifier = Modifier
@@ -108,7 +108,7 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.92f))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.92f))
                     .padding(horizontal = 24.dp, vertical = 28.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -117,12 +117,12 @@ fun LoginScreen(
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
-                    color = Color(0xFF2D3436)
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "登录你的账号，开启智能购物之旅",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF636E72),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
                 )
 
@@ -173,7 +173,7 @@ fun LoginScreen(
                             Icon(
                                 imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                 contentDescription = if (passwordVisible) "隐藏密码" else "显示密码",
-                                tint = Color(0xFFB2BEC3)
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     },
@@ -195,7 +195,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = errorMessage,
-                        color = Color(0xFFE17055),
+                        color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()

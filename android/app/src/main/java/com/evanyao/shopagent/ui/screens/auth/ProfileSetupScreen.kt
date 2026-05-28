@@ -55,8 +55,8 @@ fun ProfileSetupScreen(
     var selectedSkinType by remember { mutableStateOf("") }
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
 
-    val primaryColor = Color(0xFFFF6B35)
-    val backgroundLight = Color(0xFFFFF8F5)
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val backgroundLight = MaterialTheme.colorScheme.background
 
     val genderOptions = listOf(
         1 to "男",
@@ -95,13 +95,13 @@ fun ProfileSetupScreen(
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
                     color = primaryColor,
-                    trackColor = Color(0xFFE8ECEF)
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
                 TextButton(
                     onClick = onSkip,
                     modifier = Modifier.align(Alignment.CenterEnd)
                 ) {
-                    Text("跳过", color = Color(0xFF636E72))
+                    Text("跳过", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
@@ -122,12 +122,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "帮助我们为你推荐更合适的内容",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF636E72),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -141,10 +141,10 @@ fun ProfileSetupScreen(
                                     .padding(vertical = 8.dp)
                                     .height(56.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color.White)
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface)
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(16.dp)
                                     )
                                     .clickable { selectedGender = value },
@@ -153,7 +153,7 @@ fun ProfileSetupScreen(
                                 Text(
                                     text = label,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -167,12 +167,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "不同年龄有不同的潮流趋势",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF636E72),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -186,10 +186,10 @@ fun ProfileSetupScreen(
                                     .padding(vertical = 8.dp)
                                     .height(56.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color.White)
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface)
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(16.dp)
                                     )
                                     .clickable { selectedAgeRange = age },
@@ -198,7 +198,7 @@ fun ProfileSetupScreen(
                                 Text(
                                     text = "${age}岁",
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -212,12 +212,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "帮助我们推荐适合你的护肤美妆产品",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF636E72),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -231,10 +231,10 @@ fun ProfileSetupScreen(
                                     .padding(vertical = 8.dp)
                                     .height(56.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color.White)
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface)
                                     .border(
                                         width = if (isSelected) 2.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(16.dp)
                                     )
                                     .clickable { selectedSkinType = skinType },
@@ -243,7 +243,7 @@ fun ProfileSetupScreen(
                                 Text(
                                     text = skinType,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -257,12 +257,12 @@ fun ProfileSetupScreen(
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "选择你感兴趣的标签（可多选）",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF636E72),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
                         )
 
@@ -274,7 +274,7 @@ fun ProfileSetupScreen(
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.SemiBold
                                 ),
-                                color = Color(0xFF2D3436),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 12.dp)

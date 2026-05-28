@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,11 +42,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import com.evanyao.shopagent.ui.components.LoadingIndicator
+import com.evanyao.shopagent.ui.components.UserAvatar
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.evanyao.shopagent.ui.components.noFocusClickable
@@ -66,10 +70,18 @@ fun ProfileScreen(
     onAboutClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val primaryColor = Color(0xFFFF6B35)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     LaunchedEffect(Unit) {
         viewModel.loadProfile()
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearError()
+        }
     }
 
     val user = uiState.user
@@ -77,7 +89,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
@@ -92,13 +104,13 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "设置",
-                        tint = Color(0xFF636E72)
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.White
+                containerColor = MaterialTheme.colorScheme.surface
             )
         )
 
@@ -112,26 +124,16 @@ fun ProfileScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .noFocusClickable(onClick = onEditProfileClick)
                         .padding(horizontal = 20.dp, vertical = 20.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Avatar
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(primaryColor.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = primaryColor,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
+                    UserAvatar(
+                        size = 64.dp,
+                        gender = user?.gender
+                    )
 
                     Spacer(modifier = Modifier.width(16.dp))
 
@@ -141,12 +143,12 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = phone ?: user?.phone ?: "",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF636E72),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
@@ -154,7 +156,7 @@ fun ProfileScreen(
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = null,
-                        tint = Color(0xFFB2BEC3),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -166,7 +168,7 @@ fun ProfileScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White)
+                            .background(MaterialTheme.colorScheme.surface)
                             .padding(horizontal = 20.dp, vertical = 16.dp)
                     ) {
                         Text(
@@ -174,7 +176,7 @@ fun ProfileScreen(
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = Color(0xFF2D3436)
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -193,10 +195,10 @@ fun ProfileScreen(
                                 ProfileTag(text = genderText, color = primaryColor)
                             }
                             user.ageRange?.let { age ->
-                                ProfileTag(text = "${age}岁", color = Color(0xFF6C5CE7))
+                                ProfileTag(text = "${age}岁", color = MaterialTheme.colorScheme.tertiary)
                             }
                             user.skinType?.let { skin ->
-                                ProfileTag(text = skin, color = Color(0xFF00B894))
+                                ProfileTag(text = skin, color = MaterialTheme.colorScheme.secondary)
                             }
                         }
 
@@ -209,7 +211,7 @@ fun ProfileScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 user.preferenceTags.forEach { tag ->
-                                    ProfileTag(text = tag, color = Color(0xFF636E72))
+                                    ProfileTag(text = tag, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -222,7 +224,7 @@ fun ProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                 ) {
                     ProfileMenuItem(
                         icon = Icons.Default.Favorite,
@@ -249,11 +251,13 @@ fun ProfileScreen(
 
             // Loading overlay
             if (uiState.isLoading) {
-                CircularProgressIndicator(
-                    color = primaryColor,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                LoadingIndicator()
             }
+
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }
@@ -295,26 +299,26 @@ private fun ProfileMenuItem(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = Color(0xFF636E72),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyLarge,
-                color = Color(0xFF2D3436),
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = Color(0xFFB2BEC3),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(20.dp)
             )
         }
         HorizontalDivider(
             modifier = Modifier.padding(start = 52.dp),
-            color = Color(0xFFF1F3F5)
+            color = MaterialTheme.colorScheme.outlineVariant
         )
     }
 }

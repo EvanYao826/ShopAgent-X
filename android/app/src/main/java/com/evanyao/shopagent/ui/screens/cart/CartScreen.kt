@@ -9,6 +9,7 @@ import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,30 +31,42 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
 import com.evanyao.shopagent.data.model.CartItem
 import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.ui.components.buildImageUrl
+import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
+import com.evanyao.shopagent.ui.components.LoadingIndicator
 import com.evanyao.shopagent.viewmodel.CartViewModel
 
-// 淘宝风格配色
-private val TaobaoOrange = Color(0xFFFF5000)
-private val TaobaoBg = Color(0xFFF5F5F5)
-private val PriceRed = Color(0xFFFF4444)
-private val TextPrimary = Color(0xFF333333)
-private val TextSecondary = Color(0xFF999999)
-private val DividerColor = Color(0xFFE5E5E5)
+// 主题配色（统一使用 MaterialTheme.colorScheme）
+private val CartPrimary @Composable get() = MaterialTheme.colorScheme.primary
+private val CartBg @Composable get() = MaterialTheme.colorScheme.background
+private val CartPriceRed @Composable get() = MaterialTheme.colorScheme.error
+private val CartTextPrimary @Composable get() = MaterialTheme.colorScheme.onSurface
+private val CartTextSecondary @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val CartDividerColor @Composable get() = MaterialTheme.colorScheme.outlineVariant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CartScreen(
     viewModel: CartViewModel,
     onProductClick: (Long) -> Unit,
-    onCheckout: () -> Unit
+    onCheckout: () -> Unit,
+    onNavigateToProducts: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
     val editingSkuItem = uiState.editingSkuItem
+    val listState = rememberLazyListState()
+
+    // 错误提示
+    uiState.errorMessage?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearError()
+        }
+    }
 
     // 规格选择弹窗
     if (editingSkuItem != null && uiState.editingSkus.isNotEmpty()) {
@@ -65,44 +78,87 @@ fun CartScreen(
         )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(TaobaoBg)
+            .background(CartBg)
     ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         // 顶部导航栏
         CartTopBar(itemCount = uiState.cartItems.size)
 
         when {
             uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = TaobaoOrange)
-                }
+                LoadingIndicator()
             }
             uiState.cartItems.isEmpty() -> {
-                EmptyCartContent()
+                EmptyCartContent(onNavigateToProducts = onNavigateToProducts)
             }
             else -> {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = 8.dp)
-                ) {
-                    // 店铺分组（目前默认一个店铺）
-                    item {
-                        ShopSection(
-                            shopName = "优选商城",
-                            cartItems = uiState.cartItems,
-                            selectedItems = uiState.selectedItems,
-                            onProductClick = onProductClick,
-                            onRemove = { cartItemId -> viewModel.removeFromCart(cartItemId) },
-                            onToggleSelect = { viewModel.toggleItemSelection(it) },
-                            onQuantityChange = { id, qty -> viewModel.updateQuantity(id, qty) },
-                            onToggleShopSelect = { viewModel.toggleShopSelectAll() },
-                            onSkuClick = { viewModel.startEditSku(it) }
-                        )
+                Box(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(bottom = 8.dp)
+                    ) {
+                        // 店铺分组（目前默认一个店铺）
+                        item {
+                            ShopSection(
+                                shopName = "优选商城",
+                                cartItems = uiState.cartItems,
+                                selectedItems = uiState.selectedItems,
+                                onProductClick = onProductClick,
+                                onRemove = { cartItemId -> viewModel.removeFromCart(cartItemId) },
+                                onToggleSelect = { viewModel.toggleItemSelection(it) },
+                                onQuantityChange = { id, qty -> viewModel.updateQuantity(id, qty) },
+                                onToggleShopSelect = { viewModel.toggleShopSelectAll() },
+                                onSkuClick = { viewModel.startEditSku(it) }
+                            )
+                        }
+                    }
+
+                    // 滚动条
+                    val layoutInfo = listState.layoutInfo
+                    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                    val visibleItems = layoutInfo.visibleItemsInfo
+                    val avgItemHeight = if (visibleItems.isNotEmpty()) {
+                        visibleItems.sumOf { it.size } / visibleItems.size
+                    } else 120
+                    val totalContentHeight = avgItemHeight * layoutInfo.totalItemsCount
+
+                    if (totalContentHeight > viewportHeight) {
+                        val thumbRatio = (viewportHeight.toFloat() / totalContentHeight).coerceIn(0.1f, 0.6f)
+                        val trackHeightPx = viewportHeight.toFloat() - 16f
+                        val thumbHeightPx = trackHeightPx * thumbRatio
+
+                        val maxScroll = (totalContentHeight - viewportHeight).coerceAtLeast(1)
+                        val firstItem = visibleItems.firstOrNull()
+                        val scrolledPast = if (firstItem != null) {
+                            firstItem.index * avgItemHeight + listState.firstVisibleItemScrollOffset
+                        } else 0
+                        val fraction = (scrolledPast.toFloat() / maxScroll).coerceIn(0f, 1f)
+                        val thumbTravel = trackHeightPx - thumbHeightPx
+                        val thumbOffsetDp = LocalDensity.current.run { (thumbTravel * fraction).toDp() }
+                        val thumbHeightDp = LocalDensity.current.run { thumbHeightPx.toDp() }
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .width(6.dp)
+                                .fillMaxHeight()
+                                .padding(vertical = 8.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color(0x22000000))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(6.dp)
+                                    .height(thumbHeightDp)
+                                    .offset(y = thumbOffsetDp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                            )
+                        }
                     }
                 }
             }
@@ -119,12 +175,18 @@ fun CartScreen(
             }
         )
     }
+
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.align(Alignment.BottomCenter)
+    )
+    }
 }
 
 @Composable
 private fun CartTopBar(itemCount: Int) {
     Surface(
-        color = Color.White,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 1.dp
     ) {
         Row(
@@ -139,14 +201,16 @@ private fun CartTopBar(itemCount: Int) {
                 text = "购物车($itemCount)",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextPrimary
+                color = CartTextPrimary
             )
         }
     }
 }
 
 @Composable
-private fun EmptyCartContent() {
+private fun EmptyCartContent(
+    onNavigateToProducts: () -> Unit = {}
+) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -156,23 +220,23 @@ private fun EmptyCartContent() {
                 imageVector = Icons.Default.ShoppingCart,
                 contentDescription = null,
                 modifier = Modifier.size(80.dp),
-                tint = Color(0xFFCCCCCC)
+                tint = CartTextSecondary.copy(alpha = 0.5f)
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "购物车是空的",
                 fontSize = 16.sp,
-                color = TextSecondary
+                color = CartTextSecondary
             )
             Spacer(modifier = Modifier.height(12.dp))
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = TaobaoOrange
+                color = CartPrimary
             ) {
                 Text(
                     text = "去逛逛",
                     modifier = Modifier
-                        .clickable { }
+                        .clickable(onClick = onNavigateToProducts)
                         .padding(horizontal = 24.dp, vertical = 8.dp),
                     color = Color.White,
                     fontSize = 14.sp
@@ -204,7 +268,7 @@ private fun ShopSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -212,14 +276,14 @@ private fun ShopSection(
                 checked = cartItems.all { selectedItems.contains(it.productId) },
                 onCheckedChange = { onToggleShopSelect() },
                 colors = CheckboxDefaults.colors(
-                    checkedColor = TaobaoOrange,
-                    uncheckedColor = Color(0xFFCCCCCC)
+                    checkedColor = CartPrimary,
+                    uncheckedColor = CartTextSecondary
                 )
             )
             Icon(
                 imageVector = Icons.Default.Store,
                 contentDescription = null,
-                tint = TaobaoOrange,
+                tint = CartPrimary,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -227,13 +291,13 @@ private fun ShopSection(
                 text = shopName,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
-                color = TextPrimary
+                color = CartTextPrimary
             )
             Spacer(modifier = Modifier.width(4.dp))
             Icon(
                 imageVector = Icons.Default.ChevronRight,
                 contentDescription = null,
-                tint = TextSecondary,
+                tint = CartTextSecondary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -242,7 +306,7 @@ private fun ShopSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
         ) {
             cartItems.forEachIndexed { index, cartItem ->
                 var isRevealed by remember { mutableStateOf(false) }
@@ -276,7 +340,7 @@ private fun ShopSection(
                             modifier = Modifier
                                 .width(80.dp)
                                 .fillMaxHeight()
-                                .background(Color(0xFFFF4444))
+                                .background(MaterialTheme.colorScheme.error)
                                 .clickable {
                                     onRemove(cartItem.id)
                                     isRevealed = false
@@ -313,7 +377,7 @@ private fun ShopSection(
                 if (index < cartItems.size - 1) {
                     Divider(
                         modifier = Modifier.padding(start = 52.dp),
-                        color = DividerColor,
+                        color = CartDividerColor,
                         thickness = 0.5.dp
                     )
                 }
@@ -334,7 +398,7 @@ private fun CartItemCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .noFocusClickable(onClick = onProductClick)
             .padding(12.dp),
         verticalAlignment = Alignment.Top
@@ -344,20 +408,19 @@ private fun CartItemCard(
             checked = isSelected,
             onCheckedChange = { onToggleSelect() },
             colors = CheckboxDefaults.colors(
-                checkedColor = TaobaoOrange,
-                uncheckedColor = Color(0xFFCCCCCC)
+                checkedColor = CartPrimary,
+                uncheckedColor = CartTextSecondary
             ),
             modifier = Modifier.padding(top = 20.dp)
         )
 
         // 商品图片
-        AsyncImage(
+        AsyncImageWithPlaceholder(
             model = buildImageUrl(cartItem.product?.imageUrl),
             contentDescription = null,
             modifier = Modifier
                 .size(90.dp)
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color(0xFFF5F5F5))
         )
 
         Spacer(modifier = Modifier.width(12.dp))
@@ -370,7 +433,7 @@ private fun CartItemCard(
             Text(
                 text = cartItem.product?.title ?: "",
                 fontSize = 14.sp,
-                color = TextPrimary,
+                color = CartTextPrimary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = 20.sp
@@ -381,7 +444,7 @@ private fun CartItemCard(
             // 规格标签（可点击更换）
             Surface(
                 shape = RoundedCornerShape(2.dp),
-                color = Color(0xFFF5F5F5),
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 modifier = Modifier.clickable(onClick = onSkuClick)
             ) {
                 Row(
@@ -391,13 +454,13 @@ private fun CartItemCard(
                     Text(
                         text = cartItem.skuText,
                         fontSize = 11.sp,
-                        color = TextSecondary
+                        color = CartTextSecondary
                     )
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = TextSecondary
+                        tint = CartTextSecondary
                     )
                 }
             }
@@ -415,13 +478,13 @@ private fun CartItemCard(
                     Text(
                         text = "¥",
                         fontSize = 12.sp,
-                        color = PriceRed,
+                        color = CartPriceRed,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = String.format("%.2f", cartItem.sku?.price ?: cartItem.product?.basePrice ?: 0.0),
                         fontSize = 18.sp,
-                        color = PriceRed,
+                        color = CartPriceRed,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -450,7 +513,7 @@ private fun QuantitySelector(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
-            .background(Color(0xFFF5F5F5), RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
     ) {
         // 减号
         Box(
@@ -463,7 +526,7 @@ private fun QuantitySelector(
                 imageVector = Icons.Default.Remove,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = if (quantity > 1) TextPrimary else TextSecondary
+                tint = if (quantity > 1) CartTextPrimary else CartTextSecondary
             )
         }
 
@@ -472,13 +535,13 @@ private fun QuantitySelector(
             modifier = Modifier
                 .width(36.dp)
                 .height(28.dp)
-                .background(Color.White),
+                .background(MaterialTheme.colorScheme.surface),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = quantity.toString(),
                 fontSize = 14.sp,
-                color = TextPrimary,
+                color = CartTextPrimary,
                 fontWeight = FontWeight.Medium
             )
         }
@@ -494,7 +557,7 @@ private fun QuantitySelector(
                 imageVector = Icons.Default.Add,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp),
-                tint = TextPrimary
+                tint = CartTextPrimary
             )
         }
     }
@@ -529,14 +592,14 @@ private fun BottomCheckoutBar(
                     checked = isAllSelected,
                     onCheckedChange = { onToggleSelectAll() },
                     colors = CheckboxDefaults.colors(
-                        checkedColor = TaobaoOrange,
-                        uncheckedColor = Color(0xFFCCCCCC)
+                        checkedColor = CartPrimary,
+                        uncheckedColor = CartTextSecondary
                     )
                 )
                 Text(
                     text = "全选",
                     fontSize = 14.sp,
-                    color = TextPrimary
+                    color = CartTextPrimary
                 )
             }
 
@@ -550,24 +613,24 @@ private fun BottomCheckoutBar(
                     Text(
                         text = "合计: ",
                         fontSize = 14.sp,
-                        color = TextPrimary
+                        color = CartTextPrimary
                     )
                     Text(
                         text = "¥",
                         fontSize = 12.sp,
-                        color = PriceRed
+                        color = CartPriceRed
                     )
                     Text(
                         text = String.format("%.2f", totalPrice),
                         fontSize = 18.sp,
-                        color = PriceRed,
+                        color = CartPriceRed,
                         fontWeight = FontWeight.Bold
                     )
                 }
                 Text(
                     text = "不含运费",
                     fontSize = 11.sp,
-                    color = TextSecondary
+                    color = CartTextSecondary
                 )
             }
 
@@ -578,8 +641,8 @@ private fun BottomCheckoutBar(
                 onClick = onCheckout,
                 enabled = selectedCount > 0,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = TaobaoOrange,
-                    disabledContainerColor = Color(0xFFFFB088)
+                    containerColor = CartPrimary,
+                    disabledContainerColor = CartPrimary.copy(alpha = 0.5f)
                 ),
                 shape = RoundedCornerShape(22.dp),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 0.dp),
@@ -655,7 +718,7 @@ private fun CartSkuSelectionBottomSheet(
                     .padding(horizontal = 16.dp)
                     .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = TaobaoOrange)
+                colors = ButtonDefaults.buttonColors(containerColor = CartPrimary)
             ) {
                 Text(
                     text = "确定",
@@ -677,12 +740,12 @@ private fun SkuOptionItem(
     onClick: () -> Unit
 ) {
     val backgroundColor = if (isSelected) {
-        TaobaoOrange.copy(alpha = 0.1f)
+        CartPrimary.copy(alpha = 0.1f)
     } else {
-        Color(0xFFF5F5F5)
+        MaterialTheme.colorScheme.surfaceVariant
     }
     val borderColor = if (isSelected) {
-        TaobaoOrange
+        CartPrimary
     } else {
         Color.Transparent
     }
@@ -712,14 +775,14 @@ private fun SkuOptionItem(
                 Text(
                     text = "库存: $stock",
                     style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                    color = CartTextSecondary
                 )
             }
             Text(
                 text = "¥${String.format("%.2f", price)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = PriceRed
+                color = CartPriceRed
             )
         }
     }

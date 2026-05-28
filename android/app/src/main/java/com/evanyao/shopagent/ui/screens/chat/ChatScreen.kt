@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evanyao.shopagent.data.model.Conversation
 import com.evanyao.shopagent.data.model.Message
+import com.evanyao.shopagent.ui.components.AiAvatar
 import com.evanyao.shopagent.ui.components.MessageBubble
 import com.evanyao.shopagent.ui.components.RecommendSection
 import com.evanyao.shopagent.viewmodel.ChatViewModel
@@ -52,6 +53,7 @@ fun ChatScreen(
     val listState = rememberLazyListState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteDialog by remember { mutableStateOf<Conversation?>(null) }
     var showRenameDialog by remember { mutableStateOf<Conversation?>(null) }
     var renameText by remember { mutableStateOf("") }
@@ -142,45 +144,46 @@ fun ChatScreen(
                             }
                         }
 
-                        val canScroll = drawerListState.canScrollForward || drawerListState.canScrollBackward
+                        val layoutInfo = drawerListState.layoutInfo
+                        val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                        val visibleItems = layoutInfo.visibleItemsInfo
+                        val avgItemHeight = if (visibleItems.isNotEmpty()) {
+                            visibleItems.sumOf { it.size } / visibleItems.size
+                        } else 60
+                        val totalContentHeight = avgItemHeight * uiState.conversations.size
 
-                        if (canScroll) {
+                        if (totalContentHeight > viewportHeight) {
                             val density = LocalDensity.current
-                            val layoutInfo = drawerListState.layoutInfo
-                            val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-                            val thumbHeightPx = 40f
-                            val trackHeightPx = viewportHeight.toFloat() - thumbHeightPx
+                            val thumbRatio = (viewportHeight.toFloat() / totalContentHeight).coerceIn(0.1f, 0.6f)
+                            val trackHeightPx = viewportHeight.toFloat() - 16f
+                            val thumbHeightPx = trackHeightPx * thumbRatio
 
-                            val visibleItems = layoutInfo.visibleItemsInfo
-                            val avgItemHeight = if (visibleItems.isNotEmpty()) {
-                                visibleItems.sumOf { it.size } / visibleItems.size
-                            } else 60
-                            val totalContentHeight = avgItemHeight * uiState.conversations.size
                             val maxScroll = (totalContentHeight - viewportHeight).coerceAtLeast(1)
-
                             val firstItem = visibleItems.firstOrNull()
                             val scrolledPast = if (firstItem != null) {
                                 firstItem.index * avgItemHeight + drawerListState.firstVisibleItemScrollOffset
                             } else 0
                             val fraction = (scrolledPast.toFloat() / maxScroll).coerceIn(0f, 1f)
-                            val thumbOffsetDp = density.run { (trackHeightPx * fraction).toDp() }
+                            val thumbTravel = trackHeightPx - thumbHeightPx
+                            val thumbOffsetDp = density.run { (thumbTravel * fraction).toDp() }
+                            val thumbHeightDp = density.run { thumbHeightPx.toDp() }
 
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.CenterEnd)
-                                    .width(4.dp)
+                                    .width(6.dp)
                                     .fillMaxHeight()
                                     .padding(vertical = 8.dp)
-                                    .clip(RoundedCornerShape(2.dp))
-                                    .background(Color(0x33FDD835))
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(Color(0x22000000))
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .width(4.dp)
-                                        .height(40.dp)
+                                        .width(6.dp)
+                                        .height(thumbHeightDp)
                                         .offset(y = thumbOffsetDp)
-                                        .clip(RoundedCornerShape(2.dp))
-                                        .background(Color(0xFFFDD835))
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
                                 )
                             }
                         }
@@ -215,57 +218,108 @@ fun ChatScreen(
             )
 
             // 消息列表
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                state = listState,
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                // 推荐问题
-                if (uiState.messages.isEmpty() && uiState.currentConversation == null) {
-                    item {
-                        RecommendSection(
-                            recommendations = recommendations,
-                            onRecommendClick = { question ->
-                                viewModel.createConversationAndSendMessage(question)
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    // 推荐问题
+                    if (uiState.messages.isEmpty() && uiState.currentConversation == null) {
+                        item {
+                            RecommendSection(
+                                recommendations = recommendations,
+                                onRecommendClick = { question ->
+                                    viewModel.createConversationAndSendMessage(question)
+                                }
+                            )
+                        }
+                    }
+
+                    // 历史消息
+                    items(uiState.messages) { message ->
+                        MessageBubble(
+                            message = message,
+                            userGender = uiState.userGender,
+                            onProductClick = onProductClick,
+                            onFeedback = { messageId, feedbackType ->
+                                viewModel.submitFeedback(messageId, feedbackType)
                             }
                         )
                     }
-                }
 
-                // 历史消息
-                items(uiState.messages) { message ->
-                    MessageBubble(
-                        message = message,
-                        onProductClick = onProductClick,
-                        onFeedback = { messageId, feedbackType ->
-                            viewModel.submitFeedback(messageId, feedbackType)
+                    // 流式输出中的消息（实时更新）
+                    if (uiState.isStreaming) {
+                        item {
+                            if (uiState.streamingContent.isNotBlank()) {
+                                val streamingMessage = Message(
+                                    id = -1,
+                                    conversationId = uiState.currentConversation?.id ?: 0,
+                                    role = "assistant",
+                                    content = uiState.streamingContent
+                                )
+                                MessageBubble(
+                                    message = streamingMessage,
+                                    isStreaming = true,
+                                    userGender = uiState.userGender,
+                                    onProductClick = onProductClick
+                                )
+                            } else {
+                                TypingIndicator()
+                            }
                         }
-                    )
-                }
+                    }
 
-                // 流式输出中的消息（实时更新）
-                if (uiState.isStreaming && uiState.streamingContent.isNotBlank()) {
-                    item {
-                        val streamingMessage = Message(
-                            id = -1,
-                            conversationId = uiState.currentConversation?.id ?: 0,
-                            role = "assistant",
-                            content = uiState.streamingContent
-                        )
-                        MessageBubble(
-                            message = streamingMessage,
-                            isStreaming = true,
-                            onProductClick = onProductClick
-                        )
+                    // 三点跳动加载动画（非流式发送中）
+                    if (uiState.isSending && !uiState.isStreaming) {
+                        item {
+                            TypingIndicator()
+                        }
                     }
                 }
 
-                // 三点跳动加载动画
-                if (uiState.isSending && !uiState.isStreaming) {
-                    item {
-                        TypingIndicator()
+                // 滚动条
+                val msgLayoutInfo = listState.layoutInfo
+                val msgViewportHeight = msgLayoutInfo.viewportEndOffset - msgLayoutInfo.viewportStartOffset
+                val msgVisibleItems = msgLayoutInfo.visibleItemsInfo
+                val msgAvgItemHeight = if (msgVisibleItems.isNotEmpty()) {
+                    msgVisibleItems.sumOf { it.size } / msgVisibleItems.size
+                } else 120
+                val msgTotalContentHeight = msgAvgItemHeight * msgLayoutInfo.totalItemsCount
+
+                if (msgTotalContentHeight > msgViewportHeight) {
+                    val density = LocalDensity.current
+                    val thumbRatio = (msgViewportHeight.toFloat() / msgTotalContentHeight).coerceIn(0.1f, 0.6f)
+                    val trackHeightPx = msgViewportHeight.toFloat() - 16f
+                    val thumbHeightPx = trackHeightPx * thumbRatio
+
+                    val maxScroll = (msgTotalContentHeight - msgViewportHeight).coerceAtLeast(1)
+                    val firstItem = msgVisibleItems.firstOrNull()
+                    val scrolledPast = if (firstItem != null) {
+                        firstItem.index * msgAvgItemHeight + listState.firstVisibleItemScrollOffset
+                    } else 0
+                    val fraction = (scrolledPast.toFloat() / maxScroll).coerceIn(0f, 1f)
+                    val thumbTravel = trackHeightPx - thumbHeightPx
+                    val thumbOffsetDp = density.run { (thumbTravel * fraction).toDp() }
+                    val thumbHeightDp = density.run { thumbHeightPx.toDp() }
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(6.dp)
+                            .fillMaxHeight()
+                            .padding(vertical = 8.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(Color(0x22000000))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(6.dp)
+                                .height(thumbHeightDp)
+                                .offset(y = thumbOffsetDp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                        )
                     }
                 }
             }
@@ -403,9 +457,17 @@ fun ChatScreen(
     // 错误提示
     uiState.errorMessage?.let { message ->
         LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
             viewModel.clearError()
         }
     }
+
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier
+            .fillMaxSize()
+            .wrapContentSize(Alignment.BottomCenter)
+    )
 }
 
 /**
@@ -422,13 +484,8 @@ fun TypingIndicator() {
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // AI 头像占位
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-        )
+        // AI 头像
+        AiAvatar(size = 36.dp)
         Spacer(modifier = Modifier.width(8.dp))
 
         // 三个跳动的点

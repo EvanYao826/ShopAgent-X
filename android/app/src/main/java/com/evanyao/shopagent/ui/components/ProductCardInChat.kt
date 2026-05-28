@@ -45,7 +45,7 @@ fun encodeImageUrl(imageUrl: String?): String? {
 fun buildImageUrl(imageUrl: String?): String? {
     if (imageUrl.isNullOrBlank()) return null
     val url = when {
-        imageUrl.startsWith("http") -> imageUrl
+        imageUrl.startsWith("http") -> imageUrl.replace("localhost", "10.0.2.2")
         imageUrl.startsWith("/product-images/") -> "$BASE_URL$imageUrl"
         else -> "$BASE_URL/product-images/$imageUrl"
     }
@@ -85,21 +85,9 @@ fun ProductCardInChat(
     ) {
         Column {
             // 商品图片
-            val context = LocalContext.current
             val imageUrl = buildImageUrl(product.imageUrl)
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(imageUrl)
-                    .crossfade(true)
-                    .listener(
-                        onError = { _, result ->
-                            Log.e("Coil", "Image load failed: $imageUrl", result.throwable)
-                        },
-                        onSuccess = { _, _ ->
-                            Log.d("Coil", "Image loaded: $imageUrl")
-                        }
-                    )
-                    .build(),
+            AsyncImageWithPlaceholder(
+                model = imageUrl,
                 contentDescription = product.title,
                 modifier = Modifier
                     .fillMaxWidth()

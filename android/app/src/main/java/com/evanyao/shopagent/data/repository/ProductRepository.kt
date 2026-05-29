@@ -59,4 +59,8 @@ class ProductRepository(
     suspend fun getBrowseHistory(): ApiResult<List<Map<String, Any>>> {
         return productApi.getBrowseHistory()
     }
+
+    suspend fun deleteBrowseHistory(historyId: Long): ApiResult<String> {
+        return productApi.deleteBrowseHistory(historyId)
+    }
 }

@@ -1,6 +1,5 @@
 package com.evanyao.shopagent.navigation
 
-import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
@@ -15,8 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -25,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.evanyao.shopagent.ui.screens.auth.ChangePasswordScreen
 import com.evanyao.shopagent.ui.screens.auth.LoginScreen
 import com.evanyao.shopagent.ui.screens.auth.ProfileSetupScreen
 import com.evanyao.shopagent.ui.screens.auth.RegisterScreen
@@ -40,6 +42,10 @@ import com.evanyao.shopagent.ui.screens.profile.SettingsScreen
 import com.evanyao.shopagent.ui.screens.profile.AddressListScreen
 import com.evanyao.shopagent.ui.screens.profile.AddressEditScreen
 import com.evanyao.shopagent.ui.screens.profile.AboutScreen
+import com.evanyao.shopagent.ui.screens.order.CheckoutScreen
+import com.evanyao.shopagent.ui.screens.order.CheckoutItem
+import com.evanyao.shopagent.ui.screens.order.OrderListScreen
+import com.evanyao.shopagent.ui.screens.order.OrderDetailScreen
 import com.evanyao.shopagent.viewmodel.AuthViewModel
 import com.evanyao.shopagent.viewmodel.CartViewModel
 import com.evanyao.shopagent.viewmodel.ChatViewModel
@@ -47,6 +53,7 @@ import com.evanyao.shopagent.viewmodel.FavoriteViewModel
 import com.evanyao.shopagent.viewmodel.HistoryViewModel
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 import com.evanyao.shopagent.viewmodel.AddressViewModel
+import com.evanyao.shopagent.viewmodel.OrderViewModel
 import com.evanyao.shopagent.viewmodel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
 
@@ -61,9 +68,12 @@ fun MainNavigation() {
     val favoriteViewModel: FavoriteViewModel = koinViewModel()
     val historyViewModel: HistoryViewModel = koinViewModel()
     val addressViewModel: AddressViewModel = koinViewModel()
+    val orderViewModel: OrderViewModel = koinViewModel()
     val authState by authViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
-    val context = LocalContext.current
+
+    // 结算页临时状态（购物车结算或立即购买）
+    var checkoutItems by remember { mutableStateOf<List<CheckoutItem>>(emptyList()) }
 
     val bottomNavItems = listOf(
         BottomNavItem.Chat,
@@ -261,8 +271,19 @@ fun MainNavigation() {
                     productId = productId,
                     onBack = { navController.popBackStack() },
                     onAddToCart = { id, skuId -> cartViewModel.addToCart(id, skuId) },
-                    onBuyNow = { _, _ ->
-                        Toast.makeText(context, "订单功能开发中，敬请期待", Toast.LENGTH_SHORT).show()
+                    onBuyNow = { product, sku ->
+                        checkoutItems = listOf(
+                            CheckoutItem(
+                                productId = product.id,
+                                skuId = sku?.id,
+                                title = product.title,
+                                image = product.imageUrl,
+                                skuText = sku?.properties?.entries?.joinToString(" ") { "${it.key}: ${it.value}" } ?: "默认",
+                                price = sku?.price ?: product.basePrice,
+                                quantity = 1
+                            )
+                        )
+                        navController.navigate(Screen.Checkout.createRoute())
                     }
                 )
             }
@@ -272,7 +293,23 @@ fun MainNavigation() {
                     onProductClick = { productId ->
                         navController.navigate(Screen.ProductDetail.createRoute(productId))
                     },
-                    onCheckout = {},
+                    onCheckout = {
+                        val selected = cartState.cartItems.filter { cartState.selectedItems.contains(it.productId) }
+                        if (selected.isNotEmpty()) {
+                            checkoutItems = selected.map { cartItem ->
+                                CheckoutItem(
+                                    productId = cartItem.productId,
+                                    skuId = cartItem.skuId,
+                                    title = cartItem.product?.title ?: "",
+                                    image = cartItem.product?.imageUrl,
+                                    skuText = cartItem.skuText,
+                                    price = cartItem.sku?.price ?: cartItem.product?.basePrice ?: java.math.BigDecimal.ZERO,
+                                    quantity = cartItem.quantity
+                                )
+                            }
+                            navController.navigate(Screen.Checkout.createRoute())
+                        }
+                    },
                     onNavigateToProducts = {
                         navController.navigate(Screen.ProductList.route) {
                             popUpTo(navController.graph.findStartDestination().id) {
@@ -299,6 +336,9 @@ fun MainNavigation() {
                     },
                     onHistoryClick = {
                         navController.navigate(Screen.History.route)
+                    },
+                    onOrdersClick = {
+                        navController.navigate(Screen.OrderList.route)
                     },
                     onAddressClick = {
                         navController.navigate(Screen.AddressList.route)
@@ -336,7 +376,28 @@ fun MainNavigation() {
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }
+                    },
+                    onChangePassword = {
+                        navController.navigate(Screen.ChangePassword.route)
                     }
+                )
+            }
+            composable(Screen.ChangePassword.route) {
+                val authState by authViewModel.uiState.collectAsState()
+                LaunchedEffect(authState.changePasswordSuccess) {
+                    if (authState.changePasswordSuccess) {
+                        authViewModel.clearChangePasswordSuccess()
+                        navController.popBackStack()
+                    }
+                }
+                ChangePasswordScreen(
+                    isLoading = authState.isLoading,
+                    errorMessage = authState.errorMessage,
+                    onBack = { navController.popBackStack() },
+                    onSubmit = { oldPwd, newPwd ->
+                        authViewModel.changePassword(oldPwd, newPwd)
+                    },
+                    onClearError = { authViewModel.clearError() }
                 )
             }
             composable(Screen.EditProfile.route) {
@@ -373,6 +434,60 @@ fun MainNavigation() {
             composable(Screen.About.route) {
                 AboutScreen(
                     onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.OrderList.route) {
+                OrderListScreen(
+                    viewModel = orderViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOrderClick = { orderId ->
+                        navController.navigate(Screen.OrderDetail.createRoute(orderId))
+                    }
+                )
+            }
+            composable(
+                route = Screen.OrderDetail.route,
+                arguments = listOf(navArgument("orderId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val orderId = backStackEntry.arguments?.getLong("orderId") ?: return@composable
+                OrderDetailScreen(
+                    viewModel = orderViewModel,
+                    orderId = orderId,
+                    onBack = { navController.popBackStack() },
+                    onPaymentSuccess = { productIds ->
+                        cartViewModel.removeItemsByProductIds(productIds)
+                    }
+                )
+            }
+            composable(
+                route = Screen.Checkout.route,
+                arguments = listOf(navArgument("addressId") { type = NavType.LongType })
+            ) {
+                // 加载地址列表和用户信息
+                LaunchedEffect(Unit) {
+                    addressViewModel.loadAddressList()
+                    profileViewModel.loadProfile()
+                }
+                val addressState by addressViewModel.uiState.collectAsState()
+                val profileState by profileViewModel.uiState.collectAsState()
+                val defaultAddress = addressState.addressList.firstOrNull { it.isDefault }
+                    ?: addressState.addressList.firstOrNull()
+
+                CheckoutScreen(
+                    orderViewModel = orderViewModel,
+                    checkoutItems = checkoutItems,
+                    defaultAddress = defaultAddress,
+                    user = profileState.user,
+                    onBack = { navController.popBackStack() },
+                    onAddressClick = {
+                        navController.navigate(Screen.AddressList.route)
+                    },
+                    onOrderCreated = { orderId ->
+                        // 订单创建成功，跳转订单详情（不立即清购物车，支付后再问）
+                        navController.navigate(Screen.OrderDetail.createRoute(orderId)) {
+                            popUpTo(Screen.Cart.route) { inclusive = false }
+                        }
+                    }
                 )
             }
         }

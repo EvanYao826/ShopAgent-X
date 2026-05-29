@@ -1,6 +1,5 @@
 package com.evanyao.shopagent.ui.screens.cart
 
-import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -170,9 +169,7 @@ fun CartScreen(
             totalPrice = uiState.totalPrice,
             selectedCount = uiState.selectedItemCount,
             onToggleSelectAll = { viewModel.toggleSelectAll() },
-            onCheckout = {
-                Toast.makeText(context, "暂不支持支付", Toast.LENGTH_SHORT).show()
-            }
+            onCheckout = onCheckout
         )
     }
 

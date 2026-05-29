@@ -250,4 +250,40 @@ class CartViewModel(
         _uiState.value = CartUiState()
         loadCartList()
     }
+
+    fun clearCheckedOutItems() {
+        val selectedIds = _uiState.value.selectedItems
+        if (selectedIds.isEmpty()) return
+        // 本地移除已结算商品
+        _uiState.value = _uiState.value.copy(
+            cartItems = _uiState.value.cartItems.filter { !selectedIds.contains(it.productId) },
+            selectedItems = emptySet()
+        )
+        // 同步删除后端
+        viewModelScope.launch {
+            selectedIds.forEach { productId ->
+                try {
+                    cartRepository.removeItem(productId)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    fun removeItemsByProductIds(productIds: List<Long>) {
+        if (productIds.isEmpty()) return
+        val idSet = productIds.toSet()
+        // 本地移除
+        _uiState.value = _uiState.value.copy(
+            cartItems = _uiState.value.cartItems.filter { !idSet.contains(it.productId) },
+            selectedItems = _uiState.value.selectedItems - idSet
+        )
+        // 同步删除后端
+        viewModelScope.launch {
+            productIds.forEach { productId ->
+                try {
+                    cartRepository.removeItem(productId)
+                } catch (_: Exception) {}
+            }
+        }
+    }
 }

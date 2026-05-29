@@ -17,7 +17,8 @@ data class AuthUiState(
     val isProfileSetupDone: Boolean = false,
     val username: String? = null,
     val phone: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val changePasswordSuccess: Boolean = false
 )
 
 class AuthViewModel(
@@ -226,5 +227,27 @@ class AuthViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun changePassword(oldPassword: String, newPassword: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null, changePasswordSuccess = false)
+            try {
+                val response = authApi.changePassword(
+                    com.evanyao.shopagent.data.model.ChangePasswordRequest(oldPassword, newPassword)
+                )
+                if (response.isSuccess) {
+                    _uiState.value = _uiState.value.copy(isLoading = false, changePasswordSuccess = true)
+                } else {
+                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = response.message)
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "网络错误：${e.message}")
+            }
+        }
+    }
+
+    fun clearChangePasswordSuccess() {
+        _uiState.value = _uiState.value.copy(changePasswordSuccess = false)
     }
 }

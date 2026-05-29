@@ -1,5 +1,6 @@
 package com.evanyao.shopagent.data.network.api
 
+import com.evanyao.shopagent.data.model.ChangePasswordRequest
 import com.evanyao.shopagent.data.model.LoginRequest
 import com.evanyao.shopagent.data.model.ProfileUpdateRequest
 import com.evanyao.shopagent.data.model.RegisterRequest
@@ -26,4 +27,7 @@ interface AuthApi {
 
     @POST("api/auth/refresh")
     suspend fun refreshToken(@Header("Authorization") token: String): Result<Map<String, Any>>
+
+    @POST("api/auth/changePassword")
+    suspend fun changePassword(@Body request: ChangePasswordRequest): Result<String>
 }

@@ -38,13 +38,15 @@ fun ProductDetailScreen(
     viewModel: ProductViewModel,
     productId: Long,
     onBack: () -> Unit,
-    onAddToCart: (Long, Long?) -> Unit = { _, _ -> }
+    onAddToCart: (Long, Long?) -> Unit = { _, _ -> },
+    onBuyNow: (Long, Long?) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val detailState = uiState.productDetail
     var showSkuSheet by remember { mutableStateOf(false) }
+    var isBuyNow by remember { mutableStateOf(false) }
     var isFavorite by remember { mutableStateOf(uiState.favoriteProductIds?.contains(productId) == true) }
 
     LaunchedEffect(productId) {
@@ -75,8 +77,12 @@ fun ProductDetailScreen(
             onDismiss = { showSkuSheet = false },
             onConfirm = { skuId ->
                 showSkuSheet = false
-                onAddToCart(productId, skuId)
-                scope.launch { snackbarHostState.showSnackbar("已添加到购物车") }
+                if (isBuyNow) {
+                    onBuyNow(productId, skuId)
+                } else {
+                    onAddToCart(productId, skuId)
+                    scope.launch { snackbarHostState.showSnackbar("已添加到购物车") }
+                }
             }
         )
     }
@@ -205,6 +211,7 @@ fun ProductDetailScreen(
                 ) {
                     OutlinedButton(
                         onClick = {
+                            isBuyNow = false
                             if (detailState.skus.isNotEmpty()) {
                                 showSkuSheet = true
                             } else {
@@ -218,7 +225,14 @@ fun ProductDetailScreen(
                         Text("加入购物车")
                     }
                     Button(
-                        onClick = { /* 立即购买 */ },
+                        onClick = {
+                            isBuyNow = true
+                            if (detailState.skus.isNotEmpty()) {
+                                showSkuSheet = true
+                            } else {
+                                onBuyNow(productId, null)
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("立即购买")
@@ -592,9 +606,11 @@ private fun SkuSelectionBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // SKU 列表
+            // SKU 列表（可滚动）
             LazyColumn(
-                modifier = Modifier.weight(1f, false),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 itemsIndexed(skus) { index, sku ->
@@ -616,7 +632,7 @@ private fun SkuSelectionBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 确认按钮
+            // 确认按钮（固定在底部）
             Button(
                 onClick = {
                     val selectedSku = skus.getOrNull(selectedIndex)

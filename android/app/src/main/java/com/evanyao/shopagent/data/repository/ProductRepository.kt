@@ -15,9 +15,11 @@ class ProductRepository(
     suspend fun getProducts(
         categoryId: Long? = null,
         page: Int = 1,
-        size: Int = 20
+        size: Int = 20,
+        sortBy: String? = null,
+        sortOrder: String? = null
     ): ApiResult<PageResponse<Product>> {
-        return productApi.getProducts(categoryId, page, size)
+        return productApi.getProducts(categoryId, page, size, sortBy, sortOrder)
     }
 
     suspend fun getProductDetail(id: Long): ApiResult<Map<String, Any>> {

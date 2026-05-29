@@ -107,6 +107,7 @@ class HistoryViewModel(
         _uiState.value = _uiState.value.copy(groups = emptyList())
     }
 
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }

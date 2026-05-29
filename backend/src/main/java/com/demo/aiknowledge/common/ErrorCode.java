@@ -18,7 +18,8 @@ public enum ErrorCode {
     USER_NOT_FOUND(4007, "用户不存在，请先注册"),
     INVALID_PASSWORD(4008, "密码错误"),
     PASSWORD_TOO_SHORT(4009, "密码长度不能少于6位"),
-    INVALID_TOKEN(4010, "无效的token");
+    INVALID_TOKEN(4010, "无效的token"),
+    OLD_PASSWORD_WRONG(4011, "原密码错误");
 
 
     private final int code;

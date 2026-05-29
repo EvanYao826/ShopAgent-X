@@ -12,4 +12,5 @@ public interface AuthService {
     User getUserById(Long userId);
     User updateUserInfo(UpdateUserRequest request);
     Map<String, Object> refreshToken(String token);
+    void changePassword(Long userId, String oldPassword, String newPassword);
 }

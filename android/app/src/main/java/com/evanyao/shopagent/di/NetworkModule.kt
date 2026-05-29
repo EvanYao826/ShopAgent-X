@@ -8,6 +8,7 @@ import com.evanyao.shopagent.data.network.api.AuthApi
 import com.evanyao.shopagent.data.network.api.CartApi
 import com.evanyao.shopagent.data.network.api.CategoryApi
 import com.evanyao.shopagent.data.network.api.ChatApi
+import com.evanyao.shopagent.data.network.api.OrderApi
 import com.evanyao.shopagent.data.network.api.ProductApi
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -27,4 +28,5 @@ val networkModule = module {
     single { get<Retrofit>().create(CategoryApi::class.java) }
     single { get<Retrofit>().create(CartApi::class.java) }
     single { get<Retrofit>().create(AddressApi::class.java) }
+    single { get<Retrofit>().create(OrderApi::class.java) }
 }

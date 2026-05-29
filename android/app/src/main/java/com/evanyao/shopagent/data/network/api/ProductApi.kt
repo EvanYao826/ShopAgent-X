@@ -41,4 +41,7 @@ interface ProductApi {
 
     @GET("api/recommend/browse/history")
     suspend fun getBrowseHistory(): Result<List<@JvmSuppressWildcards Map<String, Any>>>
+
+    @DELETE("api/recommend/browse/history/{id}")
+    suspend fun deleteBrowseHistory(@Path("id") historyId: Long): Result<String>
 }

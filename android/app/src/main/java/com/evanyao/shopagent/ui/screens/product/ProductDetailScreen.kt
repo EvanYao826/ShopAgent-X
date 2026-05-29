@@ -30,6 +30,8 @@ import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
 import com.evanyao.shopagent.ui.components.LoadingIndicator
 import com.evanyao.shopagent.ui.components.ErrorState
+import com.evanyao.shopagent.data.model.Product
+import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,7 +41,7 @@ fun ProductDetailScreen(
     productId: Long,
     onBack: () -> Unit,
     onAddToCart: (Long, Long?) -> Unit = { _, _ -> },
-    onBuyNow: (Long, Long?) -> Unit = { _, _ -> }
+    onBuyNow: (Product, ProductSku?) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -78,7 +80,10 @@ fun ProductDetailScreen(
             onConfirm = { skuId ->
                 showSkuSheet = false
                 if (isBuyNow) {
-                    onBuyNow(productId, skuId)
+                    val product = detailState.product!!
+                    val skuMap = detailState.skus.find { (it["id"] as? Number)?.toLong() == skuId }
+                    val sku = skuMap?.let { mapToProductSku(it, productId) }
+                    onBuyNow(product, sku)
                 } else {
                     onAddToCart(productId, skuId)
                     scope.launch { snackbarHostState.showSnackbar("已添加到购物车") }
@@ -230,7 +235,8 @@ fun ProductDetailScreen(
                             if (detailState.skus.isNotEmpty()) {
                                 showSkuSheet = true
                             } else {
-                                onBuyNow(productId, null)
+                                val product = detailState.product!!
+                                onBuyNow(product, null)
                             }
                         },
                         modifier = Modifier.weight(1f)
@@ -710,4 +716,18 @@ private fun SkuOptionItem(
             )
         }
     }
+}
+
+private fun mapToProductSku(map: Map<String, Any>, productId: Long): ProductSku {
+    val rawProps = map["properties"] as? Map<*, *>
+    val props = rawProps?.entries?.associate { (k, v) -> k.toString() to v.toString() }
+    return ProductSku(
+        id = (map["id"] as? Number)?.toLong() ?: 0L,
+        productId = productId,
+        skuCode = map["skuCode"] as? String,
+        properties = props,
+        price = java.math.BigDecimal.valueOf((map["price"] as? Number)?.toDouble() ?: 0.0),
+        stock = (map["stock"] as? Number)?.toInt() ?: 0,
+        isDefault = (map["isDefault"] as? Number)?.toInt() == 1
+    )
 }

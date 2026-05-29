@@ -20,4 +20,12 @@ sealed class Screen(val route: String) {
         fun createRoute(addressId: Long? = null) = if (addressId != null) "address_edit/$addressId" else "address_edit/-1"
     }
     object About : Screen("about")
+    object ChangePassword : Screen("change_password")
+    object OrderList : Screen("order_list")
+    object OrderDetail : Screen("order_detail/{orderId}") {
+        fun createRoute(orderId: Long) = "order_detail/$orderId"
+    }
+    object Checkout : Screen("checkout/{addressId}") {
+        fun createRoute(addressId: Long? = null) = "checkout/${addressId ?: -1}"
+    }
 }

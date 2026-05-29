@@ -46,7 +46,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onChangePassword: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -106,7 +107,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Default.Lock,
                 title = "修改密码",
-                onClick = { }
+                onClick = onChangePassword
             )
         }
 

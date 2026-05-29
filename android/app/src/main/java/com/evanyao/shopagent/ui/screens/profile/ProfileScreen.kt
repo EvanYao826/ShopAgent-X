@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -66,6 +67,7 @@ fun ProfileScreen(
     onEditProfileClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {},
     onHistoryClick: () -> Unit,
+    onOrdersClick: () -> Unit = {},
     onAddressClick: () -> Unit = {},
     onAboutClick: () -> Unit = {}
 ) {
@@ -226,6 +228,11 @@ fun ProfileScreen(
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surface)
                 ) {
+                    ProfileMenuItem(
+                        icon = Icons.Default.Receipt,
+                        title = "我的订单",
+                        onClick = onOrdersClick
+                    )
                     ProfileMenuItem(
                         icon = Icons.Default.Favorite,
                         title = "我的收藏",

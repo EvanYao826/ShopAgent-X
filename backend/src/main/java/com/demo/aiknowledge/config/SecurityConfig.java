@@ -49,6 +49,12 @@ public class SecurityConfig {
                 .requestMatchers("/api/chat/view/image/**").permitAll()
                 // 允许商品图片静态资源访问
                 .requestMatchers("/product-images/**").permitAll()
+                // 允许商品只读接口匿名访问
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/list").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/{id}").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/search").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/hot").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/category/list").permitAll()
                 // 管理员对话管理接口允许USER和ADMIN访问
                 .requestMatchers("/api/admin/conversations").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/admin/conversations/**").hasAnyRole("USER", "ADMIN")

@@ -33,7 +33,11 @@ data class ProductUiState(
     val currentPage: Int = 1,
     val hasMore: Boolean = true,
     val productDetail: ProductDetailState = ProductDetailState(),
-    val favoriteProductIds: List<Long>? = null
+    val favoriteProductIds: List<Long>? = null,
+    val scrollPosition: Int = 0,
+    val scrollOffset: Int = 0,
+    val sortBy: String = "sales",
+    val sortOrder: String = "desc"
 )
 
 class ProductViewModel(
@@ -124,8 +128,8 @@ class ProductViewModel(
                 }
 
                 // 正常列表模式
-                Log.d("ProductVM", "Loading products: categoryId=${state.selectedCategoryId}, page=$page")
-                val response = productRepository.getProducts(state.selectedCategoryId, page)
+                Log.d("ProductVM", "Loading products: categoryId=${state.selectedCategoryId}, page=$page, sortBy=${state.sortBy}, sortOrder=${state.sortOrder}")
+                val response = productRepository.getProducts(state.selectedCategoryId, page, sortBy = state.sortBy, sortOrder = state.sortOrder)
                 Log.d("ProductVM", "Response: code=${response.code}, message=${response.message}, data=${response.data}")
 
                 if (response.isSuccess && response.data != null) {
@@ -178,6 +182,19 @@ class ProductViewModel(
         loadProducts(reset = true)
     }
 
+    fun setSortBy(sortBy: String) {
+        val state = _uiState.value
+        val newOrder = if (state.sortBy == sortBy && state.sortOrder == "desc") "asc" else "desc"
+        _uiState.value = state.copy(
+            sortBy = sortBy,
+            sortOrder = newOrder,
+            products = emptyList(),
+            currentPage = 1,
+            hasMore = true
+        )
+        loadProducts(reset = true)
+    }
+
     fun onSearchQueryChange(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
         searchJob?.cancel()
@@ -209,6 +226,10 @@ class ProductViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun saveScrollPosition(index: Int, offset: Int) {
+        _uiState.value = _uiState.value.copy(scrollPosition = index, scrollOffset = offset)
     }
 
     fun clearDetailError() {

@@ -27,8 +27,10 @@ public class ProductController {
     public Result<IPage<Product>> list(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return Result.success(productService.listByCategory(categoryId, page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(defaultValue = "desc") String sortOrder) {
+        return Result.success(productService.listByCategory(categoryId, page, size, sortBy, sortOrder));
     }
 
     @GetMapping("/{id}")

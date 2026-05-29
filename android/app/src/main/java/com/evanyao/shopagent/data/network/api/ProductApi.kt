@@ -11,7 +11,9 @@ interface ProductApi {
     suspend fun getProducts(
         @Query("categoryId") categoryId: Long? = null,
         @Query("page") page: Int = 1,
-        @Query("size") size: Int = 20
+        @Query("size") size: Int = 20,
+        @Query("sortBy") sortBy: String? = null,
+        @Query("sortOrder") sortOrder: String? = null
     ): Result<PageResponse<Product>>
 
     @GET("api/product/{id}")

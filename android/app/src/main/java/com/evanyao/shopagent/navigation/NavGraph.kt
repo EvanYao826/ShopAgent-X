@@ -1,5 +1,6 @@
 package com.evanyao.shopagent.navigation
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
@@ -15,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -61,6 +63,7 @@ fun MainNavigation() {
     val addressViewModel: AddressViewModel = koinViewModel()
     val authState by authViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     val bottomNavItems = listOf(
         BottomNavItem.Chat,
@@ -257,7 +260,10 @@ fun MainNavigation() {
                     viewModel = productViewModel,
                     productId = productId,
                     onBack = { navController.popBackStack() },
-                    onAddToCart = { id, skuId -> cartViewModel.addToCart(id, skuId) }
+                    onAddToCart = { id, skuId -> cartViewModel.addToCart(id, skuId) },
+                    onBuyNow = { _, _ ->
+                        Toast.makeText(context, "订单功能开发中，敬请期待", Toast.LENGTH_SHORT).show()
+                    }
                 )
             }
             composable(Screen.Cart.route) {

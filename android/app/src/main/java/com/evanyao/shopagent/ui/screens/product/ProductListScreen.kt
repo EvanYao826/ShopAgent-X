@@ -1,7 +1,6 @@
 package com.evanyao.shopagent.ui.screens.product
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -48,19 +47,32 @@ fun ProductListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    // 当分类或搜索词变化时，重新创建 gridState，这样新数据会从顶部开始展示
-    // 使用 selectedCategoryId 和 searchQuery 作为 key，当它们变化时会重新创建 state
     val gridState = rememberLazyGridState(
-        initialFirstVisibleItemIndex = 0
+        initialFirstVisibleItemIndex = uiState.scrollPosition,
+        initialFirstVisibleItemScrollOffset = uiState.scrollOffset
     )
     val coroutineScope = rememberCoroutineScope()
 
-    // 当分类或搜索词变化时，滚动到顶部
+    // 保存滚动位置的函数
+    val savePosition = {
+        viewModel.saveScrollPosition(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset)
+    }
+
+    // 记录上一次的分类和搜索词，避免返回时重复滚动到顶部
+    var lastCategoryId by remember { mutableStateOf(uiState.selectedCategoryId) }
+    var lastSearchQuery by remember { mutableStateOf(uiState.searchQuery) }
+
+    // 当分类或搜索词真正变化时，滚动到顶部
     LaunchedEffect(uiState.selectedCategoryId, uiState.searchQuery) {
-        // 等待数据加载完成后再滚动
-        snapshotFlow { uiState.isLoading }
-            .first { !it }
-        gridState.scrollToItem(0)
+        val categoryChanged = uiState.selectedCategoryId != lastCategoryId
+        val searchChanged = uiState.searchQuery != lastSearchQuery
+        if (categoryChanged || searchChanged) {
+            lastCategoryId = uiState.selectedCategoryId
+            lastSearchQuery = uiState.searchQuery
+            snapshotFlow { uiState.isLoading }
+                .first { !it }
+            gridState.scrollToItem(0)
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -123,6 +135,15 @@ fun ProductListScreen(
             }
         }
 
+        // 排序选项
+        if (uiState.searchQuery.isBlank()) {
+            SortBar(
+                sortBy = uiState.sortBy,
+                sortOrder = uiState.sortOrder,
+                onSortChange = { viewModel.setSortBy(it) }
+            )
+        }
+
         // 商品列表
         when {
             uiState.isLoading -> {
@@ -158,7 +179,10 @@ fun ProductListScreen(
                             ProductGridCard(
                                 product = product,
                                 isFavorite = uiState.favoriteProductIds?.contains(product.id) == true,
-                                onClick = { onProductClick(product.id) },
+                                onClick = {
+                                    savePosition()
+                                    onProductClick(product.id)
+                                },
                                 onToggleFavorite = { productId ->
                                     viewModel.toggleFavorite(productId)
                                 }
@@ -372,6 +396,42 @@ private fun FavoriteButton(
                 imageVector = androidx.compose.material.icons.Icons.Default.Favorite,
                 contentDescription = if (isFavorite) "已收藏" else "收藏",
                 tint = if (isFavorite) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SortBar(
+    sortBy: String,
+    sortOrder: String,
+    onSortChange: (String) -> Unit
+) {
+    val sortOptions = listOf(
+        "sales" to "销量",
+        "price" to "价格",
+        "rating" to "评分",
+        "newest" to "最新"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        sortOptions.forEach { (key, label) ->
+            val isSelected = sortBy == key
+            val arrow = if (isSelected) {
+                if (sortOrder == "desc") "↓" else "↑"
+            } else ""
+
+            Text(
+                text = "$label$arrow",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                modifier = Modifier.noFocusClickable { onSortChange(key) }
             )
         }
     }

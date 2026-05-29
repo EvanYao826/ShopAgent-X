@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,9 +56,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.evanyao.shopagent.data.model.User
+import com.evanyao.shopagent.ui.components.LoadingIndicator
+import com.evanyao.shopagent.ui.components.UserAvatar
 import com.evanyao.shopagent.viewmodel.ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -75,7 +82,7 @@ fun EditProfileScreen(
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
     var isInitialized by remember { mutableStateOf(false) }
 
-    val primaryColor = Color(0xFFFF6B35)
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     val genderOptions = listOf(
         1 to "男",
@@ -127,7 +134,7 @@ fun EditProfileScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
     Column(
@@ -150,46 +157,37 @@ fun EditProfileScreen(
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.White
+                containerColor = MaterialTheme.colorScheme.surface
             )
         )
 
         if (uiState.isLoading && !isInitialized) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = primaryColor)
-            }
+            LoadingIndicator()
         } else {
+            val scrollState = rememberScrollState()
+            var viewportHeightPx by remember { mutableIntStateOf(0) }
+            val density = LocalDensity.current
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { viewportHeightPx = it.height }
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
             ) {
                 // Avatar section
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(vertical = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(primaryColor.copy(alpha = 0.1f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = primaryColor,
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
+                    UserAvatar(
+                        size = 80.dp,
+                        gender = selectedGender
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -198,7 +196,7 @@ fun EditProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     Text(
@@ -206,7 +204,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
@@ -225,7 +223,7 @@ fun EditProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     Text(
@@ -233,7 +231,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
@@ -247,10 +245,10 @@ fun EditProfileScreen(
                                     .weight(1f)
                                     .height(44.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color(0xFFF8F9FA))
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant)
                                     .border(
                                         width = if (isSelected) 1.5.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .clickable { selectedGender = value },
@@ -259,7 +257,7 @@ fun EditProfileScreen(
                                 Text(
                                     text = label,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -273,7 +271,7 @@ fun EditProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     Text(
@@ -281,7 +279,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Row(
@@ -295,10 +293,10 @@ fun EditProfileScreen(
                                     .weight(1f)
                                     .height(40.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color(0xFFF8F9FA))
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant)
                                     .border(
                                         width = if (isSelected) 1.5.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .clickable { selectedAgeRange = age },
@@ -307,7 +305,7 @@ fun EditProfileScreen(
                                 Text(
                                     text = age,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -321,7 +319,7 @@ fun EditProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     Text(
@@ -329,7 +327,7 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     FlowRow(
@@ -343,10 +341,10 @@ fun EditProfileScreen(
                                 modifier = Modifier
                                     .height(36.dp)
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else Color(0xFFF8F9FA))
+                                    .background(if (isSelected) primaryColor.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surfaceVariant)
                                     .border(
                                         width = if (isSelected) 1.5.dp else 1.dp,
-                                        color = if (isSelected) primaryColor else Color(0xFFE8ECEF),
+                                        color = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant,
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .clickable { selectedSkinType = skinType }
@@ -356,7 +354,7 @@ fun EditProfileScreen(
                                 Text(
                                     text = skinType,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isSelected) primaryColor else Color(0xFF2D3436),
+                                    color = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                 )
                             }
@@ -370,7 +368,7 @@ fun EditProfileScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
                     Text(
@@ -378,12 +376,12 @@ fun EditProfileScreen(
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = Color(0xFF2D3436)
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "选择你感兴趣的标签（可多选）",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF636E72),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
 
@@ -395,7 +393,7 @@ fun EditProfileScreen(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             ),
-                            color = Color(0xFF2D3436),
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
 
@@ -476,6 +474,40 @@ fun EditProfileScreen(
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
+            }
+
+            // 滚动条
+            val viewportHeight = viewportHeightPx.toFloat()
+            val totalContentHeight = scrollState.maxValue + viewportHeightPx
+
+            if (scrollState.maxValue > 0 && viewportHeightPx > 0) {
+                val thumbRatio = (viewportHeight / totalContentHeight).coerceIn(0.1f, 0.6f)
+                val trackHeightPx = viewportHeight - 16f
+                val thumbHeightPx = trackHeightPx * thumbRatio
+                val fraction = (scrollState.value.toFloat() / scrollState.maxValue).coerceIn(0f, 1f)
+                val thumbTravel = trackHeightPx - thumbHeightPx
+                val thumbOffsetDp = density.run { (thumbTravel * fraction).toDp() }
+                val thumbHeightDp = density.run { thumbHeightPx.toDp() }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(6.dp)
+                        .fillMaxHeight()
+                        .padding(vertical = 8.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color(0x22000000))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(6.dp)
+                            .height(thumbHeightDp)
+                            .offset { IntOffset(0, thumbOffsetDp.roundToPx()) }
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                    )
+                }
+            }
             }
         }
     }

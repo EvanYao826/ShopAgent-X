@@ -33,7 +33,11 @@ data class ProductUiState(
     val currentPage: Int = 1,
     val hasMore: Boolean = true,
     val productDetail: ProductDetailState = ProductDetailState(),
-    val favoriteProductIds: List<Long>? = null
+    val favoriteProductIds: List<Long>? = null,
+    val scrollPosition: Int = 0,
+    val scrollOffset: Int = 0,
+    val sortBy: String = "sales",
+    val sortOrder: String = "desc"
 )
 
 class ProductViewModel(
@@ -50,15 +54,41 @@ class ProductViewModel(
         loadProducts(reset = true)
     }
 
+    private fun retryLoadCategories() {
+        viewModelScope.launch {
+            delay(2000)
+            Log.d("ProductVM", "Retrying loadCategories after failure")
+            loadCategories()
+        }
+    }
+
+    private fun retryLoadProducts() {
+        viewModelScope.launch {
+            delay(1000)
+            Log.d("ProductVM", "Retrying loadProducts after failure")
+            loadProducts(reset = true)
+        }
+    }
+
     fun loadCategories() {
         viewModelScope.launch {
             try {
                 val response = productRepository.getCategories()
                 if (response.isSuccess && response.data != null) {
                     _uiState.value = _uiState.value.copy(categories = response.data)
+                } else {
+                    Log.e("ProductVM", "Load categories failed: ${response.code} ${response.message}")
+                    // 加载失败时自动重试
+                    if (_uiState.value.categories.isEmpty()) {
+                        retryLoadCategories()
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("ProductVM", "Load categories failed", e)
+                // 加载失败时自动重试
+                if (_uiState.value.categories.isEmpty()) {
+                    retryLoadCategories()
+                }
             }
         }
     }
@@ -98,8 +128,8 @@ class ProductViewModel(
                 }
 
                 // 正常列表模式
-                Log.d("ProductVM", "Loading products: categoryId=${state.selectedCategoryId}, page=$page")
-                val response = productRepository.getProducts(state.selectedCategoryId, page)
+                Log.d("ProductVM", "Loading products: categoryId=${state.selectedCategoryId}, page=$page, sortBy=${state.sortBy}, sortOrder=${state.sortOrder}")
+                val response = productRepository.getProducts(state.selectedCategoryId, page, sortBy = state.sortBy, sortOrder = state.sortOrder)
                 Log.d("ProductVM", "Response: code=${response.code}, message=${response.message}, data=${response.data}")
 
                 if (response.isSuccess && response.data != null) {
@@ -132,6 +162,10 @@ class ProductViewModel(
                     isLoadingMore = false,
                     errorMessage = "加载失败: ${e.message}"
                 )
+                // 首次加载失败时自动重试
+                if (_uiState.value.products.isEmpty()) {
+                    retryLoadProducts()
+                }
             }
         }
     }
@@ -141,6 +175,19 @@ class ProductViewModel(
         _uiState.value = _uiState.value.copy(
             selectedCategoryId = categoryId,
             searchQuery = "",
+            products = emptyList(),
+            currentPage = 1,
+            hasMore = true
+        )
+        loadProducts(reset = true)
+    }
+
+    fun setSortBy(sortBy: String) {
+        val state = _uiState.value
+        val newOrder = if (state.sortBy == sortBy && state.sortOrder == "desc") "asc" else "desc"
+        _uiState.value = state.copy(
+            sortBy = sortBy,
+            sortOrder = newOrder,
             products = emptyList(),
             currentPage = 1,
             hasMore = true
@@ -179,6 +226,26 @@ class ProductViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun saveScrollPosition(index: Int, offset: Int) {
+        _uiState.value = _uiState.value.copy(scrollPosition = index, scrollOffset = offset)
+    }
+
+    fun clearDetailError() {
+        _uiState.value = _uiState.value.copy(
+            productDetail = _uiState.value.productDetail.copy(errorMessage = null)
+        )
+    }
+
+    fun refresh() {
+        _uiState.value = _uiState.value.copy(
+            products = emptyList(),
+            currentPage = 1,
+            hasMore = true,
+            errorMessage = null
+        )
+        loadProducts(reset = true)
     }
 
     fun loadProductDetail(productId: Long) {

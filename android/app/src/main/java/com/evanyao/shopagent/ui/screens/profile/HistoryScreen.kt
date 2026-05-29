@@ -1,24 +1,32 @@
 package com.evanyao.shopagent.ui.screens.profile
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import com.evanyao.shopagent.ui.components.noFocusClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
+import com.evanyao.shopagent.ui.components.LoadingIndicator
+import com.evanyao.shopagent.ui.components.EmptyState
+import com.evanyao.shopagent.ui.components.ErrorState
 import com.evanyao.shopagent.viewmodel.HistoryGroup
 import com.evanyao.shopagent.viewmodel.HistoryItem
 import com.evanyao.shopagent.viewmodel.HistoryViewModel
@@ -33,6 +41,7 @@ fun HistoryScreen(
     onProductClick: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
 
     LaunchedEffect(Unit) {
         viewModel.loadHistory()
@@ -55,56 +64,96 @@ fun HistoryScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "返回",
-                        tint = Color(0xFF2D3436)
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.White
+                containerColor = MaterialTheme.colorScheme.surface
             )
         )
 
         when {
             uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = Color(0xFFFF6B35))
-                }
+                LoadingIndicator()
             }
             uiState.errorMessage != null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(uiState.errorMessage!!, color = MaterialTheme.colorScheme.error)
-                        Spacer(Modifier.height(8.dp))
-                        Button(onClick = { viewModel.loadHistory() }) { Text("重试") }
-                    }
-                }
+                ErrorState(
+                    message = uiState.errorMessage!!,
+                    onRetry = { viewModel.loadHistory() }
+                )
             }
             uiState.groups.isEmpty() -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("暂无浏览历史", color = Color(0xFF636E72))
-                }
+                EmptyState(
+                    icon = Icons.Default.History,
+                    title = "暂无浏览历史"
+                )
             }
             else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
+                PullToRefreshBox(
+                    isRefreshing = uiState.isLoading,
+                    onRefresh = { viewModel.loadHistory() },
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    for (group in uiState.groups) {
-                        item(key = "header_${group.label}") {
-                            GroupHeader(group)
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        state = listState,
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        for (group in uiState.groups) {
+                            item(key = "header_${group.label}") {
+                                GroupHeader(group)
+                            }
+                            items(items = group.items, key = { it.id }) {
+                                HistoryItemRow(item = it, onClick = { onProductClick(it.productId) })
+                            }
                         }
-                        items(items = group.items, key = { it.id }) {
-                            HistoryItemRow(item = it, onClick = { onProductClick(it.productId) })
+                    }
+
+                    // 滚动条
+                    val layoutInfo = listState.layoutInfo
+                    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+                    val visibleItems = layoutInfo.visibleItemsInfo
+                    val avgItemHeight = if (visibleItems.isNotEmpty()) {
+                        visibleItems.sumOf { it.size } / visibleItems.size
+                    } else 120
+                    val totalContentHeight = avgItemHeight * layoutInfo.totalItemsCount
+
+                    if (totalContentHeight > viewportHeight) {
+                        val density = LocalDensity.current
+                        // 滑块大小按比例：可视区域占总内容的比例
+                        val thumbRatio = (viewportHeight.toFloat() / totalContentHeight).coerceIn(0.1f, 0.6f)
+                        val trackHeightPx = viewportHeight.toFloat() - 16f // 减去上下 padding
+                        val thumbHeightPx = trackHeightPx * thumbRatio
+
+                        val maxScroll = (totalContentHeight - viewportHeight).coerceAtLeast(1)
+                        val firstItem = visibleItems.firstOrNull()
+                        val scrolledPast = if (firstItem != null) {
+                            firstItem.index * avgItemHeight + listState.firstVisibleItemScrollOffset
+                        } else 0
+                        val fraction = (scrolledPast.toFloat() / maxScroll).coerceIn(0f, 1f)
+                        val thumbTravel = trackHeightPx - thumbHeightPx
+                        val thumbOffsetDp = density.run { (thumbTravel * fraction).toDp() }
+                        val thumbHeightDp = density.run { thumbHeightPx.toDp() }
+
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .width(6.dp)
+                                .fillMaxHeight()
+                                .padding(vertical = 8.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(Color(0x22000000))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(6.dp)
+                                    .height(thumbHeightDp)
+                                    .offset(y = thumbOffsetDp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+                            )
                         }
                     }
                 }
@@ -117,7 +166,7 @@ fun HistoryScreen(
 @Composable
 private fun GroupHeader(group: HistoryGroup) {
     Surface(
-        color = Color(0xFFF5F5F5),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier.fillMaxWidth()
     ) {
         Text(
@@ -125,7 +174,7 @@ private fun GroupHeader(group: HistoryGroup) {
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF636E72)
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -138,7 +187,7 @@ private fun HistoryItemRow(item: HistoryItem, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 4.dp)
             .noFocusClickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier
@@ -147,7 +196,7 @@ private fun HistoryItemRow(item: HistoryItem, onClick: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
+            AsyncImageWithPlaceholder(
                 model = buildImageUrl(item.productImage),
                 contentDescription = null,
                 modifier = Modifier
@@ -160,7 +209,7 @@ private fun HistoryItemRow(item: HistoryItem, onClick: () -> Unit) {
                     text = item.productName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF2D3436),
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
                 Spacer(Modifier.height(4.dp))
@@ -168,13 +217,13 @@ private fun HistoryItemRow(item: HistoryItem, onClick: () -> Unit) {
                     text = item.productPrice,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFF6B35)
+                    color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     text = item.browseTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                     style = MaterialTheme.typography.bodySmall,
-                    color= Color(0xFF636E72)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }

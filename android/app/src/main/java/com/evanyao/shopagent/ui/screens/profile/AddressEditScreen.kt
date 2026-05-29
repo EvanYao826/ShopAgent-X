@@ -35,7 +35,7 @@ fun AddressEditScreen(
     var isDefault by remember { mutableStateOf(false) }
     var initialized by remember { mutableStateOf(false) }
 
-    val primaryColor = Color(0xFFFF6B35)
+    val primaryColor = MaterialTheme.colorScheme.primary
 
     LaunchedEffect(uiState.addressList) {
         if (editId != null && !initialized) {
@@ -63,18 +63,18 @@ fun AddressEditScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8F9FA))
+            .background(MaterialTheme.colorScheme.background)
             .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         TopAppBar(
             title = { Text(if (editId != null) "编辑地址" else "新增地址", fontWeight = FontWeight.SemiBold) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = Color(0xFF2D3436))
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回", tint = MaterialTheme.colorScheme.onSurface)
                 }
             },
             windowInsets = WindowInsets(0, 0, 0, 0),
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
         )
 
         Column(
@@ -163,12 +163,12 @@ fun AddressEditScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.surface)
                     .clip(RoundedCornerShape(12.dp))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("设为默认地址", modifier = Modifier.weight(1f), color = Color(0xFF2D3436))
+                Text("设为默认地址", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
                 Switch(checked = isDefault, onCheckedChange = { isDefault = it }, colors = SwitchDefaults.colors(checkedTrackColor = primaryColor))
             }
 
@@ -203,11 +203,11 @@ private fun FormSection(label: String, content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.surface)
             .clip(RoundedCornerShape(12.dp))
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        Text(label, fontWeight = FontWeight.SemiBold, color = Color(0xFF2D3436), fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp))
+        Text(label, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, fontSize = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp))
         Spacer(Modifier.height(8.dp))
         content()
     }

@@ -43,12 +43,19 @@ public class SecurityConfig {
                 // 用户资料接口需要认证
                 .requestMatchers("/api/auth/profile").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/auth/update").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/auth/changePassword").hasAnyRole("USER", "ADMIN")
                 // 允许所有/api/admin/login请求
                 .requestMatchers("/api/admin/login").permitAll()
                 // 允许图片访问路径
                 .requestMatchers("/api/chat/view/image/**").permitAll()
                 // 允许商品图片静态资源访问
                 .requestMatchers("/product-images/**").permitAll()
+                // 允许商品只读接口匿名访问
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/list").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/{id}").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/search").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/hot").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/category/list").permitAll()
                 // 管理员对话管理接口允许USER和ADMIN访问
                 .requestMatchers("/api/admin/conversations").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/admin/conversations/**").hasAnyRole("USER", "ADMIN")
@@ -64,6 +71,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/product/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/recommend/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/address/**").hasAnyRole("USER", "ADMIN")
+                .requestMatchers("/api/order/**").hasAnyRole("USER", "ADMIN")
                 // 其他请求需要认证
                 .anyRequest().authenticated()
             )

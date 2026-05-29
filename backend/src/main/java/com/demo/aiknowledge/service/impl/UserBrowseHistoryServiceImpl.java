@@ -43,6 +43,14 @@ public class UserBrowseHistoryServiceImpl implements UserBrowseHistoryService {
     }
 
     @Override
+    public void deleteHistory(Long userId, Long historyId) {
+        UserBrowseHistory history = userBrowseHistoryMapper.selectById(historyId);
+        if (history != null && history.getUserId().equals(userId)) {
+            userBrowseHistoryMapper.deleteById(historyId);
+        }
+    }
+
+    @Override
     public List<UserBrowseHistory> listByUserId(Long userId) {
         List<UserBrowseHistory> all = userBrowseHistoryMapper.selectList(
                 new LambdaQueryWrapper<UserBrowseHistory>()

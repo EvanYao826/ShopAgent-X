@@ -226,6 +226,23 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        if (!StringUtils.hasText(oldPassword) || !passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BusinessException(ErrorCode.OLD_PASSWORD_WRONG);
+        }
+        if (!StringUtils.hasText(newPassword) || newPassword.length() < 6) {
+            throw new BusinessException(ErrorCode.PASSWORD_TOO_SHORT);
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
+    @Override
     public Map<String, Object> refreshToken(String token) {
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);

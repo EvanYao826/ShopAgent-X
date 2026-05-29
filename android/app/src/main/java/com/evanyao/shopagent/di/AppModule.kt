@@ -4,6 +4,7 @@ import com.evanyao.shopagent.data.TokenManager
 import com.evanyao.shopagent.data.repository.AddressRepository
 import com.evanyao.shopagent.data.repository.CartRepository
 import com.evanyao.shopagent.data.repository.ChatRepository
+import com.evanyao.shopagent.data.repository.OrderRepository
 import com.evanyao.shopagent.data.repository.ProductRepository
 import com.evanyao.shopagent.viewmodel.AddressViewModel
 import com.evanyao.shopagent.viewmodel.AuthViewModel
@@ -11,6 +12,7 @@ import com.evanyao.shopagent.viewmodel.CartViewModel
 import com.evanyao.shopagent.viewmodel.ChatViewModel
 import com.evanyao.shopagent.viewmodel.FavoriteViewModel
 import com.evanyao.shopagent.viewmodel.HistoryViewModel
+import com.evanyao.shopagent.viewmodel.OrderViewModel
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 import com.evanyao.shopagent.viewmodel.ProfileViewModel
 import org.koin.android.ext.koin.androidContext
@@ -23,6 +25,7 @@ val appModule = module {
     single { ProductRepository(get(), get()) }
     single { CartRepository(get()) }
     single { AddressRepository(get()) }
+    single { OrderRepository(get()) }
     viewModel { AuthViewModel(get(), get()) }
     viewModel { ChatViewModel(get(), get()) }
     viewModel { ProductViewModel(get()) }
@@ -31,4 +34,5 @@ val appModule = module {
     viewModel { FavoriteViewModel(get()) }
     viewModel { HistoryViewModel(get()) }
     viewModel { AddressViewModel(get()) }
+    viewModel { OrderViewModel(get()) }
 }

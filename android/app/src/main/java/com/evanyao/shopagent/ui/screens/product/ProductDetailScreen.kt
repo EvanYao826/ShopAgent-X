@@ -1,7 +1,5 @@
 package com.evanyao.shopagent.ui.screens.product
 
-import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,19 +16,22 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.evanyao.shopagent.ui.components.buildImageUrl
+import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
+import com.evanyao.shopagent.ui.components.LoadingIndicator
+import com.evanyao.shopagent.ui.components.ErrorState
+import com.evanyao.shopagent.data.model.Product
+import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.viewmodel.ProductViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,12 +40,15 @@ fun ProductDetailScreen(
     viewModel: ProductViewModel,
     productId: Long,
     onBack: () -> Unit,
-    onAddToCart: (Long, Long?) -> Unit = { _, _ -> }
+    onAddToCart: (Long, Long?) -> Unit = { _, _ -> },
+    onBuyNow: (Product, ProductSku?) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
     val detailState = uiState.productDetail
     var showSkuSheet by remember { mutableStateOf(false) }
+    var isBuyNow by remember { mutableStateOf(false) }
     var isFavorite by remember { mutableStateOf(uiState.favoriteProductIds?.contains(productId) == true) }
 
     LaunchedEffect(productId) {
@@ -54,6 +58,13 @@ fun ProductDetailScreen(
 
     LaunchedEffect(uiState.favoriteProductIds) {
         isFavorite = uiState.favoriteProductIds?.contains(productId) == true
+    }
+
+    LaunchedEffect(detailState.errorMessage) {
+        detailState.errorMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearDetailError()
+        }
     }
 
     // 收藏按钮点击处理
@@ -68,20 +79,26 @@ fun ProductDetailScreen(
             onDismiss = { showSkuSheet = false },
             onConfirm = { skuId ->
                 showSkuSheet = false
-                onAddToCart(productId, skuId)
-                Toast.makeText(context, "已添加到购物车", Toast.LENGTH_SHORT).show()
+                if (isBuyNow) {
+                    val product = detailState.product!!
+                    val skuMap = detailState.skus.find { (it["id"] as? Number)?.toLong() == skuId }
+                    val sku = skuMap?.let { mapToProductSku(it, productId) }
+                    onBuyNow(product, sku)
+                } else {
+                    onAddToCart(productId, skuId)
+                    scope.launch { snackbarHostState.showSnackbar("已添加到购物车") }
+                }
             }
         )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (detailState.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            LoadingIndicator()
         } else if (detailState.errorMessage != null) {
-            Text(
-                text = detailState.errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.align(Alignment.Center)
+            ErrorState(
+                message = detailState.errorMessage,
+                onRetry = { viewModel.loadProductDetail(productId) }
             )
         } else if (detailState.product != null) {
             val listState = rememberLazyListState()
@@ -171,7 +188,7 @@ fun ProductDetailScreen(
                         .fillMaxHeight()
                         .padding(vertical = 8.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(Color(0x33FDD835))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
                 ) {
                     Box(
                         modifier = Modifier
@@ -179,7 +196,7 @@ fun ProductDetailScreen(
                             .height(40.dp)
                             .offset(y = thumbOffsetDp)
                             .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0xFFFDD835))
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                 }
             }
@@ -199,11 +216,12 @@ fun ProductDetailScreen(
                 ) {
                     OutlinedButton(
                         onClick = {
+                            isBuyNow = false
                             if (detailState.skus.isNotEmpty()) {
                                 showSkuSheet = true
                             } else {
                                 onAddToCart(productId, null)
-                                Toast.makeText(context, "已添加到购物车", Toast.LENGTH_SHORT).show()
+                                scope.launch { snackbarHostState.showSnackbar("已添加到购物车") }
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -212,7 +230,15 @@ fun ProductDetailScreen(
                         Text("加入购物车")
                     }
                     Button(
-                        onClick = { /* 立即购买 */ },
+                        onClick = {
+                            isBuyNow = true
+                            if (detailState.skus.isNotEmpty()) {
+                                showSkuSheet = true
+                            } else {
+                                val product = detailState.product!!
+                                onBuyNow(product, null)
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("立即购买")
@@ -246,31 +272,24 @@ fun ProductDetailScreen(
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = if (isFavorite) "取消收藏" else "收藏",
-                        tint = if (isFavorite) Color(0xFFFF6B35) else Color.White
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else Color.White
                     )
                 }
             }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
 @Composable
 private fun ProductImageSection(imageUrl: String?) {
-    val context = LocalContext.current
     val finalUrl = buildImageUrl(imageUrl)
-    AsyncImage(
-        model = ImageRequest.Builder(context)
-            .data(finalUrl)
-            .crossfade(true)
-            .listener(
-                onError = { _, result ->
-                    Log.e("Coil", "Image load failed: $finalUrl", result.throwable)
-                },
-                onSuccess = { _, _ ->
-                    Log.d("Coil", "Image loaded: $finalUrl")
-                }
-            )
-            .build(),
+    AsyncImageWithPlaceholder(
+        model = finalUrl,
         contentDescription = null,
         modifier = Modifier
             .fillMaxWidth()
@@ -346,7 +365,7 @@ private fun ProductInfoSection(
                 Icon(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = if (isFavorite) "已收藏" else "收藏",
-                    tint = if (isFavorite) Color(0xFFFF6B35) else Color(0xFFB2BEC3)
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -593,9 +612,11 @@ private fun SkuSelectionBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // SKU 列表
+            // SKU 列表（可滚动）
             LazyColumn(
-                modifier = Modifier.weight(1f, false),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 itemsIndexed(skus) { index, sku ->
@@ -617,7 +638,7 @@ private fun SkuSelectionBottomSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 确认按钮
+            // 确认按钮（固定在底部）
             Button(
                 onClick = {
                     val selectedSku = skus.getOrNull(selectedIndex)
@@ -695,4 +716,18 @@ private fun SkuOptionItem(
             )
         }
     }
+}
+
+private fun mapToProductSku(map: Map<String, Any>, productId: Long): ProductSku {
+    val rawProps = map["properties"] as? Map<*, *>
+    val props = rawProps?.entries?.associate { (k, v) -> k.toString() to v.toString() }
+    return ProductSku(
+        id = (map["id"] as? Number)?.toLong() ?: 0L,
+        productId = productId,
+        skuCode = map["skuCode"] as? String,
+        properties = props,
+        price = java.math.BigDecimal.valueOf((map["price"] as? Number)?.toDouble() ?: 0.0),
+        stock = (map["stock"] as? Number)?.toInt() ?: 0,
+        isDefault = (map["isDefault"] as? Number)?.toInt() == 1
+    )
 }

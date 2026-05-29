@@ -61,4 +61,10 @@ public class RecommendController {
     public Result<List<UserBrowseHistory>> browseHistory() {
         return Result.success(userBrowseHistoryService.listByUserId(getCurrentUserId()));
     }
+
+    @DeleteMapping("/browse/history/{id}")
+    public Result<String> deleteHistory(@PathVariable Long id) {
+        userBrowseHistoryService.deleteHistory(getCurrentUserId(), id);
+        return Result.success("已删除");
+    }
 }

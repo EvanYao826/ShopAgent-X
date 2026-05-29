@@ -18,13 +18,32 @@ public class ProductServiceImpl implements ProductService {
     private final ProductMapper productMapper;
 
     @Override
-    public IPage<Product> listByCategory(Long categoryId, int page, int size) {
+    public IPage<Product> listByCategory(Long categoryId, int page, int size, String sortBy, String sortOrder) {
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Product::getStatus, 1);
         if (categoryId != null) {
             wrapper.eq(Product::getCategoryId, categoryId);
         }
-        wrapper.orderByDesc(Product::getSalesCount);
+
+        boolean isAsc = "asc".equalsIgnoreCase(sortOrder);
+        switch (sortBy != null ? sortBy : "sales") {
+            case "price":
+                wrapper.orderBy(true, isAsc, Product::getBasePrice);
+                break;
+            case "rating":
+                wrapper.orderBy(true, isAsc, Product::getRating);
+                break;
+            case "reviews":
+                wrapper.orderBy(true, isAsc, Product::getReviewCount);
+                break;
+            case "newest":
+                wrapper.orderBy(true, isAsc, Product::getCreateTime);
+                break;
+            default:
+                wrapper.orderByDesc(Product::getSalesCount);
+                break;
+        }
+
         return productMapper.selectPage(new Page<>(page, size), wrapper);
     }
 

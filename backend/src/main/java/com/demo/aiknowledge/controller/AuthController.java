@@ -1,6 +1,7 @@
 package com.demo.aiknowledge.controller;
 
 import com.demo.aiknowledge.common.Result;
+import com.demo.aiknowledge.dto.ChangePasswordRequest;
 import com.demo.aiknowledge.dto.LoginRequest;
 import com.demo.aiknowledge.dto.RegisterRequest;
 import com.demo.aiknowledge.dto.UpdateUserRequest;
@@ -51,6 +52,13 @@ public class AuthController {
         Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         User user = authService.getUserById(userId);
         return Result.success(user);
+    }
+
+    @PostMapping("/changePassword")
+    public Result<String> changePassword(@RequestBody ChangePasswordRequest request) {
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+        authService.changePassword(userId, request.getOldPassword(), request.getNewPassword());
+        return Result.success("密码修改成功");
     }
 
     @PostMapping("/refresh")

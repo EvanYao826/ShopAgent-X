@@ -70,7 +70,7 @@ public class ConversationContextServiceImpl implements ConversationContextServic
         List<Message> messages = messageMapper.selectList(
                 new LambdaQueryWrapper<Message>()
                         .eq(Message::getConversationId, conversationId)
-                        .orderByDesc(Message::getCreateTime)
+                        .orderByAsc(Message::getCreateTime)
                         .last("LIMIT " + Math.max(maxMessages, DEFAULT_WINDOW_SIZE))
         );
 

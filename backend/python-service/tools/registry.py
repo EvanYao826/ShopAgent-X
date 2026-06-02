@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional
 import time
 import threading
+import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from tools.base import Tool
 from tools.execution import tool_execution_tracker
@@ -19,6 +20,7 @@ class ToolRegistry:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
                     cls._instance._tools = {}
+                    cls._instance._executor = ThreadPoolExecutor(max_workers=10)
         return cls._instance
     
     def register_tool(self, tool: Tool):
@@ -50,7 +52,7 @@ class ToolRegistry:
         
         # 生成 run_id 如果没有提供
         if run_id is None:
-            run_id = str(time.time())
+            run_id = str(uuid.uuid4())
         
         # 开始工具调用跟踪
         tool_call_id = tool_execution_tracker.start_tool_call(run_id, tool_name, parameters)
@@ -65,14 +67,13 @@ class ToolRegistry:
         while retries <= max_retries:
             start_time = time.time()
             try:
-                # 使用线程池执行工具，强制超时控制
-                with ThreadPoolExecutor(max_workers=1) as executor:
-                    future = executor.submit(tool.execute, parameters)
-                    try:
-                        result = future.result(timeout=timeout_sec)
-                    except FutureTimeoutError:
-                        future.cancel()
-                        raise TimeoutError(f"Tool {tool_name} timed out after {timeout_ms}ms")
+                # 使用共享线程池执行工具，强制超时控制
+                future = self._executor.submit(tool.execute, parameters)
+                try:
+                    result = future.result(timeout=timeout_sec)
+                except FutureTimeoutError:
+                    future.cancel()
+                    raise TimeoutError(f"Tool {tool_name} timed out after {timeout_ms}ms")
 
                 execution_time = (time.time() - start_time) * 1000
                 config.logger.info(f"Tool {tool_name} executed in {execution_time:.2f}ms")

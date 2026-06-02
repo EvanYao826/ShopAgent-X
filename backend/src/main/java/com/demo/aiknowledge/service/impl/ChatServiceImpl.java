@@ -281,6 +281,7 @@ public class ChatServiceImpl implements ChatService {
                 // 3. 构建请求体
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("question", content);
+                requestBody.put("conversation_id", conversationId.toString());
                 requestBody.put("context", conversationContext);
                 if (username != null) {
                     requestBody.put("username", username);

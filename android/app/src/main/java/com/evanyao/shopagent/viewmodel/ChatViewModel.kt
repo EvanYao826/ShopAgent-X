@@ -230,7 +230,7 @@ class ChatViewModel(
                 val response = chatRepository.getMessages(conversationId)
                 if (response.isSuccess && response.data != null) {
                     _uiState.value = _uiState.value.copy(
-                        messages = response.data.reversed(),
+                        messages = response.data,
                         isLoading = false
                     )
                 } else {

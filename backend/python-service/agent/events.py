@@ -1,6 +1,8 @@
 from typing import Dict, Any, Optional, Callable, List
 from dataclasses import dataclass, field
 from datetime import datetime
+from collections import defaultdict
+import threading
 import logging
 
 logger = logging.getLogger(__name__)
@@ -244,3 +246,104 @@ class EventBus:
 
 
 event_bus = EventBus()
+
+
+class MetricsCollector:
+    """指标收集器 - 收集系统运行指标"""
+
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._metrics = defaultdict(lambda: {
+                        "count": 0,
+                        "success_count": 0,
+                        "fail_count": 0,
+                        "total_duration_ms": 0,
+                        "last_occurred": None
+                    })
+                    cls._instance._alerts = []
+                    cls._instance._alert_callbacks = []
+        return cls._instance
+
+    def record_event(self, event: Event):
+        """记录事件指标"""
+        metric_key = event.event_type
+        metric = self._metrics[metric_key]
+        metric["count"] += 1
+        metric["last_occurred"] = event.timestamp
+
+        # 根据事件类型更新成功/失败计数
+        if "completed" in event.event_type.lower() or "success" in event.event_type.lower():
+            metric["success_count"] += 1
+        elif "failed" in event.event_type.lower() or "error" in event.event_type.lower():
+            metric["fail_count"] += 1
+            # 检查是否需要触发告警
+            self._check_alert(metric_key, event)
+
+        # 记录持续时间
+        if hasattr(event, 'data') and isinstance(event.data, dict):
+            duration = event.data.get("duration_ms")
+            if duration:
+                metric["total_duration_ms"] += duration
+
+    def _check_alert(self, metric_key: str, event: Event):
+        """检查是否需要触发告警"""
+        metric = self._metrics[metric_key]
+
+        # 连续失败3次触发告警
+        if metric["fail_count"] >= 3:
+            alert = {
+                "type": "consecutive_failures",
+                "metric_key": metric_key,
+                "fail_count": metric["fail_count"],
+                "last_error": event.data.get("error", "Unknown error"),
+                "timestamp": datetime.now().isoformat()
+            }
+            self._alerts.append(alert)
+            self._trigger_alert(alert)
+
+    def _trigger_alert(self, alert: Dict[str, Any]):
+        """触发告警"""
+        logger.warning(f"[MetricsCollector] Alert triggered: {alert}")
+
+        # 调用注册的告警回调
+        for callback in self._alert_callbacks:
+            try:
+                callback(alert)
+            except Exception as e:
+                logger.error(f"[MetricsCollector] Alert callback failed: {e}")
+
+    def register_alert_callback(self, callback: Callable[[Dict[str, Any]], None]):
+        """注册告警回调"""
+        self._alert_callbacks.append(callback)
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """获取所有指标"""
+        return dict(self._metrics)
+
+    def get_alerts(self) -> List[Dict[str, Any]]:
+        """获取所有告警"""
+        return self._alerts
+
+    def reset_metrics(self):
+        """重置指标"""
+        self._metrics.clear()
+        self._alerts.clear()
+
+
+# 全局指标收集器
+metrics_collector = MetricsCollector()
+
+
+def setup_metrics_collector():
+    """设置指标收集器，订阅所有事件"""
+    def on_event(event: Event):
+        metrics_collector.record_event(event)
+
+    event_bus.subscribe_global(on_event)
+    logger.info("[MetricsCollector] Subscribed to all events")

@@ -85,8 +85,7 @@ class ChitChatAgent(BaseAgent):
             # 2. 生成回复（带会话上下文）
             answer = self._generate_chitchat_response(question, conversation_history, user_profile)
 
-            # 3. 写入会话记忆
-            self._save_to_memory(conversation_id, question, answer)
+            # 记忆写入已移至 RouterAgent 统一处理
 
             return {
                 "answer": answer,
@@ -123,13 +122,31 @@ class ChitChatAgent(BaseAgent):
         logger.info(f"[ChitChatAgent] Stream chitchat: {question[:50]}...")
 
         try:
-            answer = self._generate_chitchat_response(question, user_profile=user_profile)
+            # 1. 读取会话记忆作为上下文
+            conversation_history = ""
+            if conversation_id and tool_registry.has_tool("conversation_memory_read"):
+                try:
+                    history = tool_registry.invoke_tool(
+                        "conversation_memory_read",
+                        {"conversation_id": conversation_id, "limit": 10}
+                    )
+                    messages = history.get("messages", [])
+                    if messages:
+                        conversation_history = self._format_history(messages)
+                        logger.info(f"[ChitChatAgent] Loaded {len(messages)} messages from memory")
+                except Exception as e:
+                    logger.warning(f"[ChitChatAgent] Failed to read conversation memory: {e}")
+
+            # 2. 生成回复（带会话上下文）
+            answer = self._generate_chitchat_response(question, conversation_history, user_profile)
 
             for char in answer:
                 yield json.dumps({
                     "type": "token",
                     "content": char
                 })
+
+            # 记忆写入已移至 RouterAgent 统一处理
 
             yield json.dumps({
                 "type": "end",

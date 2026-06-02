@@ -79,7 +79,9 @@ class KnowledgeQAAgent(BaseAgent):
             complexity = self.router.classify_complexity(question)
             logger.info(f"[KnowledgeQAAgent] Complexity: {complexity}")
 
-            if complexity == "medium":
+            if complexity == "complex":
+                return self._ask_with_orchestrator(question, conversation_id, user_id, full_context, user_profile=user_profile)
+            elif complexity == "medium":
                 return self._ask_l2(question, conversation_id, full_context, user_profile)
             else:
                 return self._ask_l1(question, conversation_id, full_context)
@@ -234,16 +236,17 @@ class KnowledgeQAAgent(BaseAgent):
 
     def _ask_with_orchestrator(self, question: str, conversation_id: Optional[str] = None,
                                user_id: Optional[str] = None, context: str = "",
-                               **kwargs) -> Dict[str, Any]:
+                               user_profile: str = "", **kwargs) -> Dict[str, Any]:
         """
-        使用原有的Orchestrator方式进行知识问答（回退方案）
+        使用原有的Orchestrator方式进行知识问答（L3复杂链路）
         """
-        logger.info(f"[KnowledgeQAAgent] Using orchestrator fallback...")
+        logger.info(f"[KnowledgeQAAgent] Using orchestrator for complex question...")
         result = self.orchestrator.run(
             input_text=question,
             conversation_id=conversation_id,
             user_id=user_id,
             context=context,
+            user_profile=user_profile,
             goal=f"回答知识问题: {question[:50]}...",
             **kwargs
         )

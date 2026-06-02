@@ -6,6 +6,7 @@ from workflows.admin_copilot_agent import AdminCopilotAgent
 from workflows.inspection_agent import InspectionAgent
 from workflows.retrieval_agent import RetrievalAgent
 from workflows.shopping_agent import ShoppingAgent
+from tools.registry import tool_registry
 from intent.classifier import IntentClassifier, IntentType
 import logging
 import json
@@ -66,42 +67,48 @@ class RouterAgent:
         logger.info(f"[RouterAgent] Routing to: {task_type.value} for input: {input_text[:50]}...")
 
         try:
+            result = None
             if task_type == TaskType.CHITCHAT:
-                return self.chitchat_agent.chat(
+                result = self.chitchat_agent.chat(
                     input_text, conversation_id, user_id, context, **kwargs
                 )
 
             elif task_type == TaskType.KNOWLEDGE_QA:
-                return self.knowledge_qa_agent.ask(
+                result = self.knowledge_qa_agent.ask(
                     input_text, conversation_id, user_id, context, **kwargs
                 )
 
             elif task_type == TaskType.ADMIN_COPILOT:
-                return self.admin_copilot_agent.handle(
+                result = self.admin_copilot_agent.handle(
                     input_text, conversation_id, user_id, context, **kwargs
                 )
 
             elif task_type == TaskType.KNOWLEDGE_INSPECTION:
-                # 从输入中解析巡检类型
                 inspection_type = self._parse_inspection_type(input_text)
-                return self.inspection_agent.inspect(
+                result = self.inspection_agent.inspect(
                     inspection_type, conversation_id, user_id, context, **kwargs
                 )
 
             elif task_type == TaskType.REASONING:
-                return self.reasoning_agent.reason(
+                result = self.reasoning_agent.reason(
                     input_text, context, conversation_id
                 )
 
             elif task_type == TaskType.SHOPPING:
-                return self.shopping_agent.recommend(
+                result = self.shopping_agent.recommend(
                     input_text, conversation_id, user_id, context, **kwargs
                 )
 
             else:
-                return self.knowledge_qa_agent.ask(
+                result = self.knowledge_qa_agent.ask(
                     input_text, conversation_id, user_id, context, **kwargs
                 )
+
+            # 统一写入记忆
+            if result and conversation_id:
+                self._save_to_memory(conversation_id, input_text, result.get("answer", ""))
+
+            return result
         except Exception as e:
             logger.error(f"[RouterAgent] Route error: {str(e)}")
             return {
@@ -139,22 +146,49 @@ class RouterAgent:
                 "task_type": task_type.value
             })
 
+            full_answer = ""
+
             if task_type == TaskType.CHITCHAT:
                 for event in self.chitchat_agent.chat_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
+                    # 提取token内容用于记忆写入
+                    try:
+                        parsed = json.loads(event) if isinstance(event, str) else event
+                        if parsed.get("type") == "token":
+                            full_answer += parsed.get("content", "")
+                        elif parsed.get("type") == "answer":
+                            full_answer = parsed.get("content", full_answer)
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
                     yield event
 
             elif task_type == TaskType.KNOWLEDGE_QA:
                 for event in self.knowledge_qa_agent.ask_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
+                    try:
+                        parsed = json.loads(event) if isinstance(event, str) else event
+                        if parsed.get("type") == "token":
+                            full_answer += parsed.get("content", "")
+                        elif parsed.get("type") == "answer":
+                            full_answer = parsed.get("content", full_answer)
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
                     yield event
 
             elif task_type == TaskType.ADMIN_COPILOT:
                 for event in self.admin_copilot_agent.handle_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
+                    try:
+                        parsed = json.loads(event) if isinstance(event, str) else event
+                        if parsed.get("type") == "token":
+                            full_answer += parsed.get("content", "")
+                        elif parsed.get("type") == "answer":
+                            full_answer = parsed.get("content", full_answer)
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
                     yield event
 
             elif task_type == TaskType.KNOWLEDGE_INSPECTION:
@@ -162,15 +196,24 @@ class RouterAgent:
                 for event in self.inspection_agent.inspect_stream(
                     inspection_type, conversation_id, user_id, context, **kwargs
                 ):
+                    try:
+                        parsed = json.loads(event) if isinstance(event, str) else event
+                        if parsed.get("type") == "token":
+                            full_answer += parsed.get("content", "")
+                        elif parsed.get("type") == "answer":
+                            full_answer = parsed.get("content", full_answer)
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
                     yield event
 
             elif task_type == TaskType.REASONING:
                 result = self.reasoning_agent.reason(
                     input_text, context, conversation_id
                 )
+                full_answer = result.get("answer", "")
                 yield json.dumps({
                     "type": "answer",
-                    "content": result.get("answer", ""),
+                    "content": full_answer,
                     "sources": result.get("sources", [])
                 })
 
@@ -178,13 +221,33 @@ class RouterAgent:
                 for event in self.shopping_agent.recommend_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
+                    try:
+                        parsed = json.loads(event) if isinstance(event, str) else event
+                        if parsed.get("type") == "token":
+                            full_answer += parsed.get("content", "")
+                        elif parsed.get("type") == "answer":
+                            full_answer = parsed.get("content", full_answer)
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
                     yield event
 
             else:
                 for event in self.knowledge_qa_agent.ask_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
+                    try:
+                        parsed = json.loads(event) if isinstance(event, str) else event
+                        if parsed.get("type") == "token":
+                            full_answer += parsed.get("content", "")
+                        elif parsed.get("type") == "answer":
+                            full_answer = parsed.get("content", full_answer)
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
                     yield event
+
+            # 流式结束后统一写入记忆
+            if full_answer and conversation_id:
+                self._save_to_memory(conversation_id, input_text, full_answer)
 
         except Exception as e:
             logger.error(f"[RouterAgent] Stream route error: {str(e)}")
@@ -282,3 +345,20 @@ class RouterAgent:
     def get_task_stats(self) -> Dict[str, int]:
         """获取各类关键词数量统计（用于调试和分析）"""
         return self.classifier.get_keyword_stats()
+
+    def _save_to_memory(self, conversation_id: str, question: str, answer: str):
+        """统一记忆写入 - 所有Agent执行后调用"""
+        if not conversation_id or not tool_registry.has_tool("conversation_memory_write"):
+            return
+        try:
+            tool_registry.invoke_tool(
+                "conversation_memory_write",
+                {"conversation_id": conversation_id, "role": "user", "content": question}
+            )
+            tool_registry.invoke_tool(
+                "conversation_memory_write",
+                {"conversation_id": conversation_id, "role": "assistant", "content": answer}
+            )
+            logger.info(f"[RouterAgent] Saved to memory: conversation_id={conversation_id}")
+        except Exception as e:
+            logger.warning(f"[RouterAgent] Failed to save memory: {e}")

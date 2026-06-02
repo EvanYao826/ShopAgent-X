@@ -249,5 +249,5 @@ class ChitChatAgent(BaseAgent):
 
             response = llm.generate(prompt, temperature=0.7, max_tokens=150)
             return response.strip()
-        except:
+        except Exception as e:
             return self.chitchat_prompts["default"][0]

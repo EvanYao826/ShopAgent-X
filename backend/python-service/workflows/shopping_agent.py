@@ -69,9 +69,6 @@ class ShoppingAgent(BaseAgent):
             # 7. 构建商品卡片
             product_cards = self._build_product_cards(products)
 
-            # 8. 保存对话记忆
-            self._save_to_memory(conversation_id, question, answer)
-
             sources = self._build_sources(docs)
 
             return {

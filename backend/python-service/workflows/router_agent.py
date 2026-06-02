@@ -152,43 +152,21 @@ class RouterAgent:
                 for event in self.chitchat_agent.chat_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
-                    # 提取token内容用于记忆写入
-                    try:
-                        parsed = json.loads(event) if isinstance(event, str) else event
-                        if parsed.get("type") == "token":
-                            full_answer += parsed.get("content", "")
-                        elif parsed.get("type") == "answer":
-                            full_answer = parsed.get("content", full_answer)
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
+                    full_answer = self._extract_answer_from_event(event, full_answer)
                     yield event
 
             elif task_type == TaskType.KNOWLEDGE_QA:
                 for event in self.knowledge_qa_agent.ask_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
-                    try:
-                        parsed = json.loads(event) if isinstance(event, str) else event
-                        if parsed.get("type") == "token":
-                            full_answer += parsed.get("content", "")
-                        elif parsed.get("type") == "answer":
-                            full_answer = parsed.get("content", full_answer)
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
+                    full_answer = self._extract_answer_from_event(event, full_answer)
                     yield event
 
             elif task_type == TaskType.ADMIN_COPILOT:
                 for event in self.admin_copilot_agent.handle_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
-                    try:
-                        parsed = json.loads(event) if isinstance(event, str) else event
-                        if parsed.get("type") == "token":
-                            full_answer += parsed.get("content", "")
-                        elif parsed.get("type") == "answer":
-                            full_answer = parsed.get("content", full_answer)
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
+                    full_answer = self._extract_answer_from_event(event, full_answer)
                     yield event
 
             elif task_type == TaskType.KNOWLEDGE_INSPECTION:
@@ -196,14 +174,7 @@ class RouterAgent:
                 for event in self.inspection_agent.inspect_stream(
                     inspection_type, conversation_id, user_id, context, **kwargs
                 ):
-                    try:
-                        parsed = json.loads(event) if isinstance(event, str) else event
-                        if parsed.get("type") == "token":
-                            full_answer += parsed.get("content", "")
-                        elif parsed.get("type") == "answer":
-                            full_answer = parsed.get("content", full_answer)
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
+                    full_answer = self._extract_answer_from_event(event, full_answer)
                     yield event
 
             elif task_type == TaskType.REASONING:
@@ -221,28 +192,14 @@ class RouterAgent:
                 for event in self.shopping_agent.recommend_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
-                    try:
-                        parsed = json.loads(event) if isinstance(event, str) else event
-                        if parsed.get("type") == "token":
-                            full_answer += parsed.get("content", "")
-                        elif parsed.get("type") == "answer":
-                            full_answer = parsed.get("content", full_answer)
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
+                    full_answer = self._extract_answer_from_event(event, full_answer)
                     yield event
 
             else:
                 for event in self.knowledge_qa_agent.ask_stream(
                     input_text, conversation_id, user_id, context, **kwargs
                 ):
-                    try:
-                        parsed = json.loads(event) if isinstance(event, str) else event
-                        if parsed.get("type") == "token":
-                            full_answer += parsed.get("content", "")
-                        elif parsed.get("type") == "answer":
-                            full_answer = parsed.get("content", full_answer)
-                    except (json.JSONDecodeError, AttributeError):
-                        pass
+                    full_answer = self._extract_answer_from_event(event, full_answer)
                     yield event
 
             # 流式结束后统一写入记忆
@@ -345,6 +302,18 @@ class RouterAgent:
     def get_task_stats(self) -> Dict[str, int]:
         """获取各类关键词数量统计（用于调试和分析）"""
         return self.classifier.get_keyword_stats()
+
+    def _extract_answer_from_event(self, event, full_answer: str) -> str:
+        """从流式事件中提取答案内容用于记忆写入"""
+        try:
+            parsed = json.loads(event) if isinstance(event, str) else event
+            if parsed.get("type") == "token":
+                full_answer += parsed.get("content", "")
+            elif parsed.get("type") == "answer":
+                full_answer = parsed.get("content", full_answer)
+        except (json.JSONDecodeError, AttributeError):
+            pass
+        return full_answer
 
     def _save_to_memory(self, conversation_id: str, question: str, answer: str):
         """统一记忆写入 - 所有Agent执行后调用"""

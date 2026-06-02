@@ -118,7 +118,7 @@ class ToolExecutionTracker:
                 config.logger.info(f"Cleared tool calls for run_id: {run_id}")
 
     def _cleanup_expired(self):
-        """清理过期的记录"""
+        """清理过期记录，如果清理后仍超容量则强制删除最旧的记录"""
         now = time.time()
         expired_ids = [
             call_id for call_id, record in self._tool_calls.items()
@@ -132,6 +132,21 @@ class ToolExecutionTracker:
                     del self._run_tool_calls[record.run_id]
         if expired_ids:
             config.logger.info(f"Cleaned up {len(expired_ids)} expired tool call records")
+
+        # 如果清理过期记录后仍超容量，强制删除最旧的记录
+        if len(self._tool_calls) >= self.MAX_RECORDS:
+            sorted_ids = sorted(
+                self._tool_calls.keys(),
+                key=lambda cid: self._tool_calls[cid].created_at
+            )
+            remove_count = len(sorted_ids) - self.MAX_RECORDS + 1
+            for call_id in sorted_ids[:remove_count]:
+                record = self._tool_calls.pop(call_id)
+                if record.run_id in self._run_tool_calls:
+                    self._run_tool_calls[record.run_id].remove(call_id)
+                    if not self._run_tool_calls[record.run_id]:
+                        del self._run_tool_calls[record.run_id]
+            config.logger.info(f"Force removed {remove_count} oldest tool call records")
 
 
 # 全局工具执行跟踪器

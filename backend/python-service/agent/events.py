@@ -50,7 +50,6 @@ class Event:
         }
 
 
-@dataclass
 class RunStartedEvent(Event):
     """运行开始事件"""
     def __init__(self, run_id: str, goal: str, input_data: str, **kwargs):
@@ -61,7 +60,6 @@ class RunStartedEvent(Event):
         )
 
 
-@dataclass
 class RunCompletedEvent(Event):
     """运行完成事件"""
     def __init__(self, run_id: str, output: Dict[str, Any], **kwargs):
@@ -72,7 +70,6 @@ class RunCompletedEvent(Event):
         )
 
 
-@dataclass
 class RunFailedEvent(Event):
     """运行失败事件"""
     def __init__(self, run_id: str, error: str, error_code: Optional[str] = None, **kwargs):
@@ -98,7 +95,6 @@ class StepEvent(Event):
         return result
 
 
-@dataclass
 class StepStartedEvent(StepEvent):
     """步骤开始事件"""
     def __init__(self, run_id: str, step_id: str, step_name: str, step_type: str, **kwargs):
@@ -111,7 +107,6 @@ class StepStartedEvent(StepEvent):
         )
 
 
-@dataclass
 class StepCompletedEvent(StepEvent):
     """步骤完成事件"""
     def __init__(self, run_id: str, step_id: str, step_name: str, step_type: str,
@@ -126,7 +121,6 @@ class StepCompletedEvent(StepEvent):
         )
 
 
-@dataclass
 class StepFailedEvent(StepEvent):
     """步骤失败事件"""
     def __init__(self, run_id: str, step_id: str, step_name: str, step_type: str,
@@ -154,7 +148,6 @@ class ToolCallEvent(Event):
         return result
 
 
-@dataclass
 class ToolCallCompletedEvent(ToolCallEvent):
     """工具调用完成事件"""
     def __init__(self, run_id: str, tool_call_id: str, tool_name: str,
@@ -168,7 +161,6 @@ class ToolCallCompletedEvent(ToolCallEvent):
         )
 
 
-@dataclass
 class ToolCallFailedEvent(ToolCallEvent):
     """工具调用失败事件"""
     def __init__(self, run_id: str, tool_call_id: str, tool_name: str,
@@ -182,7 +174,6 @@ class ToolCallFailedEvent(ToolCallEvent):
         )
 
 
-@dataclass
 class AnswerGeneratedEvent(Event):
     """答案生成事件"""
     def __init__(self, run_id: str, answer: str, sources: List[Dict[str, Any]], **kwargs):
@@ -263,6 +254,7 @@ class MetricsCollector:
                         "count": 0,
                         "success_count": 0,
                         "fail_count": 0,
+                        "consecutive_fail_count": 0,
                         "total_duration_ms": 0,
                         "last_occurred": None
                     })
@@ -280,8 +272,10 @@ class MetricsCollector:
         # 根据事件类型更新成功/失败计数
         if "completed" in event.event_type.lower() or "success" in event.event_type.lower():
             metric["success_count"] += 1
+            metric["consecutive_fail_count"] = 0  # 成功时重置连续失败计数
         elif "failed" in event.event_type.lower() or "error" in event.event_type.lower():
             metric["fail_count"] += 1
+            metric["consecutive_fail_count"] += 1
             # 检查是否需要触发告警
             self._check_alert(metric_key, event)
 
@@ -296,11 +290,12 @@ class MetricsCollector:
         metric = self._metrics[metric_key]
 
         # 连续失败3次触发告警
-        if metric["fail_count"] >= 3:
+        if metric["consecutive_fail_count"] >= 3:
             alert = {
                 "type": "consecutive_failures",
                 "metric_key": metric_key,
-                "fail_count": metric["fail_count"],
+                "consecutive_fail_count": metric["consecutive_fail_count"],
+                "total_fail_count": metric["fail_count"],
                 "last_error": event.data.get("error", "Unknown error"),
                 "timestamp": datetime.now().isoformat()
             }

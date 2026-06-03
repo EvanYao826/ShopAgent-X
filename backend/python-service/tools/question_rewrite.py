@@ -20,6 +20,12 @@ class QuestionRewriteTool(Tool):
                     description="对话上下文（可选）",
                     required=False,
                     default=""
+                ),
+                "user_profile": SchemaProperty(
+                    type="string",
+                    description="用户画像（可选，如性别、肤质、偏好）",
+                    required=False,
+                    default=""
                 )
             },
             type="object"
@@ -63,22 +69,28 @@ class QuestionRewriteTool(Tool):
         """执行问题重写"""
         question = parameters.get("question")
         conversation_context = parameters.get("conversation_context", "")
-        
+        user_profile = parameters.get("user_profile", "")
+
         # 构建重写提示
+        profile_section = ""
+        if user_profile:
+            profile_section = f"\n用户画像：{user_profile}\n"
+
         rewrite_prompt = f"""
         你是一个问题重写专家。请将用户的原始问题重写为更适合知识库检索的形式。
-        
+
         原始问题：{question}
-        
+
         对话上下文：
         {conversation_context if conversation_context else "无"}
-        
+        {profile_section}
         要求：
         1. 保持问题的核心意图不变
         2. 使用更正式、明确的语言
         3. 补充可能缺失的关键信息
         4. 优化关键词，使其更适合向量检索
-        5. 直接返回重写后的问题，不要添加任何前缀或解释
+        5. 如果用户有肤质/偏好信息，在重写时补充相关限定词（如油性→控油，敏感肌→温和）
+        6. 直接返回重写后的问题，不要添加任何前缀或解释
         """
         
         # 使用 LLM 重写问题

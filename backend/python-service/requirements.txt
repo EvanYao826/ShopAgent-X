@@ -3,6 +3,7 @@ uvicorn>=0.27.1
 langchain>=0.1.11
 langchain-community>=0.0.27
 langchain-core>=0.1.30
+langchain-openai>=0.1.0
 langchain-experimental>=0.0.1
 python-multipart>=0.0.9
 pypdf>=4.1.0

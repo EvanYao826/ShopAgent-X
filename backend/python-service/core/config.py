@@ -18,6 +18,14 @@ class ConfigManager:
         self.EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "dashscope")
         # 本地Embedding模型名称（仅当EMBEDDING_MODEL=local时生效）
         self.LOCAL_EMBEDDING_MODEL = os.getenv("LOCAL_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
+
+        # LLM 模型选择：doubao 或 dashscope
+        self.LLM_PROVIDER = os.getenv("LLM_PROVIDER", "dashscope").lower()
+
+        # 豆包模型配置
+        self.DOUBAO_API_KEY = os.getenv("DOUBAO_API_KEY", "")
+        self.DOUBAO_BASE_URL = os.getenv("DOUBAO_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3/")
+        self.DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "ep-20260514111645-lmgt2")
         
         # Milvus Configuration
         self.MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")

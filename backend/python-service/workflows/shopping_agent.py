@@ -49,7 +49,7 @@ class ShoppingAgent(BaseAgent):
             logger.info(f"[ShoppingAgent] Retrieved {len(docs)} documents")
 
             # 3. 从 MySQL 搜索匹配商品
-            products = self._search_products(question)
+            products = self._search_products(question, user_profile)
             logger.info(f"[ShoppingAgent] Found {len(products)} products from DB")
 
             # 4. 构建商品信息上下文
@@ -101,7 +101,7 @@ class ShoppingAgent(BaseAgent):
             docs = self.vector_store.search(
                 query=question, k=8, similarity_threshold=0.6, use_rerank=False
             )
-            products = self._search_products(question)
+            products = self._search_products(question, user_profile)
             product_context = self._build_product_context(products)
             sources = self._build_sources(docs)
             logger.info(f"[ShoppingAgent] Stream: found {len(products)} products, {len(docs)} docs")
@@ -135,7 +135,7 @@ class ShoppingAgent(BaseAgent):
                 "content": "为您查找商品时遇到问题，请稍后再试。"
             })
 
-    def _search_products(self, question: str) -> List[Dict[str, Any]]:
+    def _search_products(self, question: str, user_profile: str = "") -> List[Dict[str, Any]]:
         """从 MySQL 搜索匹配商品"""
         try:
             # 提取关键词进行商品搜索
@@ -172,16 +172,76 @@ class ShoppingAgent(BaseAgent):
                 "户外装备": ["徒步鞋", "户外裤", "背包"],
             }
 
+            # 从用户画像中提取偏好关键词，用于补充搜索
+            profile_preferences = []
+            if user_profile:
+                import re
+                # 提取"偏好：运动、数码"中的标签
+                pref_match = re.search(r'偏好[：:]\s*([^；;]+)', user_profile)
+                if pref_match:
+                    profile_preferences = [tag.strip() for tag in re.split(r'[、,，]', pref_match.group(1)) if tag.strip()]
+                # 提取"肤质：油性"用于护肤品场景
+                skin_match = re.search(r'肤质[：:]\s*([^；;]+)', user_profile)
+                if skin_match:
+                    profile_preferences.append(skin_match.group(1).strip())
+
+            # 精确匹配：用户说具体品类时，只匹配对应数据库品类，不展开
+            # 解决"推荐跑鞋"误匹配"篮球鞋"的问题
+            PRECISE_MATCH_MAP = {
+                "跑鞋": ["跑步鞋"],
+                "跑步鞋": ["跑步鞋"],
+                "跑步": ["跑步鞋"],
+                "篮球鞋": ["篮球鞋"],
+                "篮球": ["篮球鞋"],
+                "徒步鞋": ["徒步鞋"],
+                "徒步": ["徒步鞋"],
+                "咖啡": ["咖啡"],
+                "茶": ["茶饮"],
+                "茶饮": ["茶饮"],
+                "牛奶": ["牛奶"],
+                "碳酸": ["碳酸饮料"],
+                "面膜": ["面膜"],
+                "精华": ["精华"],
+                "防晒": ["防晒霜", "防晒"],
+                "眼霜": ["眼霜"],
+                "面霜": ["面霜"],
+                "洁面": ["洁面"],
+                "卸妆": ["卸妆"],
+                "坚果": ["坚果"],
+                "手机": ["智能手机"],
+                "笔记本": ["笔记本电脑"],
+                "平板": ["平板电脑"],
+                "耳机": ["真无线耳机"],
+                "背包": ["背包"],
+            }
+
+            # 泛词集合：这些词需要展开子品类
+            BROAD_KEYWORDS = {"衣服", "裤子", "鞋", "鞋子", "运动鞋", "护肤品", "护肤",
+                              "水乳", "彩妆", "化妆品", "数码", "零食", "饮料",
+                              "运动装备", "户外装备"}
+
             import re
             search_terms = []
             for kw in keywords:
-                search_terms.append(kw)
+                # 优先级1：精确匹配（"跑鞋" → 只匹配"跑步鞋"，不展开）
+                if kw in PRECISE_MATCH_MAP:
+                    for term in PRECISE_MATCH_MAP[kw]:
+                        if term not in search_terms:
+                            search_terms.append(term)
+                    continue  # 精确命中后跳过泛词展开和拆字逻辑
 
-                # 同义词展开（"衣服" → "卫衣","T恤","短袖","速干"）
-                if kw in SYNONYM_MAP:
+                # 优先级2：泛词展开（"鞋子" → "篮球鞋","跑步鞋","徒步鞋","运动鞋"）
+                if kw in BROAD_KEYWORDS and kw in SYNONYM_MAP:
+                    if kw not in search_terms:
+                        search_terms.append(kw)
                     for syn in SYNONYM_MAP[kw]:
                         if syn not in search_terms:
                             search_terms.append(syn)
+                    continue  # 泛词展开后跳过拆字逻辑
+
+                # 优先级3：普通关键词 + 拆字匹配
+                if kw not in search_terms:
+                    search_terms.append(kw)
 
                 cn_chars = re.findall(r'[一-鿿]', kw)
                 # 2字中文词：拆出首字 + 去掉"子/品/物"后缀的词根
@@ -200,6 +260,13 @@ class ShoppingAgent(BaseAgent):
                         sub = ''.join(cn_chars[i:i+2])
                         if sub not in search_terms:
                             search_terms.append(sub)
+
+            # 用户画像偏好补充：当查询较短（≤2个搜索词）时，用偏好关键词补充
+            # 避免"推荐护肤品"返回与用户肤质/偏好无关的商品
+            if profile_preferences and len(search_terms) <= 2:
+                for pref in profile_preferences:
+                    if pref not in search_terms and len(pref) >= 2:
+                        search_terms.append(pref)
 
             # 用 LIKE 模糊匹配
             conditions = " OR ".join([
@@ -360,6 +427,8 @@ class ShoppingAgent(BaseAgent):
             f"3. 不要用与用户性别不符的称呼\n"
             f"4. 直接推荐2-3款，说明核心卖点即可\n"
             f"5. 不要编造商品不存在的功能\n"
+            f"6. 如果用户有肤质信息，推荐护肤品时说明是否适合该肤质\n"
+            f"7. 如果用户有偏好标签，优先推荐与偏好相关的商品\n"
         )
         try:
             return self.llm_service.llm.invoke(prompt).content

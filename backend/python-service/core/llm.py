@@ -2,7 +2,6 @@ import os
 import json
 import requests
 from typing import AsyncGenerator, Generator
-from langchain_community.llms import Tongyi
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from PIL import Image
@@ -17,27 +16,52 @@ if config.TESSERACT_PATH:
 
 class LLMService:
     def __init__(self):
-        # 默认使用阿里云通义千问 (需要设置 DASHSCOPE_API_KEY 环境变量)
-        api_key = config.DASHSCOPE_API_KEY
-        
-        if not api_key:
-            config.logger.warning("DASHSCOPE_API_KEY not found. LLM features will not work properly.")
-            self.llm = None
+        # 根据配置选择 LLM 提供商
+        provider = config.LLM_PROVIDER
+        config.logger.info(f"Initializing LLM with provider: {provider}")
+
+        if provider == "doubao":
+            # 使用豆包模型（Doubao-Seed-2.0-lite）
+            try:
+                from langchain_openai import ChatOpenAI
+            except ImportError:
+                config.logger.error("langchain_openai not installed. Run: pip install langchain-openai")
+                self.llm = None
+                return
+
+            api_key = config.DOUBAO_API_KEY
+            if not api_key:
+                config.logger.warning("DOUBAO_API_KEY not found. LLM features will not work properly.")
+                self.llm = None
+            else:
+                self.llm = ChatOpenAI(
+                    model=config.DOUBAO_MODEL,
+                    api_key=api_key,
+                    base_url=config.DOUBAO_BASE_URL,
+                    streaming=True
+                )
+                config.logger.info(f"Using Doubao model: {config.DOUBAO_MODEL}")
         else:
-            # 使用 qwen-plus 模型，效果比 turbo 好，适合知识库问答
-            # 如果需要更强的推理能力，可以使用 qwen-max
-            # 启用流式输出
-            self.llm = Tongyi(
-                model_name="qwen-plus",
-                api_key=api_key,
-                streaming=True  # 启用流式输出
-            )
+            # 使用阿里云通义千问（默认）
+            from langchain_community.llms import Tongyi
+
+            api_key = config.DASHSCOPE_API_KEY
+            if not api_key:
+                config.logger.warning("DASHSCOPE_API_KEY not found. LLM features will not work properly.")
+                self.llm = None
+            else:
+                self.llm = Tongyi(
+                    model_name="qwen-plus",
+                    api_key=api_key,
+                    streaming=True
+                )
+                config.logger.info("Using DashScope qwen-plus model")
 
         # 优化后的 Prompt 模板
         # 支持对话上下文和知识库上下文
         self.prompt = PromptTemplate.from_template(
             """
-            你是智能导购助手「小智」，专注于数码产品、美妆护肤、运动户外等商品推荐。
+            你是智能导购助手「小智」，专注于数码产品、美妆护肤、运动户外等商品推荐和商品知识问答。
 
             我们商城主要商品类别：
             - 数码产品：智能手机（iPhone、华为、小米、OPPO、vivo）、耳机（AirPods、Sony）、平板（iPad）、笔记本（MacBook、联想）
@@ -55,7 +79,8 @@ class LLMService:
             4. 如果有相关商品信息，直接推荐2-3款，说明核心卖点即可
             5. 如果没有相关信息，简短告知并建议换个关键词
             6. 不要提及"AI服务不可用"、"系统错误"等技术问题
-            7. 【重要】推荐商品时，严格按照「相关商品信息」中列出的顺序来推荐，不要自行调换顺序。例如商品信息中第一个商品是A，就先推荐A，第二个是B，再推荐B，以此类推
+            7. 【重要】推荐商品时，严格按照「相关商品信息」中列出的顺序来推荐，不要自行调换顺序
+            8. 【重要】只回答与商城商品相关的问题。如果用户问的问题与商品无关（如政治、历史、编程等），请礼貌地引导用户咨询商品相关问题
 
             对话历史：
             {conversation_context}

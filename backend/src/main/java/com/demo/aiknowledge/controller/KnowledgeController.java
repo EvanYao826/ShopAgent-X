@@ -4,6 +4,7 @@ import com.demo.aiknowledge.common.Result;
 import com.demo.aiknowledge.entity.KnowledgeDoc;
 import com.demo.aiknowledge.service.KnowledgeService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -33,7 +34,9 @@ public class KnowledgeController {
     }
 
     @GetMapping("/view/{id}")
-    public Result<KnowledgeDoc> view(@PathVariable Long id, @RequestParam Long userId) {
+    public Result<KnowledgeDoc> view(@PathVariable Long id) {
+        // IDOR修复：从JWT获取userId
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         return Result.success(knowledgeService.viewDoc(id, userId));
     }
 }

@@ -26,6 +26,11 @@ public class AgentRunServiceImpl implements AgentRunService {
     public void saveAgentRun(AgentRun agentRun) {
         agentRunMapper.insert(agentRun);
     }
+
+    @Override
+    public void updateAgentRun(AgentRun agentRun) {
+        agentRunMapper.updateById(agentRun);
+    }
     
     @Override
     public AgentRun getAgentRunById(String id) {

@@ -372,7 +372,13 @@ fun MainNavigation() {
                     onLogout = {
                         authViewModel.logout()
                         chatViewModel.clearState()
-                        cartViewModel.clearError()
+                        cartViewModel.clearState()
+                        productViewModel.clearState()
+                        favoriteViewModel.clearState()
+                        historyViewModel.clearState()
+                        addressViewModel.clearState()
+                        orderViewModel.clearState()
+                        profileViewModel.clearState()
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }

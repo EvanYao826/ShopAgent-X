@@ -286,4 +286,9 @@ class CartViewModel(
             }
         }
     }
+
+    fun clearState() {
+        _uiState.value = CartUiState()
+        loadCartList()
+    }
 }

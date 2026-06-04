@@ -415,7 +415,7 @@ async def ask_question_stream(request: ChatRequest):
     async def event_generator():
         nonlocal final_answer, final_task_type
         try:
-            logger.info(f"Streaming question: {request.question}, username: {request.username}, is_admin: {request.is_admin}, gender: {request.gender}")
+            logger.info(f"Streaming question: {request.question}, conversation_id: {request.conversation_id}, username: {request.username}")
 
             # 处理身份相关问题
             lower_question = request.question.lower()

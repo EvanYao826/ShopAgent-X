@@ -85,8 +85,7 @@ class ChitChatAgent(BaseAgent):
             # 2. 生成回复（带会话上下文）
             answer = self._generate_chitchat_response(question, conversation_history, user_profile)
 
-            # 3. 写入会话记忆
-            self._save_to_memory(conversation_id, question, answer)
+            # 记忆写入已移至 RouterAgent 统一处理
 
             return {
                 "answer": answer,
@@ -123,22 +122,56 @@ class ChitChatAgent(BaseAgent):
         logger.info(f"[ChitChatAgent] Stream chitchat: {question[:50]}...")
 
         try:
-            answer = self._generate_chitchat_response(question, user_profile=user_profile)
+            # 1. 读取会话记忆作为上下文
+            conversation_history = ""
+            if conversation_id and tool_registry.has_tool("conversation_memory_read"):
+                try:
+                    history = tool_registry.invoke_tool(
+                        "conversation_memory_read",
+                        {"conversation_id": conversation_id, "limit": 10}
+                    )
+                    messages = history.get("messages", [])
+                    if messages:
+                        conversation_history = self._format_history(messages)
+                        logger.info(f"[ChitChatAgent] Loaded {len(messages)} messages from memory")
+                except Exception as e:
+                    logger.warning(f"[ChitChatAgent] Failed to read conversation memory: {e}")
 
-            for char in answer:
-                yield json.dumps({
-                    "type": "token",
-                    "content": char
-                })
+            # 2. 检查是否需要调用 LLM（简单场景直接返回，不需要流式）
+            lower_question = question.lower()
+            simple_keywords = ["你好", "您好", "hello", "hi", "早上好", "下午好", "晚上好",
+                               "谢谢", "感谢", "多谢", "你叫什么", "你是谁", "几点", "时间"]
+            is_simple = any(kw in lower_question for kw in simple_keywords)
 
-            yield json.dumps({
-                "type": "end",
-                "content": {
-                    "answer": answer,
-                    "sources": [],
-                    "task_type": "chitchat"
-                }
-            })
+            if is_simple:
+                # 简单场景，直接返回预设回复
+                answer = self._generate_chitchat_response(question, conversation_history, user_profile)
+                yield json.dumps({"type": "token", "content": answer})
+            else:
+                # 3. 复杂场景，使用真正的流式 LLM
+                context_section = ""
+                if conversation_history:
+                    context_section = f"\n对话历史：\n{conversation_history}\n请基于对话历史回复用户。"
+
+                profile_section = ""
+                if user_profile:
+                    profile_section = f"\n用户画像：{user_profile}"
+
+                prompt = f"""你是智能导购助手「小智」，请用自然、亲切的方式回复用户，就像朋友之间聊天一样。
+回复要简短有趣，80字以内。
+根据用户画像调整称呼：男性用「兄弟/哥们」，女性用「姐妹/小姐姐」。
+可以自然引导用户咨询商品，但不要生硬推销。
+{profile_section}
+{context_section}
+
+用户说：{question}"""
+
+                # 使用真正的流式 LLM
+                for chunk in llm.get_answer_stream(prompt, [], "", user_profile):
+                    yield chunk
+
+            # 记忆写入已移至 RouterAgent 统一处理
+
         except Exception as e:
             logger.error(f"[ChitChatAgent] Stream error: {str(e)}")
             yield json.dumps({
@@ -232,5 +265,5 @@ class ChitChatAgent(BaseAgent):
 
             response = llm.generate(prompt, temperature=0.7, max_tokens=150)
             return response.strip()
-        except:
+        except Exception as e:
             return self.chitchat_prompts["default"][0]

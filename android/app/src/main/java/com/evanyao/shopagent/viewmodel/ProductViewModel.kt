@@ -374,4 +374,10 @@ class ProductViewModel(
     fun clearProductDetail() {
         _uiState.value = _uiState.value.copy(productDetail = ProductDetailState())
     }
+
+    fun clearState() {
+        _uiState.value = ProductUiState()
+        loadCategories()
+        loadProducts(reset = true)
+    }
 }

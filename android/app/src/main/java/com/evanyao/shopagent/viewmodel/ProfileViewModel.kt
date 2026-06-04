@@ -109,4 +109,8 @@ class ProfileViewModel(
     fun clearUpdateSuccess() {
         _uiState.value = _uiState.value.copy(updateSuccess = false)
     }
+
+    fun clearState() {
+        _uiState.value = ProfileUiState()
+    }
 }

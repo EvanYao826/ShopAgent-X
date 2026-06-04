@@ -3,6 +3,7 @@ package com.evanyao.shopagent.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.evanyao.shopagent.data.model.AddressRequest
 import com.evanyao.shopagent.data.repository.AddressRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,14 +42,14 @@ class AddressViewModel(
                 if (response.isSuccess && response.data != null) {
                     val list = response.data.map { item ->
                         AddressItem(
-                            id = (item["id"] as? Number)?.toLong() ?: 0L,
-                            receiverName = item["receiverName"] as? String ?: "",
-                            phone = item["phone"] as? String ?: "",
-                            province = item["province"] as? String ?: "",
-                            city = item["city"] as? String ?: "",
-                            district = item["district"] as? String ?: "",
-                            detail = item["detail"] as? String ?: "",
-                            isDefault = (item["isDefault"] as? Number)?.toInt() == 1
+                            id = item.id,
+                            receiverName = item.receiverName,
+                            phone = item.phone,
+                            province = item.province,
+                            city = item.city,
+                            district = item.district,
+                            detail = item.detail,
+                            isDefault = item.isDefault == 1
                         )
                     }
                     _uiState.value = _uiState.value.copy(isLoading = false, addressList = list)
@@ -69,14 +70,14 @@ class AddressViewModel(
     ) {
         viewModelScope.launch {
             try {
-                val response = addressRepository.add(mapOf(
-                    "receiverName" to receiverName,
-                    "phone" to phone,
-                    "province" to province,
-                    "city" to city,
-                    "district" to district,
-                    "detail" to detail,
-                    "isDefault" to if (isDefault) 1 else 0
+                val response = addressRepository.add(AddressRequest(
+                    receiverName = receiverName,
+                    phone = phone,
+                    province = province,
+                    city = city,
+                    district = district,
+                    detail = detail,
+                    isDefault = if (isDefault) 1 else 0
                 ))
                 if (response.isSuccess) {
                     _uiState.value = _uiState.value.copy(operationSuccess = true)
@@ -98,15 +99,15 @@ class AddressViewModel(
     ) {
         viewModelScope.launch {
             try {
-                val response = addressRepository.update(mapOf(
-                    "id" to id,
-                    "receiverName" to receiverName,
-                    "phone" to phone,
-                    "province" to province,
-                    "city" to city,
-                    "district" to district,
-                    "detail" to detail,
-                    "isDefault" to if (isDefault) 1 else 0
+                val response = addressRepository.update(AddressRequest(
+                    id = id,
+                    receiverName = receiverName,
+                    phone = phone,
+                    province = province,
+                    city = city,
+                    district = district,
+                    detail = detail,
+                    isDefault = if (isDefault) 1 else 0
                 ))
                 if (response.isSuccess) {
                     _uiState.value = _uiState.value.copy(operationSuccess = true)
@@ -157,5 +158,9 @@ class AddressViewModel(
 
     fun clearOperationSuccess() {
         _uiState.value = _uiState.value.copy(operationSuccess = false)
+    }
+
+    fun clearState() {
+        _uiState.value = AddressUiState()
     }
 }

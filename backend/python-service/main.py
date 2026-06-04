@@ -10,9 +10,13 @@ load_dotenv(dotenv_path=env_path)
 
 from api.routes import router
 from api.agent_routes import router as agent_router
+from agent.events import setup_metrics_collector
 import tools
 
 app = FastAPI(title="AI Knowledge System - Python Service")
+
+# 初始化指标收集器
+setup_metrics_collector()
 
 # 配置 CORS
 app.add_middleware(

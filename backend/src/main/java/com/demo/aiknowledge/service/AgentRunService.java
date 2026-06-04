@@ -7,6 +7,7 @@ import java.util.List;
 
 public interface AgentRunService {
     void saveAgentRun(AgentRun agentRun);
+    void updateAgentRun(AgentRun agentRun);
     AgentRun getAgentRunById(String id);
     AgentRun getAgentRunByRunId(String runId);
     AgentRunResponse getAgentRunResponseById(String id);

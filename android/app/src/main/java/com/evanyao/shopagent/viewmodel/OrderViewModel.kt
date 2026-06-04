@@ -282,4 +282,7 @@ class OrderViewModel(private val orderRepository: OrderRepository) : ViewModel()
         _uiState.value = _uiState.value.copy(createSuccess = false)
     }
 
+    fun clearState() {
+        _uiState.value = OrderUiState()
+    }
 }

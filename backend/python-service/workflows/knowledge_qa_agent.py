@@ -79,10 +79,12 @@ class KnowledgeQAAgent(BaseAgent):
             complexity = self.router.classify_complexity(question)
             logger.info(f"[KnowledgeQAAgent] Complexity: {complexity}")
 
-            if complexity == "medium":
+            if complexity == "complex":
+                return self._ask_with_orchestrator(question, conversation_id, user_id, full_context, user_profile=user_profile)
+            elif complexity == "medium":
                 return self._ask_l2(question, conversation_id, full_context, user_profile)
             else:
-                return self._ask_l1(question, conversation_id, full_context)
+                return self._ask_l1(question, conversation_id, full_context, user_profile)
 
         except Exception as e:
             logger.error(f"[KnowledgeQAAgent] QA failed: {e}", exc_info=True)
@@ -95,7 +97,7 @@ class KnowledgeQAAgent(BaseAgent):
             }
 
     def _ask_l1(self, question: str, conversation_id: Optional[str],
-                full_context: str) -> Dict[str, Any]:
+                full_context: str, user_profile: str = "") -> Dict[str, Any]:
         """L1 简化链路：直接检索+生成"""
         # 直接向量检索
         docs = self.vector_store.search(
@@ -108,11 +110,9 @@ class KnowledgeQAAgent(BaseAgent):
                 answer = self.llm_service.get_answer(question, [], full_context, user_profile)
             else:
                 answer = "抱歉，知识库中没有找到与您问题相关的内容。"
-            self._save_to_memory(conversation_id, question, answer)
             return {"answer": answer, "sources": [], "has_sources": False, "task_type": "knowledge_qa"}
 
         answer = self.llm_service.get_answer(question, docs, full_context, user_profile)
-        self._save_to_memory(conversation_id, question, answer)
         sources = self._build_sources(docs)
 
         return {
@@ -137,7 +137,6 @@ class KnowledgeQAAgent(BaseAgent):
 
         if not docs:
             answer = "抱歉，知识库中没有找到与您问题相关的内容。"
-            self._save_to_memory(conversation_id, question, answer)
             return {"answer": answer, "sources": [], "has_sources": False, "task_type": "knowledge_qa"}
 
         # 将检索结果转为 LLM 可用的文档格式
@@ -153,7 +152,6 @@ class KnowledgeQAAgent(BaseAgent):
                 ))
 
         answer = self.llm_service.get_answer(question, llm_docs, full_context, user_profile)
-        self._save_to_memory(conversation_id, question, answer)
 
         citation_sources = retrieval_result.citations.get("sources", []) if retrieval_result.citations else []
         sources = citation_sources if citation_sources else self._build_sources(docs)
@@ -234,16 +232,17 @@ class KnowledgeQAAgent(BaseAgent):
 
     def _ask_with_orchestrator(self, question: str, conversation_id: Optional[str] = None,
                                user_id: Optional[str] = None, context: str = "",
-                               **kwargs) -> Dict[str, Any]:
+                               user_profile: str = "", **kwargs) -> Dict[str, Any]:
         """
-        使用原有的Orchestrator方式进行知识问答（回退方案）
+        使用原有的Orchestrator方式进行知识问答（L3复杂链路）
         """
-        logger.info(f"[KnowledgeQAAgent] Using orchestrator fallback...")
+        logger.info(f"[KnowledgeQAAgent] Using orchestrator for complex question...")
         result = self.orchestrator.run(
             input_text=question,
             conversation_id=conversation_id,
             user_id=user_id,
             context=context,
+            user_profile=user_profile,
             goal=f"回答知识问题: {question[:50]}...",
             **kwargs
         )

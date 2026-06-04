@@ -53,20 +53,6 @@ class ReasoningAgent:
                         seen_ids.add(doc_id)
                         all_sources.append(src)
 
-            # 写入会话记忆
-            if conversation_id and tool_registry.has_tool("conversation_memory_write"):
-                try:
-                    tool_registry.invoke_tool(
-                        "conversation_memory_write",
-                        {"conversation_id": conversation_id, "role": "user", "content": question}
-                    )
-                    tool_registry.invoke_tool(
-                        "conversation_memory_write",
-                        {"conversation_id": conversation_id, "role": "assistant", "content": final_answer}
-                    )
-                except Exception as e:
-                    logger.warning(f"[ReasoningAgent] Failed to write memory: {e}")
-
             return {
                 "answer": final_answer,
                 "reasoning_steps": reasoning_steps,

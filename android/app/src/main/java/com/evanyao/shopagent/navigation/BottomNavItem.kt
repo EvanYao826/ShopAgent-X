@@ -11,6 +11,7 @@ import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.ui.graphics.vector.ImageVector
 
+/** 底部导航栏项目定义 */
 sealed class BottomNavItem(
     val route: String,
     val title: String,

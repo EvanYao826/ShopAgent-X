@@ -13,11 +13,11 @@ import org.koin.androidx.compose.KoinAndroidContext
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 状态栏透明，图标深色（适配浅色背景页面）
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.light(Color.WHITE, Color.WHITE)
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
         )
-        window.setBackgroundDrawableResource(android.R.color.white)
         setContent {
             KoinAndroidContext {
                 AppTheme {

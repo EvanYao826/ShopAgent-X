@@ -15,6 +15,7 @@ import com.demo.aiknowledge.service.AgentService;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -40,16 +41,15 @@ public class AgentController {
     public Result<IPage<AgentRun>> listRuns(
             @RequestParam(defaultValue = "1") Integer pageNum,
             @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) LocalDateTime startTime,
             @RequestParam(required = false) LocalDateTime endTime) {
+        // IDOR修复：从JWT获取userId
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
 
         Page<AgentRun> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<AgentRun> wrapper = new LambdaQueryWrapper<>();
-        if (userId != null) {
-            wrapper.eq(AgentRun::getUserId, userId);
-        }
+        wrapper.eq(AgentRun::getUserId, userId);
         if (status != null && !status.isEmpty()) {
             wrapper.eq(AgentRun::getStatus, status);
         }

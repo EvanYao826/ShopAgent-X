@@ -1,7 +1,5 @@
 from typing import Dict, Any, Optional, Generator, List
-from tools.question_rewrite import QuestionRewriteTool
-from tools.knowledge_search import KnowledgeSearchTool
-from tools.rerank import RerankTool
+from tools.registry import tool_registry
 from tools.citation import CitationIntegrator, CitationTracker
 from core.vector_store import vector_store
 from core.config import config
@@ -51,9 +49,10 @@ class RetrievalAgent:
     """Retrieval Agent - 负责检索全流程：query rewrite -> recall -> rerank -> citation integration"""
 
     def __init__(self):
-        self.question_rewrite_tool = QuestionRewriteTool()
-        self.knowledge_search_tool = KnowledgeSearchTool()
-        self.rerank_tool = RerankTool()
+        # 通过 ToolRegistry 获取工具
+        self.question_rewrite_tool = tool_registry.get_tool("question_rewrite")
+        self.knowledge_search_tool = tool_registry.get_tool("knowledge_search")
+        self.rerank_tool = tool_registry.get_tool("rerank")
         self.citation_integrator = CitationIntegrator()
         self.citation_tracker = CitationTracker()
         self.vector_store = vector_store
@@ -98,10 +97,10 @@ class RetrievalAgent:
 
         try:
             if use_rewrite:
-                rewrite_result = self.question_rewrite_tool.execute({
-                    "question": query,
-                    "conversation_context": conversation_context
-                })
+                rewrite_result = tool_registry.invoke_tool(
+                    "question_rewrite",
+                    {"question": query, "conversation_context": conversation_context}
+                )
                 rewritten_query = rewrite_result.get("rewritten_question", query)
                 logger.info(f"[RetrievalAgent] Query rewritten: '{query}' -> '{rewritten_query}'")
 
@@ -192,10 +191,10 @@ class RetrievalAgent:
                     "status": "started"
                 })
 
-                rewrite_result = self.question_rewrite_tool.execute({
-                    "question": query,
-                    "conversation_context": conversation_context
-                })
+                rewrite_result = tool_registry.invoke_tool(
+                    "question_rewrite",
+                    {"question": query, "conversation_context": conversation_context}
+                )
                 rewritten_query = rewrite_result.get("rewritten_question", query)
 
                 yield json.dumps({
@@ -284,13 +283,11 @@ class RetrievalAgent:
     ) -> List:
         """执行文档检索"""
         try:
-            if self.knowledge_search_tool.vector_store:
-                result = self.knowledge_search_tool.execute({
-                    "query": query,
-                    "top_k": k,
-                    "similarity_threshold": similarity_threshold,
-                    "use_rerank": False
-                })
+            if self.knowledge_search_tool and self.knowledge_search_tool.vector_store:
+                result = tool_registry.invoke_tool(
+                    "knowledge_search",
+                    {"query": query, "top_k": k, "similarity_threshold": similarity_threshold, "use_rerank": False}
+                )
                 return result.get("documents", [])
         except Exception as e:
             logger.warning(f"[RetrievalAgent] knowledge_search tool failed: {e}")
@@ -319,11 +316,10 @@ class RetrievalAgent:
     ) -> Dict[str, Any]:
         """执行文档重排序"""
         try:
-            return self.rerank_tool.execute({
-                "query": query,
-                "documents": documents,
-                "top_k": top_k
-            })
+            return tool_registry.invoke_tool(
+                "rerank",
+                {"query": query, "documents": documents, "top_k": top_k}
+            )
         except Exception as e:
             logger.warning(f"[RetrievalAgent] rerank failed: {e}")
             return {

@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+/** 推荐问题区域，显示在对话页面空状态时 */
 @Composable
 fun RecommendSection(
     recommendations: List<String>,

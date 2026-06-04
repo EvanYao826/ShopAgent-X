@@ -37,18 +37,24 @@ public class ChatController {
     private String uploadTempDir;
 
     @PostMapping("/conversations")
-    public Result<Conversation> createConversation(@RequestParam Long userId, @RequestParam(required = false) String title) {
+    public Result<Conversation> createConversation(@RequestParam(required = false) String title) {
+        // IDOR修复：从JWT获取userId
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         return Result.success(chatService.createConversation(userId, title));
     }
 
     @GetMapping("/conversations")
-    public Result<List<Conversation>> getHistory(@RequestParam Long userId) {
+    public Result<List<Conversation>> getHistory() {
+        // IDOR修复：从JWT获取userId
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
         return Result.success(chatService.getHistory(userId));
     }
 
-@PostMapping("/messages")
+    @PostMapping("/messages")
     public Result<Message> sendMessage(@RequestBody ChatRequest request) {
-        return Result.success(chatService.sendMessage(request.getUserId(), request.getConversationId(), request.getContent()));
+        // IDOR修复：从JWT获取userId，忽略客户端传入的值
+        Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+        return Result.success(chatService.sendMessage(userId, request.getConversationId(), request.getContent()));
     }
 
     /**

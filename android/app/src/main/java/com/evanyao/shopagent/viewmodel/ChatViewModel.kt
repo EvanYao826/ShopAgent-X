@@ -16,17 +16,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
+/** 聊天页面 UI 状态 */
 data class ChatUiState(
-    val conversations: List<Conversation> = emptyList(),
-    val currentConversation: Conversation? = null,
-    val messages: List<Message> = emptyList(),
-    val isLoading: Boolean = false,
-    val isSending: Boolean = false,
-    val isStreaming: Boolean = false,
-    val streamingContent: String = "",
-    val errorMessage: String? = null,
-    val userGender: Int? = null,
-    val recommendations: List<String> = listOf(
+    val conversations: List<Conversation> = emptyList(),      // 会话列表
+    val currentConversation: Conversation? = null,            // 当前选中的会话
+    val messages: List<Message> = emptyList(),                // 当前会话的消息列表
+    val isLoading: Boolean = false,                           // 是否正在加载
+    val isSending: Boolean = false,                           // 是否正在发送消息
+    val isStreaming: Boolean = false,                         // 是否正在流式接收
+    val streamingContent: String = "",                        // 流式接收的临时内容
+    val errorMessage: String? = null,                         // 错误提示
+    val userGender: Int? = null,                              // 用户性别（用于推荐问题）
+    val recommendations: List<String> = listOf(               // 推荐问题列表
         "推荐一款适合油皮的精华",
         "敏感肌可以用什么面膜？",
         "有没有好用的防晒霜？",
@@ -34,6 +35,7 @@ data class ChatUiState(
     )
 )
 
+/** 聊天 ViewModel，管理会话列表、消息收发、SSE 流式输出 */
 class ChatViewModel(
     private val chatRepository: ChatRepository,
     private val tokenManager: TokenManager
@@ -104,14 +106,17 @@ class ChatViewModel(
         viewModelScope.launch {
             val skinType = tokenManager.getSkinType()
             val tags = tokenManager.getPreferenceTags()
-            val recs = generateRecommendations(skinType, tags)
+            val gender = tokenManager.getGender()
+            val recs = generateRecommendations(skinType, tags, gender)
             _uiState.value = _uiState.value.copy(recommendations = recs)
         }
     }
 
-    private fun generateRecommendations(skinType: String?, tags: List<String>): List<String> {
+    private fun generateRecommendations(skinType: String?, tags: List<String>, gender: String?): List<String> {
         val recs = mutableListOf<String>()
+        val month = java.time.LocalDate.now().monthValue
 
+        // 肤质适配
         when (skinType) {
             "油性" -> recs.add("推荐一款适合油皮的控油精华")
             "干性" -> recs.add("推荐一款高保湿面霜，干皮救星")
@@ -120,6 +125,22 @@ class ChatViewModel(
             "中性" -> recs.add("推荐一款日常基础护肤套装")
         }
 
+        // 性别适配
+        when (gender) {
+            "男" -> recs.add("男士护肤套装推荐")
+            "女" -> recs.add("适合女生的平价好物推荐")
+        }
+
+        // 季节适配
+        val seasonRec = when (month) {
+            in 3..5 -> "春季敏感肌修复面膜推荐"
+            in 6..8 -> "夏季清爽防晒霜推荐"
+            in 9..11 -> "秋季保湿精华推荐"
+            else -> "冬季滋润身体乳推荐"
+        }
+        recs.add(seasonRec)
+
+        // 偏好标签适配
         val tagRecs = mapOf(
             "美妆护肤" to "有没有好用的防晒霜推荐？",
             "时尚穿搭" to "推荐几款百搭的通勤穿搭",
@@ -138,11 +159,11 @@ class ChatViewModel(
             }
         }
 
+        // 默认推荐兜底
         val defaults = listOf(
             "抗衰老护肤品推荐",
             "有没有平价好用的水乳推荐？",
-            "适合学生党的护肤套装",
-            "秋冬保湿身体乳推荐"
+            "适合学生党的护肤套装"
         )
         for (d in defaults) {
             if (recs.size >= 4) break

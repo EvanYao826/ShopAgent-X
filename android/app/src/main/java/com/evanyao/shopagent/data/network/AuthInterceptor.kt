@@ -6,7 +6,10 @@ import com.evanyao.shopagent.data.network.api.AuthApi
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 class AuthInterceptor(
     private val tokenManager: TokenManager,
@@ -14,6 +17,7 @@ class AuthInterceptor(
 ) : Interceptor {
 
     private val isRefreshing = AtomicBoolean(false)
+    private val refreshLatch = AtomicReference<CountDownLatch?>(null)
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val original = chain.request()
@@ -48,7 +52,10 @@ class AuthInterceptor(
             }
 
             if (!isRefreshing.compareAndSet(false, true)) {
-                Thread.sleep(100)
+                val latch = CountDownLatch(1)
+                refreshLatch.set(latch)
+                latch.await(5, TimeUnit.SECONDS)
+                refreshLatch.set(null)
                 val newToken = runBlocking { tokenManager.getToken() } ?: return response
                 return chain.proceed(
                     original.newBuilder()
@@ -86,6 +93,7 @@ class AuthInterceptor(
                 return response
             } finally {
                 isRefreshing.set(false)
+                refreshLatch.getAndSet(null)?.countDown()
             }
         }
     }

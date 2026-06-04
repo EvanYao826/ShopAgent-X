@@ -1,6 +1,7 @@
 package com.evanyao.shopagent.data.network
 
 import android.util.Log
+import com.evanyao.shopagent.BuildConfig
 import com.evanyao.shopagent.data.TokenManager
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -28,7 +29,7 @@ class SseClient(
 ) {
     companion object {
         private const val TAG = "SseClient"
-        private const val BASE_URL = "http://10.0.2.2:8080"
+        private val BASE_URL = BuildConfig.BASE_URL.trimEnd('/')
         private const val STREAM_PATH = "/api/chat/stream/messages"
         private const val CONNECT_TIMEOUT = 30L
         private const val READ_TIMEOUT = 5L

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -65,8 +66,8 @@ fun RegisterScreen(
     var countdown by remember { mutableIntStateOf(0) }
 
     val primaryColor = MaterialTheme.colorScheme.primary
-    val primaryLight = MaterialTheme.colorScheme.primaryContainer
-    val primaryPale = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+    val primaryLight = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+    val primaryPale = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
 
     LaunchedEffect(countdown) {
         if (countdown > 0) {
@@ -87,7 +88,9 @@ fun RegisterScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 48.dp)
+                .padding(horizontal = 32.dp)
+                .statusBarsPadding()
+                .padding(top = 8.dp, bottom = 48.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

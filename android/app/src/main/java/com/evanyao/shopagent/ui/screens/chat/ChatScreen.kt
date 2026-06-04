@@ -42,6 +42,7 @@ import com.evanyao.shopagent.ui.components.RecommendSection
 import com.evanyao.shopagent.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 
+/** 对话页面，包含会话列表侧边栏、消息列表、输入框 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(

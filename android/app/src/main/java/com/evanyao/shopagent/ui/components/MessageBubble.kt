@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.evanyao.shopagent.data.model.Message
 
+/** 消息气泡组件，支持长按复制、点赞/踩反馈 */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(

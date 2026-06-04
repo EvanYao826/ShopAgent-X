@@ -3,6 +3,7 @@ package com.evanyao.shopagent.navigation
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -57,9 +58,11 @@ import com.evanyao.shopagent.viewmodel.OrderViewModel
 import com.evanyao.shopagent.viewmodel.ProfileViewModel
 import org.koin.androidx.compose.koinViewModel
 
+/** 主导航图，管理所有页面路由和底部导航栏 */
 @Composable
 fun MainNavigation() {
     val navController = rememberNavController()
+    // 所有 ViewModel 通过 Koin 注入，生命周期与 Activity 绑定
     val authViewModel: AuthViewModel = koinViewModel()
     val chatViewModel: ChatViewModel = koinViewModel()
     val productViewModel: ProductViewModel = koinViewModel()
@@ -110,6 +113,7 @@ fun MainNavigation() {
     }
 
     Scaffold(
+        containerColor = Color.Transparent,
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentDestination = navBackStackEntry?.destination

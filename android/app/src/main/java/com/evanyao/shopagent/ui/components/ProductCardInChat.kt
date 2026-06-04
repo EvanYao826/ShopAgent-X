@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets
 
 private const val BASE_URL = "http://10.0.2.2:8080"
 
+/** 编码图片 URL，处理中文字符 */
 fun encodeImageUrl(imageUrl: String?): String? {
     if (imageUrl.isNullOrBlank()) return null
     return try {
@@ -42,6 +43,7 @@ fun encodeImageUrl(imageUrl: String?): String? {
     }
 }
 
+/** 构建完整的图片 URL */
 fun buildImageUrl(imageUrl: String?): String? {
     if (imageUrl.isNullOrBlank()) return null
     val url = when {
@@ -54,6 +56,7 @@ fun buildImageUrl(imageUrl: String?): String? {
     return encoded
 }
 
+/** 商品卡片列表，横向滚动展示 */
 @Composable
 fun ProductCardList(
     products: List<Product>,
@@ -71,6 +74,7 @@ fun ProductCardList(
     }
 }
 
+/** 对话中的商品卡片组件 */
 @Composable
 fun ProductCardInChat(
     product: Product,

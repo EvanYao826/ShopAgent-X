@@ -63,6 +63,37 @@ public class CartServiceImpl implements CartService {
 
     @Override
     @Transactional
+    public void decreaseQuantity(Long userId, Long productId, Integer quantity) {
+        List<Cart> existingList = cartMapper.selectList(
+                new LambdaQueryWrapper<Cart>()
+                        .eq(Cart::getUserId, userId)
+                        .eq(Cart::getProductId, productId));
+        if (existingList == null || existingList.isEmpty()) {
+            return;
+        }
+        // 汇总当前总数量
+        int totalQuantity = existingList.stream().mapToInt(Cart::getQuantity).sum();
+        if (totalQuantity <= quantity) {
+            // 数量不足，删除所有匹配行
+            for (Cart item : existingList) {
+                cartMapper.deleteById(item.getId());
+            }
+        } else {
+            // 删除多余的行，只保留第一行并更新数量
+            int remaining = totalQuantity - quantity;
+            Cart first = existingList.get(0);
+            first.setQuantity(remaining);
+            first.setUpdateTime(LocalDateTime.now());
+            cartMapper.updateById(first);
+            // 删除其余重复行
+            for (int i = 1; i < existingList.size(); i++) {
+                cartMapper.deleteById(existingList.get(i).getId());
+            }
+        }
+    }
+
+    @Override
+    @Transactional
     public void updateQuantity(Long userId, Long productId, Integer quantity) {
         Cart cart = new Cart();
         cart.setQuantity(quantity);

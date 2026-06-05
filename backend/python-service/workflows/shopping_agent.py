@@ -13,6 +13,11 @@ logger = logging.getLogger(__name__)
 class ShoppingAgent(BaseAgent):
     """导购 Agent - 商品推荐、对比、搜索"""
 
+    # 缓存每个会话最近推荐的商品，供购物车操作时使用
+    _recent_products: Dict[str, List[Dict]] = {}
+    # 缓存待确认的购物车操作（删除/修改/清空需用户确认）
+    _pending_cart_actions: Dict[str, Dict] = {}
+
     def __init__(self):
         self.vector_store = vector_store
         self.llm_service = LLMService()
@@ -69,6 +74,10 @@ class ShoppingAgent(BaseAgent):
             # 7. 构建商品卡片
             product_cards = self._build_product_cards(products)
 
+            # 8. 缓存推荐商品，供购物车操作时使用
+            if conversation_id and products:
+                ShoppingAgent._recent_products[conversation_id] = products
+
             sources = self._build_sources(docs)
 
             return {
@@ -108,6 +117,12 @@ class ShoppingAgent(BaseAgent):
 
             # 流式生成 - 在 end 之前插入商品卡片
             product_cards = self._build_product_cards(products)
+            logger.info(f"[ShoppingAgent] Stream: built {len(product_cards)} product cards")
+
+            # 缓存推荐商品，供购物车操作时使用
+            if conversation_id and products:
+                ShoppingAgent._recent_products[conversation_id] = products
+
             for chunk in self.llm_service.get_answer_stream(
                 question=question,
                 context_docs=docs,
@@ -118,6 +133,7 @@ class ShoppingAgent(BaseAgent):
                 try:
                     parsed = json.loads(chunk)
                     if parsed.get("type") == "end":
+                        logger.info(f"[ShoppingAgent] Yielding product_cards event with {len(product_cards)} cards")
                         yield json.dumps({
                             "type": "product_cards",
                             "product_cards": product_cards,
@@ -134,6 +150,633 @@ class ShoppingAgent(BaseAgent):
                 "type": "error",
                 "content": "为您查找商品时遇到问题，请稍后再试。"
             })
+
+    def handle_cart(self, question: str, conversation_id: Optional[str] = None,
+                    user_id: Optional[str] = None, context: str = "", **kwargs) -> Dict[str, Any]:
+        """处理购物车操作请求（同步）"""
+        jwt_token = kwargs.get("jwt_token")
+        logger.info(f"[ShoppingAgent] Cart handling: {question[:50]}...")
+
+        # 内部添加确认消息
+        if question.startswith("ADD_CONFIRM:"):
+            count = question.split(":")[1] if ":" in question else "1"
+            return {
+                "answer": f"成功添加{count}件商品到购物车",
+                "sources": [], "has_sources": False,
+                "task_type": "cart", "product_cards": []
+            }
+
+        if not user_id:
+            return {
+                "answer": "请先登录后再操作购物车哦～",
+                "sources": [], "has_sources": False,
+                "task_type": "cart", "product_cards": []
+            }
+
+        try:
+            # 0. 检查是否有待确认的操作
+            pending = ShoppingAgent._pending_cart_actions.get(conversation_id)
+            if pending:
+                return self._handle_confirmation(question, pending, user_id, conversation_id, jwt_token)
+
+            # 0.1 获取购物车列表（通过 Java API）
+            cart_items = self._fetch_cart_items(user_id, jwt_token)
+
+            # 1. LLM 判断子意图 + 提取参数
+            action, product_id, quantity, product_name = self._parse_cart_intent(question, context, user_id, cart_items)
+            logger.info(f"[Cart] Parsed: action={action}, product_id={product_id}, name={product_name}, qty={quantity}")
+
+            # 2. add 无明确 product_id 时，优先检查最近推荐缓存（让用户选择）
+            if action == "add" and product_id is None:
+                recent = ShoppingAgent._recent_products.get(conversation_id, [])
+                if recent:
+                    selection = self._build_cart_selection(recent)
+                    return {
+                        "answer": selection["message"],
+                        "sources": [], "has_sources": False,
+                        "task_type": "cart", "product_cards": [],
+                        "cart_selection": selection
+                    }
+
+            # 3. 解析 product_id（从名称反查数据库）
+            if product_id is None and product_name:
+                product_id = self._resolve_product_id(product_name)
+
+            # 3.1 批量删除检测
+            batch_ids = None
+            if action == "remove" and product_id is None:
+                batch_ids = self._detect_batch_remove(product_name, user_id, cart_items, jwt_token)
+                if batch_ids:
+                    logger.info(f"[Cart] Batch remove detected: {len(batch_ids)} items")
+
+            # 3.2 remove/update 需要 product_id，缺失时询问用户（clear/list/批量不需要）
+            if action not in ("list", "clear") and product_id is None and not batch_ids:
+                clarification = self._ask_which_product(action, question, user_id, context, conversation_id, cart_items, jwt_token)
+                return {
+                    "answer": clarification,
+                    "sources": [], "has_sources": False,
+                    "task_type": "cart", "product_cards": []
+                }
+
+            # 4. 删除/修改/清空需要确认（返回确认卡片）
+            if action in ("remove", "update", "clear"):
+                if batch_ids:
+                    ShoppingAgent._pending_cart_actions[conversation_id] = {
+                        "action": action, "product_ids": batch_ids,
+                        "user_id": user_id, "jwt_token": jwt_token
+                    }
+                    confirm_card = self._build_batch_confirm_message(batch_ids, user_id)
+                else:
+                    ShoppingAgent._pending_cart_actions[conversation_id] = {
+                        "action": action, "product_id": product_id,
+                        "quantity": quantity, "user_id": user_id, "jwt_token": jwt_token
+                    }
+                    confirm_card = self._build_confirm_message(action, product_id, product_name)
+                return {
+                    "answer": confirm_card.get("message", "请确认操作"),
+                    "sources": [], "has_sources": False,
+                    "task_type": "cart", "product_cards": [],
+                    "confirm_card": confirm_card
+                }
+
+            # 5. list 操作返回商品卡片
+            if action == "list":
+                cart_cards = self._build_cart_list_cards(user_id, cart_items, jwt_token)
+                return {
+                    "answer": cart_cards.get("message", "购物车里的商品："),
+                    "sources": [], "has_sources": False,
+                    "task_type": "cart", "product_cards": [],
+                    "cart_selection": cart_cards
+                }
+
+            # 6. 执行购物车操作（add 不需要确认）
+            result = self._execute_cart_action(action, user_id, product_id, quantity, jwt_token)
+
+            # 7. 组装自然语言回复
+            answer = self._generate_cart_response(question, action, result, context)
+
+            return {
+                "answer": answer,
+                "sources": [], "has_sources": False,
+                "task_type": "cart", "product_cards": []
+            }
+
+        except Exception as e:
+            logger.error(f"[ShoppingAgent] Cart error: {e}", exc_info=True)
+            return {
+                "answer": "操作购物车时遇到问题，请稍后再试。",
+                "sources": [], "has_sources": False,
+                "task_type": "cart", "product_cards": [], "error": True
+            }
+
+    def handle_cart_stream(self, question: str, conversation_id: Optional[str] = None,
+                           user_id: Optional[str] = None, context: str = "",
+                           **kwargs) -> Generator[str, None, None]:
+        """处理购物车操作请求（流式）"""
+        jwt_token = kwargs.get("jwt_token")
+        logger.info(f"[ShoppingAgent] Cart stream handling: {question[:50]}...")
+
+        # 内部添加确认消息
+        if question.startswith("ADD_CONFIRM:"):
+            count = question.split(":")[1] if ":" in question else "1"
+            yield json.dumps({"type": "routed", "task_type": "cart"})
+            yield json.dumps({"type": "token", "content": f"成功添加{count}件商品到购物车"})
+            yield json.dumps({"type": "end"})
+            return
+
+        try:
+            yield json.dumps({"type": "routed", "task_type": "cart"})
+
+            if not user_id:
+                yield json.dumps({"type": "token", "content": "请先登录后再操作购物车哦～"})
+                yield json.dumps({"type": "end"})
+                return
+
+            # 0. 检查是否有待确认的操作
+            pending = ShoppingAgent._pending_cart_actions.get(conversation_id)
+            logger.info(f"[Cart] Checking pending: conv_id={conversation_id}, found={pending is not None}, all_keys={list(ShoppingAgent._pending_cart_actions.keys())}")
+            if pending:
+                result = self._handle_confirmation(question, pending, user_id, conversation_id, jwt_token)
+                yield json.dumps({"type": "token", "content": result["answer"]})
+                yield json.dumps({"type": "end"})
+                return
+
+            # 0.1 获取购物车列表（通过 Java API）
+            cart_items = self._fetch_cart_items(user_id, jwt_token)
+
+            # 1. 解析意图
+            action, product_id, quantity, product_name = self._parse_cart_intent(question, context, user_id, cart_items)
+            logger.info(f"[Cart Stream] Parsed: action={action}, product_id={product_id}, name={product_name}, qty={quantity}")
+
+            # 2. add 无明确 product_id 时，优先检查最近推荐缓存（让用户选择）
+            if action == "add" and product_id is None:
+                recent = ShoppingAgent._recent_products.get(conversation_id, [])
+                if recent:
+                    selection = self._build_cart_selection(recent)
+                    yield json.dumps({"type": "cart_selection", "cart_selection": selection})
+                    yield json.dumps({"type": "end"})
+                    return
+
+            # 3. 解析 product_id（从名称反查数据库）
+            if product_id is None and product_name:
+                product_id = self._resolve_product_id(product_name)
+
+            # 3.1 批量删除检测：处理"删除前三个/删除后两个/删除第2到第4个"
+            batch_ids = None
+            if action == "remove" and product_id is None:
+                batch_ids = self._detect_batch_remove(product_name, user_id, cart_items, jwt_token)
+                if batch_ids:
+                    logger.info(f"[Cart Stream] Batch remove detected: {len(batch_ids)} items")
+
+            # 3.2 缺失 product_id 时询问用户（clear/list/批量不需要）
+            if action not in ("list", "clear") and product_id is None and not batch_ids:
+                clarification = self._ask_which_product(action, question, user_id, context, conversation_id, cart_items, jwt_token)
+                yield json.dumps({"type": "token", "content": clarification})
+                yield json.dumps({"type": "end"})
+                return
+
+            # 4. 删除/修改/清空需要确认（返回确认卡片）
+            if action in ("remove", "update", "clear"):
+                if batch_ids:
+                    # 批量删除：存入多个 product_id
+                    ShoppingAgent._pending_cart_actions[conversation_id] = {
+                        "action": action, "product_ids": batch_ids,
+                        "user_id": user_id, "jwt_token": jwt_token
+                    }
+                    logger.info(f"[Cart] Stored pending batch remove: conv_id={conversation_id}, batch_ids={batch_ids}, user_id={user_id}")
+                    confirm_card = self._build_batch_confirm_message(batch_ids, user_id)
+                else:
+                    ShoppingAgent._pending_cart_actions[conversation_id] = {
+                        "action": action, "product_id": product_id,
+                        "quantity": quantity, "user_id": user_id, "jwt_token": jwt_token
+                    }
+                    logger.info(f"[Cart] Stored pending single remove: conv_id={conversation_id}, pid={product_id}, qty={quantity}, user_id={user_id}")
+                    confirm_card = self._build_confirm_message(action, product_id, product_name)
+                yield json.dumps({"type": "confirm_card", "confirm_card": confirm_card})
+                yield json.dumps({"type": "end"})
+                return
+
+            # 5. list 操作返回商品卡片
+            if action == "list":
+                cart_cards = self._build_cart_list_cards(user_id, cart_items, jwt_token)
+                yield json.dumps({"type": "token", "content": cart_cards.get("message", "购物车里的商品：")})
+                yield json.dumps({"type": "cart_list", "cart_list": cart_cards})
+                yield json.dumps({"type": "end"})
+                return
+
+            # 6. 执行操作（add 不需要确认）
+            result = self._execute_cart_action(action, user_id, product_id, quantity, jwt_token)
+
+            # 7. 流式输出回复
+            answer = self._generate_cart_response(question, action, result, context)
+            yield json.dumps({"type": "token", "content": answer})
+            yield json.dumps({"type": "end"})
+
+        except Exception as e:
+            logger.error(f"[ShoppingAgent] Cart stream error: {e}", exc_info=True)
+            yield json.dumps({"type": "error", "content": "操作购物车时遇到问题，请稍后再试。"})
+
+    def _fetch_cart_items(self, user_id: str, jwt_token: str = None) -> list:
+        """通过 Java API 获取购物车列表，返回 item 列表"""
+        try:
+            cart_tool = tool_registry.get_tool("cart_operation")
+            if not cart_tool:
+                logger.warning("[ShoppingAgent] cart_operation tool not registered")
+                return []
+            result = cart_tool.execute({"action": "list", "user_id": user_id, "jwt_token": jwt_token})
+            if not result.get("success"):
+                logger.warning(f"[ShoppingAgent] _fetch_cart_items failed: {result.get('message')}")
+                return []
+            return result.get("data", {}).get("items", [])
+        except Exception as e:
+            logger.warning(f"[ShoppingAgent] _fetch_cart_items failed: {e}")
+            return []
+
+    def _parse_cart_intent(self, question: str, context: str = "", user_id: str = None, cart_items: list = None) -> tuple:
+        """用 LLM 解析购物车子意图，返回 (action, product_id, quantity, product_name)"""
+        # 使用预取的购物车内容，帮助 LLM 理解"第N个""最后一个"等引用
+        cart_context = ""
+        if cart_items:
+            cart_lines = [f"{it['index']}. {it['title']} (id={it['product_id']}, 数量={it['quantity']})" for it in cart_items]
+            cart_context = "当前购物车内容：\n" + "\n".join(cart_lines)
+
+        prompt = (
+            "你是购物车助手。分析用户输入和对话上下文，返回 JSON：\n"
+            '{"action": "add|list|remove|update|clear", "product_id": 数字或null, '
+            '"product_name": "商品名称或null", "quantity": 数字或null}\n\n'
+            "规则：\n"
+            "- \"加到购物车/加购/加入购物车\" → action=add\n"
+            "- \"查看购物车/购物车里有什么/看看购物车\" → action=list\n"
+            "- \"删除/移除购物车里的XX\" → action=remove\n"
+            "- \"改数量/改为N个/修改数量\" → action=update\n"
+            "- \"清空购物车/清理购物车/清除购物车/购物车清空\" → action=clear\n"
+            "- 从对话上下文中提取最近推荐或提到的商品名称，填入 product_name\n"
+            "- 如果用户说\"第一个/第二个/第N个\"，根据购物车列表中的序号确定对应商品\n"
+            "- 如果用户说\"最后一个/最后N个\"，根据购物车列表的最后一个/最后N个确定商品\n"
+            "- 如果用户说\"前N个/前N件/后N个/后N件\"（如\"删除前两个\"），把\"前2个\"填入 product_name（用阿拉伯数字）\n"
+            "- 如果能确定具体商品 ID，填入 product_id；否则填 product_name\n"
+            "- 只返回JSON，不要其他内容\n\n"
+            f"用户输入：{question}\n"
+            f"对话上下文：{context or '（无）'}\n"
+            f"{cart_context}"
+        )
+
+        try:
+            result = self.llm_service.llm.invoke(prompt)
+            text = result.content if hasattr(result, 'content') else str(result)
+            import re
+            json_match = re.search(r'\{[^}]+\}', text.strip())
+            if json_match:
+                data = json.loads(json_match.group())
+            else:
+                data = json.loads(text.strip())
+
+            action = data.get("action", "list")
+            product_id = data.get("product_id")
+            product_name = data.get("product_name")
+            quantity = data.get("quantity")
+
+            valid_actions = {"add", "list", "remove", "update", "clear"}
+            if action not in valid_actions:
+                action = "list"
+
+            return action, product_id, quantity, product_name
+
+        except Exception as e:
+            logger.warning(f"[ShoppingAgent] Cart intent parse failed: {e}, defaulting to list")
+            return "list", None, None, None
+
+    def _resolve_product_id(self, product_name: str) -> Optional[int]:
+        """通过商品名称从数据库反查 product_id"""
+        if not product_name:
+            return None
+        try:
+            product = mysql_client.fetch_one(
+                "SELECT id FROM product WHERE title LIKE %s AND status = 1 LIMIT 1",
+                (f"%{product_name}%",)
+            )
+            if product:
+                logger.info(f"[ShoppingAgent] Resolved product_id={product['id']} for '{product_name}'")
+                return product["id"]
+            logger.info(f"[ShoppingAgent] No product found for '{product_name}'")
+        except Exception as e:
+            logger.warning(f"[ShoppingAgent] Product resolve failed: {e}")
+        return None
+
+    def _ask_which_product(self, action: str, question: str, user_id: str,
+                           context: str = "", conversation_id: str = None,
+                           cart_items: list = None, jwt_token: str = None) -> str:
+        """当无法确定具体商品时，询问用户选择"""
+        if action == "add":
+            # 优先使用最近推荐的商品缓存
+            products = ShoppingAgent._recent_products.get(conversation_id, [])
+            if not products:
+                # 从上下文中提取关键词搜索
+                products = self._search_products(question)
+            if products:
+                lines = ["您想添加哪一款到购物车呢？"]
+                for i, p in enumerate(products, 1):
+                    lines.append(
+                        f"{i}. {p.get('title', '未知')} "
+                        f"¥{p.get('base_price', 0)}"
+                    )
+                lines.append("\n请告诉我商品名称或序号～")
+                return "\n".join(lines)
+            return "您想添加哪个商品到购物车呢？请告诉我商品名称。"
+
+        # remove/update：列出购物车内容让用户选择
+        if cart_items is None:
+            cart_items = self._fetch_cart_items(user_id, jwt_token)
+        if cart_items:
+            verb = "删除" if action == "remove" else "修改数量"
+            lines = [f"您想{verb}哪个商品呢？购物车里有："]
+            for item in cart_items:
+                lines.append(
+                    f"{item['index']}. {item.get('title', '未知')} "
+                    f"x{item['quantity']} ¥{item.get('price', 0)}"
+                )
+            lines.append("\n请告诉我商品名称或序号～")
+            return "\n".join(lines)
+        return "购物车是空的哦～"
+
+    def _generate_cart_response(self, question: str, action: str,
+                                 result: Dict[str, Any], context: str = "") -> str:
+        """根据购物车操作结果生成自然语言回复"""
+        if not result.get("success"):
+            return result.get("message", "操作失败，请稍后再试。")
+
+        message = result.get("message", "")
+
+        if action == "list":
+            data = result.get("data", {})
+            items = data.get("items", [])
+            if not items:
+                return "购物车是空的，快去逛逛吧～"
+            lines = ["购物车里的商品："]
+            for item in items:
+                lines.append(
+                    f"{item['index']}. {item.get('title', '未知')} "
+                    f"x{item['quantity']} ¥{item.get('price', 0)}"
+                )
+            return "\n".join(lines)
+
+        return message
+
+    def _execute_cart_action(self, action: str, user_id: str,
+                             product_id: int = None, quantity: int = None,
+                             jwt_token: str = None) -> Dict[str, Any]:
+        """执行购物车操作并返回结果（通过 Java API）"""
+        params = {"action": action, "user_id": user_id, "jwt_token": jwt_token}
+        if product_id is not None:
+            params["product_id"] = int(product_id)
+        if quantity is not None:
+            params["quantity"] = int(quantity)
+        cart_tool = tool_registry.get_tool("cart_operation")
+        if not cart_tool:
+            return {"success": False, "message": "购物车工具未注册"}
+        try:
+            result = cart_tool.execute(params)
+        except Exception as e:
+            logger.error(f"[Cart] Tool execute failed: {e}", exc_info=True)
+            return {"success": False, "message": f"操作异常: {e}"}
+        logger.info(f"[Cart] Executed {action}: user_id={user_id}, product_id={product_id}, result={result}")
+        return result if result else {"success": False, "message": "操作返回空结果"}
+
+    def _build_confirm_message(self, action: str, product_id: int = None,
+                               product_name: str = None) -> Dict[str, Any]:
+        """构建确认提示消息，返回包含产品卡片和按钮的确认数据"""
+        # 从数据库获取商品详情
+        product_info = None
+        if product_id:
+            try:
+                product_info = mysql_client.fetch_one(
+                    "SELECT id, title, brand, base_price, image_url, rating, sub_category "
+                    "FROM product WHERE id = %s",
+                    (product_id,)
+                )
+            except Exception as e:
+                logger.warning(f"[ShoppingAgent] Failed to fetch product info: {e}")
+
+        # 确定操作描述
+        action_desc = {
+            "remove": "删除",
+            "update": "修改数量",
+            "clear": "清空购物车",
+        }.get(action, action)
+
+        # 构建确认卡片
+        confirm_card = {
+            "type": "confirm_card",
+            "message": f"确定要{action_desc}吗？" if action == "clear" else f"确定要将「{product_name or '该商品'}」从购物车中{action_desc}吗？",
+            "action": action,
+            "product": None,
+            "buttons": [
+                {"type": "confirm", "label": "确认"},
+                {"type": "cancel", "label": "取消"},
+            ]
+        }
+
+        # 如果有商品信息，添加产品卡片
+        if product_info:
+            confirm_card["product"] = {
+                "product_id": product_info.get("id"),
+                "title": product_info.get("title", ""),
+                "brand": product_info.get("brand", ""),
+                "base_price": float(product_info.get("base_price", 0)),
+                "image_url": product_info.get("image_url", ""),
+                "rating": float(product_info.get("rating", 0)),
+                "sub_category": product_info.get("sub_category", ""),
+            }
+
+        return confirm_card
+
+    def _build_cart_selection(self, products: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """构建购物车选择卡片，让用户勾选要加入购物车的商品"""
+        items = []
+        for p in products:
+            items.append({
+                "product_id": p.get("id"),
+                "title": p.get("title", ""),
+                "brand": p.get("brand", ""),
+                "base_price": float(p.get("base_price", 0)),
+                "image_url": p.get("image_url", ""),
+                "rating": float(p.get("rating", 0)) if p.get("rating") else 0,
+            })
+        return {
+            "type": "cart_selection",
+            "message": "请选择要加入购物车的商品：",
+            "items": items,
+        }
+
+    def _build_cart_list_cards(self, user_id: str, cart_items: list = None, jwt_token: str = None) -> Dict[str, Any]:
+        """构建购物车列表的商品卡片，用于查看购物车时展示"""
+        if cart_items is None:
+            cart_items = self._fetch_cart_items(user_id, jwt_token)
+        items = []
+        for item in cart_items:
+            items.append({
+                "product_id": item.get("product_id"),
+                "title": item.get("title", ""),
+                "brand": item.get("brand", ""),
+                "base_price": float(item.get("price", 0)),
+                "image_url": item.get("image_url", ""),
+                "quantity": item.get("quantity", 1),
+            })
+        count = len(items)
+        return {
+            "type": "cart_list",
+            "message": f"购物车里有 {count} 件商品：",
+            "items": items,
+        }
+
+    def _detect_batch_remove(self, product_name: str, user_id: str, cart_items: list = None, jwt_token: str = None) -> Optional[List[int]]:
+        """从 product_name 解析批量删除模式（前N个/后N个/最后N个），返回 product_id 列表"""
+        import re
+        # 匹配"前2个""后3个"格式
+        m = re.search(r'(前|后)(\d+)[个件]', product_name or "")
+        # 匹配"最后一个""最后两个"格式
+        if not m:
+            m2 = re.search(r'最后([一二三四五六七八九十\d]+)[个件]?', product_name or "")
+            if m2:
+                cn_map = {"一": 1, "两": 2, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}
+                val = m2.group(1)
+                count = cn_map.get(val)
+                if count is None:
+                    try:
+                        count = int(val)
+                    except ValueError:
+                        return None
+                if count <= 0:
+                    return None
+                # 当作"后N个"处理
+                direction = "后"
+            else:
+                return None
+        else:
+            direction = m.group(1)
+            count = int(m.group(2))
+            if count <= 0:
+                return None
+
+        logger.info(f"[Cart] Batch detected from product_name: direction={direction}, count={count}")
+
+        # 使用预取的购物车列表
+        if cart_items is None:
+            cart_items = self._fetch_cart_items(user_id, jwt_token)
+        if not cart_items:
+            return None
+
+        if direction == "前":
+            selected = cart_items[:count]
+        else:
+            selected = cart_items[-count:]
+
+        return [item["product_id"] for item in selected]
+
+    def _build_batch_confirm_message(self, product_ids: List[int], user_id: str) -> Dict[str, Any]:
+        """构建批量删除的确认卡片，展示所有待删除商品"""
+        count = len(product_ids)
+
+        # 获取所有商品信息
+        products = []
+        if product_ids:
+            try:
+                placeholders = ",".join(["%s"] * len(product_ids))
+                rows = mysql_client.fetch_all(
+                    f"SELECT id, title, brand, base_price, image_url, rating, sub_category "
+                    f"FROM product WHERE id IN ({placeholders})",
+                    tuple(product_ids)
+                )
+                for row in (rows or []):
+                    products.append({
+                        "product_id": row.get("id"),
+                        "title": row.get("title", ""),
+                        "brand": row.get("brand", ""),
+                        "base_price": float(row.get("base_price", 0)),
+                        "image_url": row.get("image_url", ""),
+                        "rating": float(row.get("rating", 0)),
+                        "sub_category": row.get("sub_category", ""),
+                    })
+            except Exception as e:
+                logger.warning(f"[ShoppingAgent] Failed to fetch products: {e}")
+
+        confirm_card = {
+            "type": "confirm_card",
+            "message": f"确定要删除以下{count}件商品吗？",
+            "action": "remove",
+            "products": products,
+            "buttons": [
+                {"type": "confirm", "label": "确认删除"},
+                {"type": "cancel", "label": "取消"},
+            ]
+        }
+
+        return confirm_card
+
+    def _handle_confirmation(self, question: str, pending: Dict,
+                             user_id: str, conversation_id: str,
+                             jwt_token: str = None) -> Dict[str, Any]:
+        """处理用户确认/取消响应"""
+        logger.info(f"[Cart] _handle_confirmation: question='{question}', user_id={user_id}, conv_id={conversation_id}, pending={pending}")
+        lower_q = question.strip().lower()
+
+        # 判断是否确认
+        confirm_keywords = ["确认", "确定", "是的", "好的", "好", "对", "yes", "ok", "执行", "删吧", "清吧"]
+        cancel_keywords = ["取消", "不要", "算了", "不", "否", "no", "cancel"]
+
+        is_confirm = any(kw in lower_q for kw in confirm_keywords)
+        is_cancel = any(kw in lower_q for kw in cancel_keywords)
+
+        if is_cancel:
+            ShoppingAgent._pending_cart_actions.pop(conversation_id, None)
+            return {
+                "answer": "好的，已取消操作。",
+                "sources": [], "has_sources": False,
+                "task_type": "cart", "product_cards": []
+            }
+
+        if is_confirm:
+            # 执行待确认的操作
+            action = pending["action"]
+            ShoppingAgent._pending_cart_actions.pop(conversation_id, None)
+
+            try:
+                # 优先从参数获取 jwt_token，其次从 pending 中获取
+                token = jwt_token or pending.get("jwt_token")
+                # 批量删除
+                batch_ids = pending.get("product_ids")
+                if batch_ids:
+                    success_count = 0
+                    for pid in batch_ids:
+                        logger.info(f"[Cart] Batch remove: pid={pid}, user_id={user_id}")
+                        result = self._execute_cart_action(action, user_id, pid, 1, token)
+                        logger.info(f"[Cart] Batch remove result: pid={pid}, success={result.get('success')}, msg={result.get('message')}")
+                        if result.get("success"):
+                            success_count += 1
+                    answer = f"已成功删除 {success_count} 件商品。"
+                else:
+                    pid = pending.get("product_id")
+                    qty = pending.get("quantity") or 1  # 默认删1个
+                    logger.info(f"[Cart] Single remove: pid={pid}, qty={qty}, user_id={user_id}")
+                    result = self._execute_cart_action(action, user_id, pid, qty, token)
+                    logger.info(f"[Cart] Single remove result: success={result.get('success')}, msg={result.get('message')}")
+                    answer = self._generate_cart_response(question, action, result, "")
+            except Exception as e:
+                logger.error(f"[Cart] Confirmation execution failed: {e}", exc_info=True)
+                answer = "操作执行失败，请稍后再试。"
+            return {
+                "answer": answer,
+                "sources": [], "has_sources": False,
+                "task_type": "cart", "product_cards": []
+            }
+
+        # 无法识别的回复，重新询问
+        action = pending.get("action", "操作")
+        return {
+            "answer": f"请回复「确认」执行{action}，或「取消」放弃操作。",
+            "sources": [], "has_sources": False,
+            "task_type": "cart", "product_cards": []
+        }
 
     def _search_products(self, question: str, user_profile: str = "") -> List[Dict[str, Any]]:
         """从 MySQL 搜索匹配商品"""

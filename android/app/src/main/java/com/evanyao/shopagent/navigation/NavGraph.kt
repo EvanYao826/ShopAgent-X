@@ -75,6 +75,13 @@ fun MainNavigation() {
     val authState by authViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
 
+    // 监听聊天中的购物车操作事件，自动刷新购物车
+    LaunchedEffect(Unit) {
+        chatViewModel.cartEvent.collect {
+            cartViewModel.loadCartList()
+        }
+    }
+
     // 结算页临时状态（购物车结算或立即购买）
     var checkoutItems by remember { mutableStateOf<List<CheckoutItem>>(emptyList()) }
 
@@ -254,6 +261,9 @@ fun MainNavigation() {
                     viewModel = chatViewModel,
                     onProductClick = { productId ->
                         navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    },
+                    onAddToCart = { productIds ->
+                        productIds.forEach { id -> cartViewModel.addToCart(id) }
                     }
                 )
             }

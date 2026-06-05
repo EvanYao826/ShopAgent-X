@@ -32,13 +32,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evanyao.shopagent.data.model.Conversation
 import com.evanyao.shopagent.data.model.Message
+import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.ui.components.AiAvatar
+import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
 import com.evanyao.shopagent.ui.components.MessageBubble
 import com.evanyao.shopagent.ui.components.RecommendSection
+import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.viewmodel.ChatViewModel
 import kotlinx.coroutines.launch
 
@@ -47,7 +51,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel,
-    onProductClick: (Long) -> Unit
+    onProductClick: (Long) -> Unit,
+    onAddToCart: ((List<Long>) -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
@@ -60,6 +65,10 @@ fun ChatScreen(
     var renameText by remember { mutableStateOf("") }
 
     val recommendations = uiState.recommendations
+
+    // SKU 选择状态
+    val skuSelectionProduct by viewModel.skuSelectionProduct.collectAsState()
+    val skuSelectionList by viewModel.skuSelectionList.collectAsState()
 
     // 自动滚动到底部（包括流式输出时）
     LaunchedEffect(uiState.messages.size, uiState.isSending, uiState.streamingContent) {
@@ -245,7 +254,11 @@ fun ChatScreen(
                             onProductClick = onProductClick,
                             onFeedback = { messageId, feedbackType ->
                                 viewModel.submitFeedback(messageId, feedbackType)
-                            }
+                            },
+                            onConfirmAction = { actionType ->
+                                viewModel.sendConfirmAction(actionType)
+                            },
+                            onAddToCart = { productIds -> viewModel.startAddToCartWithSku(productIds) }
                         )
                     }
 
@@ -463,12 +476,165 @@ fun ChatScreen(
         }
     }
 
+    // 加入购物车规格选择弹窗
+    if (skuSelectionProduct != null && skuSelectionList.isNotEmpty()) {
+        ChatSkuSelectionSheet(
+            productTitle = skuSelectionProduct!!.title,
+            productImageUrl = skuSelectionProduct!!.imageUrl,
+            skus = skuSelectionList,
+            onDismiss = { viewModel.cancelSkuSelection() },
+            onConfirm = { skuId -> viewModel.confirmSkuSelection(skuId) }
+        )
+    }
+
     SnackbarHost(
         hostState = snackbarHostState,
         modifier = Modifier
             .fillMaxSize()
             .wrapContentSize(Alignment.BottomCenter)
     )
+}
+
+/** 对话中加入购物车的规格选择弹窗 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatSkuSelectionSheet(
+    productTitle: String,
+    productImageUrl: String?,
+    skus: List<ProductSku>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // 商品信息 + 标题
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val imageUrl = buildImageUrl(productImageUrl)
+                if (imageUrl != null) {
+                    AsyncImageWithPlaceholder(
+                        model = imageUrl,
+                        contentDescription = productTitle,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                }
+                Column {
+                    Text(
+                        text = "选择规格",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = productTitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // SKU 列表
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(skus.size) { index ->
+                    val sku = skus[index]
+                    val isSelected = index == selectedIndex
+                    val bgColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    val borderColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        Color.Transparent
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedIndex = index },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = bgColor),
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (isSelected) 2.dp else 0.dp, borderColor
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = sku.propertiesText.ifEmpty { "默认规格" },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "库存: ${sku.stock}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "¥${String.format("%.2f", sku.price.toDouble())}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 确认按钮
+            Button(
+                onClick = {
+                    val selectedSku = skus.getOrNull(selectedIndex)
+                    if (selectedSku != null) {
+                        onConfirm(selectedSku.id)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(50.dp),
+                shape = RoundedCornerShape(25.dp)
+            ) {
+                Text(
+                    text = "确定加入购物车",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.navigationBarsPadding())
+        }
+    }
 }
 
 /**

@@ -91,14 +91,28 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     @Transactional
-    public Message sendMessage(Long userId, Long conversationId, String content) {
-        // 1. 保存用户消息
-        Message userMsg = new Message();
-        userMsg.setConversationId(conversationId);
-        userMsg.setRole("user");
-        userMsg.setContent(content);
-        userMsg.setCreateTime(LocalDateTime.now());
-        messageMapper.insert(userMsg);
+    public Message sendMessage(Long userId, Long conversationId, String content, String jwtToken) {
+        // 0. 去重：30秒内相同内容的用户消息不重复插入（防止前端重试导致重复）
+        Message existingUserMsg = messageMapper.selectOne(
+                new LambdaQueryWrapper<Message>()
+                        .eq(Message::getConversationId, conversationId)
+                        .eq(Message::getRole, "user")
+                        .eq(Message::getContent, content)
+                        .ge(Message::getCreateTime, LocalDateTime.now().minusSeconds(30))
+                        .last("LIMIT 1"));
+        Message userMsg;
+        if (existingUserMsg != null) {
+            log.debug("Duplicate user message detected, skipping insert. conversationId={}", conversationId);
+            userMsg = existingUserMsg;
+        } else {
+            // 1. 保存用户消息
+            userMsg = new Message();
+            userMsg.setConversationId(conversationId);
+            userMsg.setRole("user");
+            userMsg.setContent(content);
+            userMsg.setCreateTime(LocalDateTime.now());
+            messageMapper.insert(userMsg);
+        }
 
         // 1.1 更新对话上下文（用户消息）
         conversationContextService.updateConversationContext(conversationId, userId, userMsg);
@@ -167,6 +181,11 @@ public class ChatServiceImpl implements ChatService {
         if (aiResponse.getProductCards() != null && !aiResponse.getProductCards().isEmpty()) {
             aiMsg.setProductCards(aiResponse.getProductCards());
             aiMsg.setMessageType("product_card");
+        }
+        // 如果有确认卡片（购物车删除/修改确认）
+        if (aiResponse.getConfirmCard() != null) {
+            aiMsg.setConfirmCard(aiResponse.getConfirmCard());
+            aiMsg.setMessageType("confirm_card");
         }
         aiMsg.setCreateTime(LocalDateTime.now());
         messageMapper.insert(aiMsg);
@@ -238,26 +257,59 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public SseEmitter sendStreamMessage(Long userId, Long conversationId, String content, String username, boolean isAdmin) {
-        return sendStreamMessage(userId, conversationId, content, username, isAdmin, null, null, null);
+    @Transactional
+    public Message saveMessage(Long conversationId, String role, String content, String messageType) {
+        Message msg = new Message();
+        msg.setConversationId(conversationId);
+        msg.setRole(role);
+        msg.setContent(content);
+        msg.setMessageType(messageType != null ? messageType : "text");
+        msg.setCreateTime(LocalDateTime.now());
+        messageMapper.insert(msg);
+
+        // 清除该会话的缓存
+        String cacheKey = CacheConfig.CacheConstants.KEY_CONVERSATION_CONTEXT + conversationId;
+        cacheService.delete(CacheConfig.CacheConstants.CACHE_CONVERSATION_CONTEXT, cacheKey);
+
+        return msg;
+    }
+
+    @Override
+    public SseEmitter sendStreamMessage(Long userId, Long conversationId, String content, String username, boolean isAdmin, String jwtToken) {
+        return sendStreamMessage(userId, conversationId, content, username, isAdmin, null, null, null, jwtToken);
     }
 
     @Override
     public SseEmitter sendStreamMessage(Long userId, Long conversationId, String content,
                                          String username, boolean isAdmin,
-                                         String gender, String skinType, List<String> preferenceTags) {
+                                         String gender, String skinType, List<String> preferenceTags,
+                                         String jwtToken) {
         // 设置超时时间（5分钟）
         SseEmitter emitter = new SseEmitter(5 * 60 * 1000L);
 
         sseExecutor.execute(() -> {
             try {
-                // 1. 保存用户消息
-                Message userMsg = new Message();
-                userMsg.setConversationId(conversationId);
-                userMsg.setRole("user");
-                userMsg.setContent(content);
-                userMsg.setCreateTime(LocalDateTime.now());
-                messageMapper.insert(userMsg);
+                // 0. 去重：30秒内相同内容的用户消息不重复插入（防止前端重试导致重复）
+                Message existingUserMsg = messageMapper.selectOne(
+                        new LambdaQueryWrapper<Message>()
+                                .eq(Message::getConversationId, conversationId)
+                                .eq(Message::getRole, "user")
+                                .eq(Message::getContent, content)
+                                .ge(Message::getCreateTime, LocalDateTime.now().minusSeconds(30))
+                                .last("LIMIT 1"));
+                Message userMsg;
+                if (existingUserMsg != null) {
+                    log.debug("Duplicate user message detected in stream, skipping insert. conversationId={}", conversationId);
+                    userMsg = existingUserMsg;
+                } else {
+                    // 1. 保存用户消息
+                    userMsg = new Message();
+                    userMsg.setConversationId(conversationId);
+                    userMsg.setRole("user");
+                    userMsg.setContent(content);
+                    userMsg.setCreateTime(LocalDateTime.now());
+                    messageMapper.insert(userMsg);
+                }
 
                 // 1.1 更新对话上下文（用户消息）
                 conversationContextService.updateConversationContext(conversationId, userId, userMsg);
@@ -287,6 +339,7 @@ public class ChatServiceImpl implements ChatService {
                     requestBody.put("username", username);
                 }
                 requestBody.put("is_admin", isAdmin);
+                requestBody.put("user_id", userId.toString());
                 // 用户画像
                 if (gender != null) {
                     requestBody.put("gender", gender);
@@ -297,6 +350,10 @@ public class ChatServiceImpl implements ChatService {
                 if (preferenceTags != null && !preferenceTags.isEmpty()) {
                     requestBody.put("preference_tags", preferenceTags);
                 }
+                // JWT token（供 Python 调用 Java API 时使用）
+                if (jwtToken != null) {
+                    requestBody.put("jwt_token", jwtToken);
+                }
 
                 // 4. 调用 Python SSE 流式接口并透传事件
                 WebClient webClient = webClientBuilder.baseUrl(aiServiceUrl).build();
@@ -304,6 +361,9 @@ public class ChatServiceImpl implements ChatService {
                 StringBuilder fullAnswer = new StringBuilder();
                 String[] taskTypeHolder = {null};
                 Object[] productCardsHolder = {null};
+                Object[] confirmCardHolder = {null};
+                Object[] cartSelectionHolder = {null};
+                String[] cartSelectionTypeHolder = {null};
 
                 Flux<String> eventStream = webClient.post()
                         .uri("/ask/stream")
@@ -343,6 +403,38 @@ public class ChatServiceImpl implements ChatService {
                                     productCardsHolder[0] = eventMap.get("product_cards");
                                     log.info("SSE product_cards received: {}", eventMap.get("product_cards"));
                                 }
+                                // 确认卡片事件：保存确认卡片数据
+                                if ("confirm_card".equals(type)) {
+                                    Object nestedCard = eventMap.get("confirm_card");
+                                    if (nestedCard instanceof Map) {
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> cardMap = (Map<String, Object>) nestedCard;
+                                        confirmCardHolder[0] = cardMap;
+                                        String confirmMsg = (String) cardMap.get("message");
+                                        if (confirmMsg != null && !confirmMsg.isEmpty()) {
+                                            fullAnswer.append(confirmMsg);
+                                        }
+                                    }
+                                    taskTypeHolder[0] = "cart";
+                                }
+
+                                // 购物车选择/列表事件：保存数据用于持久化
+                                if ("cart_selection".equals(type) || "cart_list".equals(type)) {
+                                    Object nested = eventMap.get("cart_selection");
+                                    if (nested == null) nested = eventMap.get("cart_list");
+                                    if (nested instanceof Map) {
+                                        cartSelectionHolder[0] = nested;
+                                        cartSelectionTypeHolder[0] = type;
+                                        // 用 message 字段作为 fullAnswer
+                                        @SuppressWarnings("unchecked")
+                                        Map<String, Object> csMap = (Map<String, Object>) nested;
+                                        String csMsg = (String) csMap.get("message");
+                                        if (csMsg != null && !csMsg.isEmpty()) {
+                                            fullAnswer.append(csMsg);
+                                        }
+                                    }
+                                    taskTypeHolder[0] = "cart";
+                                }
 
                                 // 透传事件给客户端
                                 emitter.send(SseEmitter.event()
@@ -367,10 +459,30 @@ public class ChatServiceImpl implements ChatService {
                             emitter.complete();
                         },
                         () -> {
-                            // 流完成 - 保存 AI 回答到数据库
+                            // 流完成 - 保存 AI 回答到数据库（跳过空回答，避免重试产生空消息）
                             try {
                                 String answer = fullAnswer.toString();
                                 String taskType = taskTypeHolder[0];
+
+                                if ((answer == null || answer.trim().isEmpty()) && confirmCardHolder[0] == null && cartSelectionHolder[0] == null) {
+                                    log.info("SSE stream completed but answer is empty, skipping save. conversationId={}", conversationId);
+                                    emitter.complete();
+                                    return;
+                                }
+
+                                // 如果 fullAnswer 为空但有确认卡片，用确认消息作为内容
+                                if ((answer == null || answer.trim().isEmpty()) && confirmCardHolder[0] != null) {
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> card = (Map<String, Object>) confirmCardHolder[0];
+                                    answer = (String) card.getOrDefault("message", "请确认操作");
+                                }
+
+                                // 如果 fullAnswer 为空但有购物车卡片，用其 message 作为内容
+                                if ((answer == null || answer.trim().isEmpty()) && cartSelectionHolder[0] != null) {
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> cs = (Map<String, Object>) cartSelectionHolder[0];
+                                    answer = (String) cs.getOrDefault("message", "购物车");
+                                }
 
                                 Message aiMsg = new Message();
                                 aiMsg.setConversationId(conversationId);
@@ -384,6 +496,22 @@ public class ChatServiceImpl implements ChatService {
                                     List<Map<String, Object>> cards = (List<Map<String, Object>>) productCardsHolder[0];
                                     aiMsg.setProductCards(cards);
                                     aiMsg.setMessageType("product_card");
+                                }
+
+                                // 设置确认卡片
+                                if (confirmCardHolder[0] != null) {
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> card = (Map<String, Object>) confirmCardHolder[0];
+                                    aiMsg.setConfirmCard(card);
+                                    aiMsg.setMessageType("confirm_card");
+                                }
+
+                                // 设置购物车选择/列表卡片
+                                if (cartSelectionHolder[0] != null) {
+                                    @SuppressWarnings("unchecked")
+                                    Map<String, Object> cs = (Map<String, Object>) cartSelectionHolder[0];
+                                    aiMsg.setCartSelection(cs);
+                                    aiMsg.setMessageType(cartSelectionTypeHolder[0] != null ? cartSelectionTypeHolder[0] : "cart_selection");
                                 }
 
                                 aiMsg.setCreateTime(LocalDateTime.now());

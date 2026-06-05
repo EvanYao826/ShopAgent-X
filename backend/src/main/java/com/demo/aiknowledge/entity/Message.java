@@ -20,6 +20,10 @@ public class Message {
     private String messageType;
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = JacksonTypeHandler.class)
     private List<Map<String, Object>> productCards;
+    @com.baomidou.mybatisplus.annotation.TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, Object> confirmCard;
+    @com.baomidou.mybatisplus.annotation.TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, Object> cartSelection;
     private String imageUrl;
     private String sources;
     private String taskType;

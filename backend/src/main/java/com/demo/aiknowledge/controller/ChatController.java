@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -51,10 +52,11 @@ public class ChatController {
     }
 
     @PostMapping("/messages")
-    public Result<Message> sendMessage(@RequestBody ChatRequest request) {
+    public Result<Message> sendMessage(@RequestBody ChatRequest request, HttpServletRequest httpRequest) {
         // IDOR修复：从JWT获取userId，忽略客户端传入的值
         Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
-        return Result.success(chatService.sendMessage(userId, request.getConversationId(), request.getContent()));
+        String jwtToken = extractJwtToken(httpRequest);
+        return Result.success(chatService.sendMessage(userId, request.getConversationId(), request.getContent(), jwtToken));
     }
 
     /**
@@ -62,9 +64,10 @@ public class ChatController {
      * 支持事件类型: routed, token, product_cards, end, error
      */
     @PostMapping("/stream/messages")
-    public SseEmitter streamMessages(@RequestBody StreamChatRequest request) {
+    public SseEmitter streamMessages(@RequestBody StreamChatRequest request, HttpServletRequest httpRequest) {
         // IDOR修复：从JWT获取userId，不信任客户端传入的值
         Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+        String jwtToken = extractJwtToken(httpRequest);
         return chatService.sendStreamMessage(
                 userId,
                 request.getConversationId(),
@@ -73,13 +76,24 @@ public class ChatController {
                 request.isAdmin(),
                 request.getGender(),
                 request.getSkinType(),
-                request.getPreferenceTags()
+                request.getPreferenceTags(),
+                jwtToken
         );
     }
 
     @GetMapping("/messages")
     public Result<List<Message>> getMessages(@RequestParam Long conversationId) {
         return Result.success(chatService.getMessages(conversationId));
+    }
+
+    /** 保存一条消息到数据库（用于客户端本地生成的消息持久化） */
+    @PostMapping("/messages/save")
+    public Result<Message> saveMessage(@RequestBody Map<String, Object> body) {
+        Long conversationId = Long.valueOf(body.get("conversationId").toString());
+        String role = (String) body.get("role");
+        String content = (String) body.get("content");
+        String messageType = (String) body.get("messageType");
+        return Result.success(chatService.saveMessage(conversationId, role, content, messageType));
     }
 
     @DeleteMapping("/conversations/{id}")
@@ -106,9 +120,11 @@ public class ChatController {
     public SseEmitter photoSearch(
             @RequestParam("file") MultipartFile file,
             @RequestParam Long conversationId,
-            @RequestParam(required = false) String question) {
+            @RequestParam(required = false) String question,
+            HttpServletRequest httpRequest) {
         // IDOR修复：从JWT获取userId
         Long userId = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
+        String jwtToken = extractJwtToken(httpRequest);
 
         // 1. 保存图片
         String fileName = file.getOriginalFilename();
@@ -131,7 +147,7 @@ public class ChatController {
         fullQuestion += "\n\n图片URL: " + imageUrl;
 
         // 3. 调用SSI流式接口
-        return chatService.sendStreamMessage(userId, conversationId, fullQuestion, null, false);
+        return chatService.sendStreamMessage(userId, conversationId, fullQuestion, null, false, jwtToken);
     }
 
     // 临时图片上传API，用于用户端上传图片，不会添加到知识库
@@ -210,6 +226,17 @@ public class ChatController {
     @PostMapping("/messages/feedback")
     public Result<Message> submitFeedback(@RequestBody FeedbackRequest request) {
         return Result.success(chatService.submitFeedback(request.getMessageId(), request.getFeedbackType()));
+    }
+
+    /**
+     * 从请求头中提取 JWT token（去掉 "Bearer " 前缀）
+     */
+    private String extractJwtToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        return null;
     }
 
     // 清理临时文件（可选）

@@ -18,6 +18,7 @@ class IntentType(Enum):
     KNOWLEDGE_INSPECTION = "knowledge_inspection"
     IDENTITY_QUERY = "identity_query"
     SHOPPING = "shopping"
+    CART = "cart"
     UNKNOWN = "unknown"
 
 
@@ -152,8 +153,23 @@ class IntentClassifier:
             # 对比类
             "对比", "比较", "区别", "哪个好", "选哪个",
             # 电商类
-            "买", "购买", "下单", "加购", "收藏", "购物",
+            "买", "购买", "下单", "收藏",
             "有没有", "多少钱", "价格", "打折", "优惠", "促销",
+        ]
+
+        # 购物车关键词库（fallback用）
+        self.cart_keywords = [
+            # 操作类
+            "加购", "加入购物车", "放到购物车", "放进购物车", "添加到购物车",
+            "购物车", "查看购物车", "看看购物车", "购物车里有什么",
+            "删除购物车", "移除购物车", "清空购物车", "清理购物车", "清除购物车", "从购物车删",
+            "修改数量", "改数量", "改一下数量", "数量改为",
+            # 状态类
+            "购物车里", "购物车中", "购物车还有", "购物车有",
+            # 简写
+            "加到车里", "车里有啥", "看看车里",
+            # 购物车操作词（需要配合上下文，但优先级高于知识问答）
+            "删掉", "去掉", "移除",
         ]
 
     @property
@@ -168,13 +184,14 @@ class IntentClassifier:
                 self._llm_service = False  # 标记为不可用
         return self._llm_service
 
-    def classify(self, input_text: str, is_admin: bool = False) -> IntentResult:
+    def classify(self, input_text: str, is_admin: bool = False, context: str = "") -> IntentResult:
         """
         统一意图分类 - 优先使用LLM，fallback到关键词匹配
 
         Args:
             input_text: 用户输入文本
             is_admin: 是否为管理员
+            context: 对话上下文（最近的对话历史）
 
         Returns:
             IntentResult: 意图识别结果
@@ -182,16 +199,16 @@ class IntentClassifier:
         # 优先使用LLM进行意图识别
         if self.llm_service and self.llm_service.llm:
             try:
-                result = self._classify_with_llm(input_text, is_admin)
+                result = self._classify_with_llm(input_text, is_admin, context)
                 if result:
                     return result
             except Exception as e:
                 logger.warning(f"LLM classification failed, falling back to keywords: {e}")
 
         # Fallback到关键词匹配
-        return self._classify_with_keywords(input_text, is_admin)
+        return self._classify_with_keywords(input_text, is_admin, context)
 
-    def _classify_with_llm(self, input_text: str, is_admin: bool = False) -> Optional[IntentResult]:
+    def _classify_with_llm(self, input_text: str, is_admin: bool = False, context: str = "") -> Optional[IntentResult]:
         """使用LLM进行意图识别"""
         from langchain_core.prompts import PromptTemplate
         from langchain_core.output_parsers import StrOutputParser
@@ -201,6 +218,7 @@ class IntentClassifier:
             """
 你是一个意图识别系统。请分析用户输入，判断其意图类型。
 
+{context_section}
 用户输入：{input_text}
 是否管理员：{is_admin}
 
@@ -211,7 +229,13 @@ class IntentClassifier:
 4. knowledge_inspection - 知识巡检（检查文档质量、重复、过期等）
 5. identity_query - 身份查询（询问系统身份、名称等）
 6. shopping - 购物导购（商品推荐、商品搜索、购买咨询、价格询问、商品对比、护肤/美妆/数码/服饰推荐等）
-7. unknown - 无法确定
+7. cart - 购物车操作（加入购物车、查看购物车、删除购物车商品、修改购物车数量、清空购物车等）
+8. unknown - 无法确定
+
+重要提示：
+- 如果对话上下文中用户刚刚查看了购物车，当前消息中提到"删除"、"移除"、"去掉"、"清空"等操作词，应分类为 cart
+- 如果用户提到"前N个"、"后N个"、"第N个"等位置引用，结合上下文判断是购物车操作还是知识问答
+- "删除前两个"、"去掉后面的"、"删掉第一个"这类表述，如果上下文涉及购物车，应分类为 cart
 
 请返回JSON格式：
 {{"intent": "意图类型", "confidence": 0.0-1.0, "reasoning": "判断理由"}}
@@ -220,11 +244,20 @@ class IntentClassifier:
 """
         )
 
+        # 构建上下文部分
+        context_section = ""
+        if context:
+            # 只取最近的对话，避免prompt过长
+            recent_lines = context.strip().split('\n')[-10:]
+            recent_context = '\n'.join(recent_lines)
+            context_section = f"最近对话上下文：\n{recent_context}\n"
+
         try:
             chain = intent_prompt | self.llm_service.llm | StrOutputParser()
             result_str = chain.invoke({
                 "input_text": input_text,
-                "is_admin": "是" if is_admin else "否"
+                "is_admin": "是" if is_admin else "否",
+                "context_section": context_section
             })
 
             # 解析JSON结果
@@ -244,6 +277,7 @@ class IntentClassifier:
                 "knowledge_inspection": IntentType.KNOWLEDGE_INSPECTION,
                 "identity_query": IntentType.IDENTITY_QUERY,
                 "shopping": IntentType.SHOPPING,
+                "cart": IntentType.CART,
                 "unknown": IntentType.UNKNOWN,
             }
 
@@ -262,7 +296,7 @@ class IntentClassifier:
             logger.error(f"LLM intent classification error: {e}")
             return None
 
-    def _classify_with_keywords(self, input_text: str, is_admin: bool = False) -> IntentResult:
+    def _classify_with_keywords(self, input_text: str, is_admin: bool = False, context: str = "") -> IntentResult:
         """使用关键词匹配进行意图识别（fallback）"""
         lower_text = input_text.lower()
 
@@ -284,8 +318,9 @@ class IntentClassifier:
         inspection_score = sum(1 for kw in self.inspection_keywords if kw in clean_text)
         emotion_score = sum(1 for kw in self.emotion_keywords if kw in clean_text)
         shopping_score = sum(1 for kw in self.shopping_keywords if kw in clean_text)
+        cart_score = sum(1 for kw in self.cart_keywords if kw in clean_text)
 
-        logger.debug(f"[IntentClassifier] Scores - chitchat:{chitchat_score}, knowledge:{knowledge_score}, admin:{admin_score}, inspection:{inspection_score}, shopping:{shopping_score}")
+        logger.debug(f"[IntentClassifier] Scores - chitchat:{chitchat_score}, knowledge:{knowledge_score}, admin:{admin_score}, inspection:{inspection_score}, shopping:{shopping_score}, cart:{cart_score}")
 
         # 管理员模式：优先处理管理相关任务
         if is_admin:
@@ -310,6 +345,14 @@ class IntentClassifier:
                     confidence=min(0.9, 0.5 + admin_score * 0.1),
                     reasoning=f"管理员模式，命中{admin_score}个管理关键词"
                 )
+
+        # 购物车操作（优先级高于购物导购）
+        if cart_score > 0 and cart_score >= shopping_score:
+            return IntentResult(
+                intent=IntentType.CART,
+                confidence=min(0.95, 0.6 + cart_score * 0.15),
+                reasoning=f"命中{cart_score}个购物车关键词"
+            )
 
         # 购物导购（核心功能，优先级高）
         if shopping_score >= 2:
@@ -442,4 +485,5 @@ class IntentClassifier:
             "inspection_keywords": len(self.inspection_keywords),
             "emotion_keywords": len(self.emotion_keywords),
             "shopping_keywords": len(self.shopping_keywords),
+            "cart_keywords": len(self.cart_keywords),
         }

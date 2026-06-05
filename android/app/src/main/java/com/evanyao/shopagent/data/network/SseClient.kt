@@ -21,7 +21,9 @@ data class SseEvent(
     val type: String,
     val content: String,
     val taskType: String? = null,
-    val productCards: Any? = null
+    val productCards: Any? = null,
+    val confirmCard: Any? = null,
+    val cartSelection: Any? = null
 )
 
 class SseClient(
@@ -99,15 +101,25 @@ class SseClient(
                     val eventContent = json.optString("content", "")
                     val taskType = json.optString("task_type", null)
                     val productCards = json.opt("product_cards")
+                    val confirmCard = json.opt("confirm_card")
+                    val cartSelection = json.opt("cart_selection") ?: json.opt("cart_list")
 
                     val event = SseEvent(
                         type = eventType,
                         content = eventContent,
                         taskType = taskType,
-                        productCards = productCards
+                        productCards = productCards,
+                        confirmCard = confirmCard,
+                        cartSelection = cartSelection
                     )
                     if (eventType == "product_cards") {
                         Log.d(TAG, "Product cards event: $productCards")
+                    }
+                    if (eventType == "confirm_card") {
+                        Log.d(TAG, "Confirm card event: $confirmCard")
+                    }
+                    if (eventType == "cart_selection") {
+                        Log.d(TAG, "Cart selection event: $cartSelection")
                     }
 
                     val result = trySend(event)

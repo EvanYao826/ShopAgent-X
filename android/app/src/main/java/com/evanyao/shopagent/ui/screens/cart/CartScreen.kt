@@ -67,13 +67,23 @@ fun CartScreen(
         }
     }
 
-    // 规格选择弹窗
+    // 更换规格弹窗
     if (editingSkuItem != null && uiState.editingSkus.isNotEmpty()) {
         CartSkuSelectionBottomSheet(
             cartItem = editingSkuItem,
             skus = uiState.editingSkus,
             onDismiss = { viewModel.cancelEditSku() },
             onConfirm = { newSkuId -> viewModel.confirmUpdateSku(newSkuId) }
+        )
+    }
+
+    // 加入购物车选择规格弹窗
+    if (uiState.addSkuProductId != null && uiState.addSkus.isNotEmpty()) {
+        AddSkuBottomSheet(
+            productTitle = uiState.addSkuProductTitle,
+            skus = uiState.addSkus,
+            onDismiss = { viewModel.cancelAddSku() },
+            onConfirm = { skuId -> viewModel.confirmAddSku(skuId) }
         )
     }
 
@@ -110,6 +120,7 @@ fun CartScreen(
                                 onRemove = { cartItemId -> viewModel.removeFromCart(cartItemId) },
                                 onToggleSelect = { viewModel.toggleItemSelection(it) },
                                 onQuantityChange = { id, qty -> viewModel.updateQuantity(id, qty) },
+                                onAddWithSku = { productId, title -> viewModel.startAddSku(productId, title) },
                                 onToggleShopSelect = { viewModel.toggleShopSelectAll() },
                                 onSkuClick = { viewModel.startEditSku(it) }
                             )
@@ -253,6 +264,7 @@ private fun ShopSection(
     onRemove: (Long) -> Unit,  // cartItemId
     onToggleSelect: (Long) -> Unit,
     onQuantityChange: (Long, Int) -> Unit,
+    onAddWithSku: (Long, String?) -> Unit,  // productId, productTitle
     onToggleShopSelect: () -> Unit,
     onSkuClick: (CartItem) -> Unit = {}
 ) {
@@ -366,6 +378,7 @@ private fun ShopSection(
                             },
                             onToggleSelect = { onToggleSelect(cartItem.productId) },
                             onQuantityChange = { onQuantityChange(cartItem.productId, it) },
+                            onAddWithSku = { onAddWithSku(cartItem.productId, cartItem.product?.title) },
                             onSkuClick = { onSkuClick(cartItem) }
                         )
                     }
@@ -390,6 +403,7 @@ private fun CartItemCard(
     onProductClick: () -> Unit,
     onToggleSelect: () -> Unit,
     onQuantityChange: (Int) -> Unit,
+    onAddWithSku: () -> Unit,
     onSkuClick: () -> Unit = {}
 ) {
     Row(
@@ -494,7 +508,7 @@ private fun CartItemCard(
                             onQuantityChange(cartItem.quantity - 1)
                         }
                     },
-                    onIncrease = { onQuantityChange(cartItem.quantity + 1) }
+                    onIncrease = { onAddWithSku() }
                 )
             }
         }
@@ -781,6 +795,78 @@ private fun SkuOptionItem(
                 fontWeight = FontWeight.Bold,
                 color = CartPriceRed
             )
+        }
+    }
+}
+
+/** 加入购物车时的规格选择弹窗 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddSkuBottomSheet(
+    productTitle: String?,
+    skus: List<ProductSku>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // 标题
+            Text(
+                text = if (!productTitle.isNullOrBlank()) "选择规格 - $productTitle" else "选择规格",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+
+            // SKU 列表
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                itemsIndexed(skus) { index, sku ->
+                    SkuOptionItem(
+                        propertiesText = sku.propertiesText.ifEmpty { "默认规格" },
+                        price = sku.price.toDouble(),
+                        stock = sku.stock,
+                        isSelected = index == selectedIndex,
+                        onClick = { selectedIndex = index }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 确认按钮
+            Button(
+                onClick = {
+                    val selectedSku = skus.getOrNull(selectedIndex)
+                    if (selectedSku != null) {
+                        onConfirm(selectedSku.id)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(50.dp),
+                shape = RoundedCornerShape(25.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = CartPrimary)
+            ) {
+                Text(
+                    text = "确定加入购物车",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.navigationBarsPadding())
         }
     }
 }

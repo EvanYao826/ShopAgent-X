@@ -36,6 +36,11 @@ interface ChatApi {
     suspend fun submitFeedback(
         @Body request: FeedbackRequest
     ): Result<Message>
+
+    @POST("api/chat/messages/save")
+    suspend fun saveMessage(
+        @Body request: Map<String, Any>
+    ): Result<Message>
 }
 
 data class FeedbackRequest(

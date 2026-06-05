@@ -27,7 +27,7 @@ val appModule = module {
     single { AddressRepository(get()) }
     single { OrderRepository(get()) }
     viewModel { AuthViewModel(get(), get()) }
-    viewModel { ChatViewModel(get(), get()) }
+    viewModel { ChatViewModel(get(), get(), get()) }
     viewModel { ProductViewModel(get()) }
     viewModel { CartViewModel(get()) }
     viewModel { ProfileViewModel(get(), get()) }

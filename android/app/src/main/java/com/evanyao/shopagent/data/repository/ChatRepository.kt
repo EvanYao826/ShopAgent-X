@@ -54,4 +54,14 @@ class ChatRepository(
     suspend fun submitFeedback(messageId: Long, feedbackType: Int): ApiResult<Message> {
         return chatApi.submitFeedback(FeedbackRequest(messageId, feedbackType))
     }
+
+    suspend fun saveMessage(conversationId: Long, role: String, content: String, messageType: String? = null): ApiResult<Message> {
+        val body = mutableMapOf<String, Any>(
+            "conversationId" to conversationId,
+            "role" to role,
+            "content" to content
+        )
+        if (messageType != null) body["messageType"] = messageType
+        return chatApi.saveMessage(body)
+    }
 }

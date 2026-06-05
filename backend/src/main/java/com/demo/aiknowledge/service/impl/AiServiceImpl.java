@@ -195,6 +195,9 @@ public class AiServiceImpl implements AiService {
                 }
             }
             requestBody.put("is_admin", isAdmin);
+            if (userId != null) {
+                requestBody.put("user_id", userId.toString());
+            }
             log.info("User is admin: {}", isAdmin);
 
             HttpHeaders headers = new HttpHeaders();
@@ -272,6 +275,23 @@ public class AiServiceImpl implements AiService {
                             }
                         }
                         aiResponse.setProductCards(productCards);
+                    }
+                }
+
+                // 检查是否有确认卡片（购物车删除/修改确认）
+                if (body.containsKey("confirm_card")) {
+                    Map<String, Object> confirmCard = (Map<String, Object>) body.get("confirm_card");
+                    if (confirmCard != null) {
+                        // 转换商品图片URL
+                        Object productObj = confirmCard.get("product");
+                        if (productObj instanceof Map) {
+                            Map<String, Object> product = (Map<String, Object>) productObj;
+                            if (product.containsKey("image_url")) {
+                                String imageUrl = (String) product.get("image_url");
+                                product.put("image_url", urlUtil.toAbsoluteUrl(imageUrl));
+                            }
+                        }
+                        aiResponse.setConfirmCard(confirmCard);
                     }
                 }
 

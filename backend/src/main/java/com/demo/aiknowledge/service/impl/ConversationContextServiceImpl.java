@@ -127,8 +127,16 @@ public class ConversationContextServiceImpl implements ConversationContextServic
     public void updateConversationContext(Long conversationId, Long userId, Message newMessage) {
         String cacheKey = CacheConfig.CacheConstants.KEY_CONVERSATION_CONTEXT + conversationId;
 
-        // 1. 获取当前上下文
-        List<Message> currentContext = getConversationContext(conversationId, MAX_WINDOW_SIZE);
+        // 1. 只从缓存获取当前上下文（不回读 DB，避免刚 insert 的消息被重复添加）
+        List<Message> currentContext = new ArrayList<>();
+        List<Object> cachedRawObjects = cacheService.get(
+                CacheConfig.CacheConstants.CACHE_CONVERSATION_CONTEXT,
+                cacheKey,
+                List.class
+        );
+        if (cachedRawObjects != null && !cachedRawObjects.isEmpty()) {
+            currentContext = convertToMessageList(cachedRawObjects);
+        }
 
         // 2. 添加新消息
         List<Message> updatedContext = new ArrayList<>(currentContext);

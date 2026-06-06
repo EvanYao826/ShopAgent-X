@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Java 后端地址
-JAVA_API_URL = os.getenv("JAVA_API_URL", "http://localhost:8080")
+JAVA_API_URL = os.getenv("JAVA_API_URL", "http://localhost:8888")
 
 
 class CartTool(Tool):
@@ -137,6 +137,8 @@ class CartTool(Tool):
             timeout=5
         )
 
+        if resp.status_code == 401 or resp.status_code == 403:
+            return {"success": False, "message": "登录已过期，请重新登录"}
         if resp.status_code != 200:
             return {"success": False, "message": f"查询失败（HTTP {resp.status_code}）"}
 

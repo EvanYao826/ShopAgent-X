@@ -1,4 +1,5 @@
 from typing import Dict, Any, Optional, Generator, List
+from datetime import datetime
 from workflows.base_agent import BaseAgent
 from core.vector_store import vector_store
 from core.llm import LLMService
@@ -6,6 +7,7 @@ from core.mysql_client import mysql_client
 from tools.registry import tool_registry
 import logging
 import json
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +19,120 @@ class ShoppingAgent(BaseAgent):
     _recent_products: Dict[str, List[Dict]] = {}
     # 缓存待确认的购物车操作（删除/修改/清空需用户确认）
     _pending_cart_actions: Dict[str, Dict] = {}
+    # 缓存购物车状态（避免同一会话内重复请求 Java API）
+    _cart_cache: Dict[str, Dict] = {}  # {conversation_id: {"items": [...], "ts": timestamp}}
 
     def __init__(self):
         self.vector_store = vector_store
         self.llm_service = LLMService()
+
+    @staticmethod
+    def _get_current_season() -> str:
+        """根据当前月份返回季节信息，用于推荐话术的季节感知"""
+        month = datetime.now().month
+        if month in (3, 4, 5):
+            return "春季"
+        elif month in (6, 7, 8):
+            return "夏季"
+        elif month in (9, 10, 11):
+            return "秋季"
+        else:
+            return "冬季"
+
+    @staticmethod
+    def _detect_comparison(question: str) -> bool:
+        """检测是否为多商品对比意图，如'A和B哪个好'"""
+        import re
+        patterns = [
+            r'.+和.+哪个好', r'.+跟.+哪个好', r'.+与.+哪个好',
+            r'.+和.+对比', r'.+跟.+对比', r'.+与.+对比',
+            r'.+和.+比较', r'.+跟.+比较', r'.+与.+比较',
+            r'.+和.+区别', r'.+跟.+区别', r'.+与.+区别',
+            r'.+和.+选哪个', r'.+跟.+选哪个', r'.+与.+选哪个',
+            r'对比.+和.+', r'比较.+和.+',
+        ]
+        return any(re.search(pat, question) for pat in patterns)
+
+    @staticmethod
+    def _extract_comparison_products(question: str) -> List[str]:
+        """从对比问题中提取商品名称，如'iPhone和华为哪个好' → ['iPhone', '华为']"""
+        import re
+        # 匹配 "A和B" / "A跟B" / "A与B"
+        match = re.search(r'(.+?)[和跟与](.+?)(?:哪个好|对比|比较|区别|选哪个)', question)
+        if match:
+            p1 = match.group(1).strip()
+            p2 = match.group(2).strip()
+            # 清理前缀词
+            for prefix in ["对比", "比较", "帮我看看", "帮我比比", "我想知道", "请帮我"]:
+                p1 = p1.removeprefix(prefix)
+                p2 = p2.removeprefix(prefix)
+            return [p1, p2] if p1 and p2 else []
+        # 匹配 "对比A和B" / "比较A和B"
+        match = re.search(r'(?:对比|比较)(.+?)[和跟与](.+)', question)
+        if match:
+            p1 = match.group(1).strip()
+            p2 = match.group(2).strip()
+            return [p1, p2] if p1 and p2 else []
+        return []
+
+    def _handle_comparison(self, question: str, user_profile: str = "") -> Dict[str, Any]:
+        """处理多商品对比请求"""
+        product_names = self._extract_comparison_products(question)
+        if len(product_names) < 2:
+            return None  # 无法提取两个商品，走正常推荐流程
+
+        # 搜索每个商品
+        all_products = []
+        for name in product_names:
+            products = self._search_products(name, user_profile)
+            if products:
+                all_products.append({"name": name, "products": products})
+
+        if len(all_products) < 2:
+            return None  # 找不到足够商品，走正常推荐流程
+
+        # 取每个搜索结果的最佳匹配
+        compare_items = []
+        for item in all_products:
+            best = item["products"][0]  # 已按综合评分排序
+            compare_items.append(best)
+
+        # 构建对比卡片
+        product_cards = self._build_product_cards(compare_items)
+
+        # 用 LLM 生成对比话术
+        compare_context = "\n".join([
+            f"商品{i+1}：{p.get('title', '')} | 品牌:{p.get('brand', '')} | "
+            f"价格:¥{p.get('base_price', 0)} | 评分:{p.get('rating', 0)} | "
+            f"销量:{p.get('sales_count', 0)} | 标签:{p.get('tags', '')}"
+            for i, p in enumerate(compare_items)
+        ])
+
+        prompt = (
+            f"你是智能导购助手「小智」。用户想对比以下商品，请给出简洁的对比分析。\n\n"
+            f"用户问题：{question}\n\n"
+            f"商品信息：\n{compare_context}\n\n"
+            f"回复规则（严格遵守）：\n"
+            f"1. 控制在120字以内\n"
+            f"2. 从价格、评分、销量等维度简要对比\n"
+            f"3. 给出明确推荐建议\n"
+            f"4. 不要编造商品不存在的功能\n"
+        )
+
+        try:
+            answer = self.llm_service.llm.invoke(prompt).content
+        except Exception as e:
+            logger.error(f"[ShoppingAgent] Comparison LLM error: {e}")
+            names = [p.get('title', '') for p in compare_items]
+            answer = f"为您对比了{'和'.join(names)}，请查看下方商品卡片了解详细信息。"
+
+        return {
+            "answer": answer,
+            "sources": [],
+            "has_sources": False,
+            "task_type": "shopping",
+            "product_cards": product_cards
+        }
 
     def recommend(self, question: str, conversation_id: Optional[str] = None,
                   user_id: Optional[str] = None, context: str = "",
@@ -29,6 +141,11 @@ class ShoppingAgent(BaseAgent):
         logger.info(f"[ShoppingAgent] Processing: {question[:50]}...")
 
         try:
+            # 0. 检测对比意图
+            if self._detect_comparison(question):
+                result = self._handle_comparison(question, user_profile)
+                if result:
+                    return result
             # 1. 读取会话记忆
             conversation_history = ""
             if conversation_id and tool_registry.has_tool("conversation_memory_read"):
@@ -53,8 +170,8 @@ class ShoppingAgent(BaseAgent):
             )
             logger.info(f"[ShoppingAgent] Retrieved {len(docs)} documents")
 
-            # 3. 从 MySQL 搜索匹配商品
-            products = self._search_products(question, user_profile)
+            # 3. 从 MySQL 搜索匹配商品（传入对话上下文，帮助理解"不要XX"等承接上文的查询）
+            products = self._search_products(question, user_profile, conversation_context=full_context)
             logger.info(f"[ShoppingAgent] Found {len(products)} products from DB")
 
             # 4. 构建商品信息上下文
@@ -106,11 +223,25 @@ class ShoppingAgent(BaseAgent):
         logger.info(f"[ShoppingAgent] Stream processing: {question[:50]}...")
 
         try:
+            # 检测对比意图
+            if self._detect_comparison(question):
+                result = self._handle_comparison(question, user_profile)
+                if result:
+                    yield json.dumps({"type": "routed", "task_type": "shopping"})
+                    yield json.dumps({"type": "token", "content": result.get("answer", "")})
+                    yield json.dumps({
+                        "type": "product_cards",
+                        "product_cards": result.get("product_cards", []),
+                        "sources": [],
+                        "task_type": "shopping"
+                    })
+                    yield json.dumps({"type": "end", "content": result.get("answer", "")})
+                    return
             # 检索
             docs = self.vector_store.search(
                 query=question, k=8, similarity_threshold=0.6, use_rerank=False
             )
-            products = self._search_products(question, user_profile)
+            products = self._search_products(question, user_profile, conversation_context=context)
             product_context = self._build_product_context(products)
             sources = self._build_sources(docs)
             logger.info(f"[ShoppingAgent] Stream: found {len(products)} products, {len(docs)} docs")
@@ -127,7 +258,8 @@ class ShoppingAgent(BaseAgent):
                 question=question,
                 context_docs=docs,
                 conversation_context=f"{context}\n\n{product_context}" if context else product_context,
-                user_profile=user_profile
+                user_profile=user_profile,
+                season=self._get_current_season()
             ):
                 # 在 end 事件之前插入商品卡片
                 try:
@@ -157,11 +289,14 @@ class ShoppingAgent(BaseAgent):
         jwt_token = kwargs.get("jwt_token")
         logger.info(f"[ShoppingAgent] Cart handling: {question[:50]}...")
 
-        # 内部添加确认消息
+        # 内部添加确认消息（Android 端已通过 Java API 添加商品）
         if question.startswith("ADD_CONFIRM:"):
             count = question.split(":")[1] if ":" in question else "1"
+            if conversation_id:
+                self._invalidate_cart_cache(conversation_id)
+            answer = self._generate_add_confirm_response(count, context, user_id)
             return {
-                "answer": f"成功添加{count}件商品到购物车",
+                "answer": answer,
                 "sources": [], "has_sources": False,
                 "task_type": "cart", "product_cards": []
             }
@@ -179,8 +314,8 @@ class ShoppingAgent(BaseAgent):
             if pending:
                 return self._handle_confirmation(question, pending, user_id, conversation_id, jwt_token)
 
-            # 0.1 获取购物车列表（通过 Java API）
-            cart_items = self._fetch_cart_items(user_id, jwt_token)
+            # 0.1 获取购物车列表（通过 Java API，带会话缓存）
+            cart_items = self._fetch_cart_items(user_id, jwt_token, conversation_id)
 
             # 1. LLM 判断子意图 + 提取参数
             action, product_id, quantity, product_name = self._parse_cart_intent(question, context, user_id, cart_items)
@@ -250,7 +385,7 @@ class ShoppingAgent(BaseAgent):
                 }
 
             # 6. 执行购物车操作（add 不需要确认）
-            result = self._execute_cart_action(action, user_id, product_id, quantity, jwt_token)
+            result = self._execute_cart_action(action, user_id, product_id, quantity, jwt_token, conversation_id)
 
             # 7. 组装自然语言回复
             answer = self._generate_cart_response(question, action, result, context)
@@ -279,6 +414,9 @@ class ShoppingAgent(BaseAgent):
         # 内部添加确认消息
         if question.startswith("ADD_CONFIRM:"):
             count = question.split(":")[1] if ":" in question else "1"
+            # Android 端已通过 Java API 添加商品，清除缓存确保下次查看购物车获取最新数据
+            if conversation_id:
+                self._invalidate_cart_cache(conversation_id)
             yield json.dumps({"type": "routed", "task_type": "cart"})
             yield json.dumps({"type": "token", "content": f"成功添加{count}件商品到购物车"})
             yield json.dumps({"type": "end"})
@@ -301,8 +439,8 @@ class ShoppingAgent(BaseAgent):
                 yield json.dumps({"type": "end"})
                 return
 
-            # 0.1 获取购物车列表（通过 Java API）
-            cart_items = self._fetch_cart_items(user_id, jwt_token)
+            # 0.1 获取购物车列表（通过 Java API，带会话缓存）
+            cart_items = self._fetch_cart_items(user_id, jwt_token, conversation_id)
 
             # 1. 解析意图
             action, product_id, quantity, product_name = self._parse_cart_intent(question, context, user_id, cart_items)
@@ -365,7 +503,7 @@ class ShoppingAgent(BaseAgent):
                 return
 
             # 6. 执行操作（add 不需要确认）
-            result = self._execute_cart_action(action, user_id, product_id, quantity, jwt_token)
+            result = self._execute_cart_action(action, user_id, product_id, quantity, jwt_token, conversation_id)
 
             # 7. 流式输出回复
             answer = self._generate_cart_response(question, action, result, context)
@@ -376,8 +514,15 @@ class ShoppingAgent(BaseAgent):
             logger.error(f"[ShoppingAgent] Cart stream error: {e}", exc_info=True)
             yield json.dumps({"type": "error", "content": "操作购物车时遇到问题，请稍后再试。"})
 
-    def _fetch_cart_items(self, user_id: str, jwt_token: str = None) -> list:
-        """通过 Java API 获取购物车列表，返回 item 列表"""
+    def _fetch_cart_items(self, user_id: str, jwt_token: str = None,
+                          conversation_id: str = None, force_refresh: bool = False) -> list:
+        """通过 Java API 获取购物车列表，支持会话级缓存（30秒 TTL）"""
+        # 检查缓存
+        if not force_refresh and conversation_id:
+            cached = ShoppingAgent._cart_cache.get(conversation_id)
+            if cached and (time.time() - cached.get("ts", 0)) < 30:
+                return cached.get("items", [])
+
         try:
             cart_tool = tool_registry.get_tool("cart_operation")
             if not cart_tool:
@@ -387,10 +532,18 @@ class ShoppingAgent(BaseAgent):
             if not result.get("success"):
                 logger.warning(f"[ShoppingAgent] _fetch_cart_items failed: {result.get('message')}")
                 return []
-            return result.get("data", {}).get("items", [])
+            items = result.get("data", {}).get("items", [])
+            # 只有非空结果才更新缓存，避免因临时错误缓存空列表
+            if conversation_id and items:
+                ShoppingAgent._cart_cache[conversation_id] = {"items": items, "ts": time.time()}
+            return items
         except Exception as e:
             logger.warning(f"[ShoppingAgent] _fetch_cart_items failed: {e}")
             return []
+
+    def _invalidate_cart_cache(self, conversation_id: str):
+        """购物车操作后清除缓存，确保下次获取最新状态"""
+        ShoppingAgent._cart_cache.pop(conversation_id, None)
 
     def _parse_cart_intent(self, question: str, context: str = "", user_id: str = None, cart_items: list = None) -> tuple:
         """用 LLM 解析购物车子意图，返回 (action, product_id, quantity, product_name)"""
@@ -524,7 +677,7 @@ class ShoppingAgent(BaseAgent):
 
     def _execute_cart_action(self, action: str, user_id: str,
                              product_id: int = None, quantity: int = None,
-                             jwt_token: str = None) -> Dict[str, Any]:
+                             jwt_token: str = None, conversation_id: str = None) -> Dict[str, Any]:
         """执行购物车操作并返回结果（通过 Java API）"""
         params = {"action": action, "user_id": user_id, "jwt_token": jwt_token}
         if product_id is not None:
@@ -540,6 +693,9 @@ class ShoppingAgent(BaseAgent):
             logger.error(f"[Cart] Tool execute failed: {e}", exc_info=True)
             return {"success": False, "message": f"操作异常: {e}"}
         logger.info(f"[Cart] Executed {action}: user_id={user_id}, product_id={product_id}, result={result}")
+        # 操作成功后清除购物车缓存
+        if result and result.get("success") and conversation_id:
+            self._invalidate_cart_cache(conversation_id)
         return result if result else {"success": False, "message": "操作返回空结果"}
 
     def _build_confirm_message(self, action: str, product_id: int = None,
@@ -749,7 +905,7 @@ class ShoppingAgent(BaseAgent):
                     success_count = 0
                     for pid in batch_ids:
                         logger.info(f"[Cart] Batch remove: pid={pid}, user_id={user_id}")
-                        result = self._execute_cart_action(action, user_id, pid, 1, token)
+                        result = self._execute_cart_action(action, user_id, pid, 1, token, conversation_id)
                         logger.info(f"[Cart] Batch remove result: pid={pid}, success={result.get('success')}, msg={result.get('message')}")
                         if result.get("success"):
                             success_count += 1
@@ -758,7 +914,7 @@ class ShoppingAgent(BaseAgent):
                     pid = pending.get("product_id")
                     qty = pending.get("quantity") or 1  # 默认删1个
                     logger.info(f"[Cart] Single remove: pid={pid}, qty={qty}, user_id={user_id}")
-                    result = self._execute_cart_action(action, user_id, pid, qty, token)
+                    result = self._execute_cart_action(action, user_id, pid, qty, token, conversation_id)
                     logger.info(f"[Cart] Single remove result: success={result.get('success')}, msg={result.get('message')}")
                     answer = self._generate_cart_response(question, action, result, "")
             except Exception as e:
@@ -778,11 +934,14 @@ class ShoppingAgent(BaseAgent):
             "task_type": "cart", "product_cards": []
         }
 
-    def _search_products(self, question: str, user_profile: str = "") -> List[Dict[str, Any]]:
+    def _search_products(self, question: str, user_profile: str = "", conversation_context: str = "") -> List[Dict[str, Any]]:
         """从 MySQL 搜索匹配商品"""
         try:
-            # 提取关键词进行商品搜索
-            keywords = self._extract_keywords(question)
+            # 提取排除关键词（如"不要含酒精的" → ["酒精"]）
+            exclusions = self._extract_exclusion_terms(question)
+
+            # 提取关键词进行商品搜索（传入对话上下文，让 LLM 理解承接上文的查询）
+            keywords = self._extract_keywords(question, conversation_context)
 
             # 如果关键词为空，尝试用数据库品牌/品类匹配
             if not keywords:
@@ -790,11 +949,12 @@ class ShoppingAgent(BaseAgent):
 
             if not keywords:
                 # 无关键词时返回热门商品
-                return mysql_client.fetch_all(
+                results = mysql_client.fetch_all(
                     "SELECT id, title, brand, base_price, image_url, rating, "
                     "review_count, sales_count, tags, sub_category "
-                    "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 5"
+                    "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 15"
                 )
+                return self._post_process_products(self._filter_exclusions(results, exclusions))
 
             # 同义词映射：用户常用泛称 → 数据库中的具体品类/关键词
             SYNONYM_MAP = {
@@ -911,6 +1071,8 @@ class ShoppingAgent(BaseAgent):
                     if pref not in search_terms and len(pref) >= 2:
                         search_terms.append(pref)
 
+            logger.info(f"[ShoppingAgent] Search terms: {search_terms}")
+
             # 用 LIKE 模糊匹配
             conditions = " OR ".join([
                 "(title LIKE %s OR brand LIKE %s OR tags LIKE %s OR sub_category LIKE %s)"
@@ -925,44 +1087,94 @@ class ShoppingAgent(BaseAgent):
                 f"SELECT id, title, brand, base_price, image_url, rating, "
                 f"review_count, sales_count, tags, sub_category "
                 f"FROM product WHERE status = 1 AND ({conditions}) "
-                f"ORDER BY sales_count DESC LIMIT 5"
+                f"ORDER BY sales_count DESC LIMIT 15"
             )
             results = mysql_client.fetch_all(sql, tuple(params))
+            logger.info(f"[ShoppingAgent] SQL returned {len(results)} results for terms {search_terms}")
 
-            # 关键词搜索无结果时，fallback 返回热门商品
+            # 品类过滤：当关键词命中精确品类时，只保留同品类商品，防止掺杂无关品类
+            expected_categories = set()
+            for kw in keywords:
+                if kw in PRECISE_MATCH_MAP:
+                    expected_categories.update(PRECISE_MATCH_MAP[kw])
+            if expected_categories and results:
+                category_filtered = [r for r in results if r.get("sub_category") in expected_categories]
+                if category_filtered:
+                    logger.info(f"[ShoppingAgent] Category filter: {len(results)} → {len(category_filtered)} (keeping {expected_categories})")
+                    results = category_filtered
+
+            # 排除过滤后无结果时，重新用 LLM 从对话上下文中提取品类关键词再搜一次
             if not results:
-                logger.info(f"[ShoppingAgent] No match for keywords {keywords}, returning popular products")
-                results = mysql_client.fetch_all(
-                    "SELECT id, title, brand, base_price, image_url, rating, "
-                    "review_count, sales_count, tags, sub_category "
-                    "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 5"
-                )
+                logger.info(f"[ShoppingAgent] No match for keywords {keywords}, retrying with context")
+                fallback_keywords = self._extract_keywords_with_llm(question, conversation_context)
+                if fallback_keywords and fallback_keywords != keywords:
+                    fb_conditions = " OR ".join([
+                        "(title LIKE %s OR brand LIKE %s OR tags LIKE %s OR sub_category LIKE %s)"
+                        for _ in fallback_keywords
+                    ])
+                    fb_params = []
+                    for kw in fallback_keywords:
+                        like_val = f"%{kw}%"
+                        fb_params.extend([like_val, like_val, like_val, like_val])
+                    results = mysql_client.fetch_all(
+                        f"SELECT id, title, brand, base_price, image_url, rating, "
+                        f"review_count, sales_count, tags, sub_category "
+                        f"FROM product WHERE status = 1 AND ({fb_conditions}) "
+                        f"ORDER BY sales_count DESC LIMIT 15",
+                        tuple(fb_params)
+                    )
+                    # fallback 结果也做品类过滤
+                    fb_categories = set()
+                    for kw in fallback_keywords:
+                        if kw in PRECISE_MATCH_MAP:
+                            fb_categories.update(PRECISE_MATCH_MAP[kw])
+                    if fb_categories and results:
+                        fb_cat_filtered = [r for r in results if r.get("sub_category") in fb_categories]
+                        if fb_cat_filtered:
+                            logger.info(f"[ShoppingAgent] Fallback category filter: {len(results)} → {len(fb_cat_filtered)}")
+                            results = fb_cat_filtered
+                    logger.info(f"[ShoppingAgent] Fallback with context returned {len(results)} products")
+                if not results:
+                    logger.info(f"[ShoppingAgent] Still no match, returning popular products")
+                    results = mysql_client.fetch_all(
+                        "SELECT id, title, brand, base_price, image_url, rating, "
+                        "review_count, sales_count, tags, sub_category "
+                        "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 15"
+                    )
 
-            return results
+            final = self._post_process_products(self._filter_exclusions(results, exclusions))
+            logger.info(f"[ShoppingAgent] After post-processing: {len(final)} products")
+            return final
         except Exception as e:
             logger.error(f"[ShoppingAgent] Product search error: {e}")
             return []
 
-    def _extract_keywords(self, question: str) -> List[str]:
+    def _extract_keywords(self, question: str, conversation_context: str = "") -> List[str]:
         """从用户问题中提取搜索关键词 - 优先用LLM，fallback到正则"""
         # 优先用 LLM 提取关键词
-        llm_keywords = self._extract_keywords_with_llm(question)
+        llm_keywords = self._extract_keywords_with_llm(question, conversation_context)
         if llm_keywords:
             return llm_keywords
 
         # Fallback: 正则分词
         return self._extract_keywords_regex(question)
 
-    def _extract_keywords_with_llm(self, question: str) -> List[str]:
-        """用 LLM 从用户问题中提取商品搜索关键词"""
+    def _extract_keywords_with_llm(self, question: str, conversation_context: str = "") -> List[str]:
+        """用 LLM 从用户问题中提取商品搜索关键词，支持对话上下文理解"""
         try:
             if not self.llm_service.llm:
                 return []
 
+            context_hint = ""
+            if conversation_context:
+                context_hint = f"\n对话历史（用于理解上下文）：\n{conversation_context}\n"
+
             prompt = (
                 f"从以下用户问题中提取商品搜索关键词，用于数据库搜索。\n"
                 f"只返回关键词，用逗号分隔，不要其他内容。\n"
-                f"关键词应该是品牌名、产品类型、功效、成分等有搜索价值的词。\n\n"
+                f"关键词应该是品牌名、产品类型、功效、成分等有搜索价值的词。\n"
+                f"如果用户说的是排除/不要某个品牌，提取原始品类关键词（如上文说手机，用户说不要oppo，则提取\"手机\"）。\n"
+                f"{context_hint}\n"
                 f"用户问题：{question}\n\n"
                 f"关键词："
             )
@@ -975,6 +1187,40 @@ class ShoppingAgent(BaseAgent):
         except Exception as e:
             logger.warning(f"[ShoppingAgent] LLM keyword extraction failed: {e}")
             return []
+
+    def _extract_exclusion_terms(self, question: str) -> List[str]:
+        """用 LLM 从用户问题中提取排除关键词，如"不要优衣库" → ["优衣库"]"""
+        try:
+            if not self.llm_service.llm:
+                return []
+            prompt = (
+                "从用户问题中提取「排除/不要」的关键词（品牌名、成分、类型等）。\n"
+                "只返回关键词，用逗号分隔。如果没有排除意图，返回空字符串。\n\n"
+                f"用户问题：{question}\n\n"
+                "排除关键词："
+            )
+            result = self.llm_service.llm.invoke(prompt)
+            text = result.content if hasattr(result, 'content') else str(result)
+            text = text.strip().strip('"').strip("'")
+            if not text:
+                return []
+            exclusions = [kw.strip() for kw in text.split(',') if kw.strip() and len(kw.strip()) >= 2]
+            logger.info(f"[ShoppingAgent] LLM extracted exclusions: {exclusions}")
+            return exclusions
+        except Exception as e:
+            logger.warning(f"[ShoppingAgent] LLM exclusion extraction failed: {e}")
+            return []
+
+    def _filter_exclusions(self, products: List[Dict[str, Any]], exclusions: List[str]) -> List[Dict[str, Any]]:
+        """过滤掉包含排除关键词的商品"""
+        if not exclusions or not products:
+            return products
+        filtered = []
+        for p in products:
+            text = f"{p.get('title', '')} {p.get('tags', '')} {p.get('sub_category', '')}".lower()
+            if not any(excl.lower() in text for excl in exclusions):
+                filtered.append(p)
+        return filtered
 
     def _extract_keywords_regex(self, question: str) -> List[str]:
         """正则分词提取关键词（LLM不可用时的fallback）"""
@@ -1040,6 +1286,43 @@ class ShoppingAgent(BaseAgent):
             logger.error(f"[ShoppingAgent] Brand/category match error: {e}")
             return []
 
+    def _post_process_products(self, products: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
+        """检索结果后处理：去重、过滤、综合排序"""
+        if not products:
+            logger.info("[PostProcess] No products to process")
+            return []
+        logger.info(f"[PostProcess] Input: {len(products)} products")
+
+        # 1. 去重：按 product id 去重，保留首次出现的
+        seen_ids = set()
+        deduped = []
+        for p in products:
+            pid = p.get("id")
+            if pid and pid not in seen_ids:
+                seen_ids.add(pid)
+                deduped.append(p)
+
+        # 2. 过滤：确保 status == 1（防御性检查，SQL 已过滤）
+        filtered = [p for p in deduped if p.get("status", 1) == 1]
+
+        # 3. 综合排序：评分权重 0.4 + 销量权重 0.6
+        # 先计算各维度最大值用于归一化（MySQL返回Decimal，需转float）
+        max_rating = float(max((p.get("rating", 0) or 0) for p in filtered)) or 1
+        max_sales = float(max((p.get("sales_count", 0) or 0) for p in filtered)) or 1
+
+        for p in filtered:
+            rating_score = float(p.get("rating", 0) or 0) / max_rating
+            sales_score = float(p.get("sales_count", 0) or 0) / max_sales
+            p["_sort_score"] = rating_score * 0.4 + sales_score * 0.6
+
+        filtered.sort(key=lambda x: x.get("_sort_score", 0), reverse=True)
+
+        # 移除临时排序字段并返回 top N
+        for p in filtered:
+            p.pop("_sort_score", None)
+
+        return filtered[:limit]
+
     def _build_product_context(self, products: List[Dict[str, Any]]) -> str:
         """构建商品信息上下文，供 LLM 生成推荐话术"""
         if not products:
@@ -1059,8 +1342,10 @@ class ShoppingAgent(BaseAgent):
         if not products:
             return "抱歉，暂时没有找到完全匹配您需求的商品，换个关键词试试吧～"
 
+        season = self._get_current_season()
         prompt = (
             f"你是智能导购助手「小智」。根据用户需求和商品信息，给出简短推荐。\n\n"
+            f"当前季节：{season}\n"
             f"用户画像：{user_profile or '（未知）'}\n"
             f"用户问题：{question}\n\n"
             f"商品信息：\n{context}\n\n"
@@ -1072,6 +1357,7 @@ class ShoppingAgent(BaseAgent):
             f"5. 不要编造商品不存在的功能\n"
             f"6. 如果用户有肤质信息，推荐护肤品时说明是否适合该肤质\n"
             f"7. 如果用户有偏好标签，优先推荐与偏好相关的商品\n"
+            f"8. 结合当前季节推荐应季商品，如夏季推荐防晒/清爽类，冬季推荐保湿/保暖类\n"
         )
         try:
             return self.llm_service.llm.invoke(prompt).content

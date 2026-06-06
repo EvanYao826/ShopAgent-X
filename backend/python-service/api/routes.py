@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from core.parser import DocumentParser
@@ -149,6 +149,7 @@ def should_return_sources(question: str) -> bool:
     return False
 
 # 初始化核心服务
+llm_service = None
 try:
     logger.info("Initializing DocumentParser...")
     parser = DocumentParser()
@@ -760,3 +761,98 @@ async def delete_vector_collection():
             })
         )
         raise HTTPException(status_code=500, detail="删除向量库失败")
+
+
+@router.post("/recognize-image")
+async def recognize_image(file: UploadFile = File(...)):
+    """
+    图片识别接口（只返回识别文字，不走对话流程）
+    用于商品页拍照搜索场景
+    """
+    start_time = time.time()
+    try:
+        if llm_service is None:
+            raise HTTPException(status_code=500, detail="LLM服务未初始化")
+
+        # 读取图片内容
+        image_bytes = await file.read()
+        logger.info(f"Recognizing image: {file.filename}, size: {len(image_bytes)} bytes")
+
+        # 调用 LLM 服务识别图片
+        text = llm_service.extract_text_from_image_bytes(image_bytes)
+
+        process_time = time.time() - start_time
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/recognize-image",
+                "status_code": 200,
+                "process_time": process_time
+            })
+        )
+        return {"text": text}
+
+    except Exception as e:
+        process_time = time.time() - start_time
+        logger.error(f"Error recognizing image: {str(e)}")
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/recognize-image",
+                "status_code": 500,
+                "process_time": process_time
+            })
+        )
+        raise HTTPException(status_code=500, detail="图片识别失败")
+
+
+@router.post("/voice/recognize")
+async def recognize_voice(file: UploadFile = File(...)):
+    """
+    语音识别接口（音频转文字）
+    用于对话页语音输入场景
+    """
+    start_time = time.time()
+    try:
+        if llm_service is None:
+            raise HTTPException(status_code=500, detail="LLM服务未初始化")
+
+        logger.info(f"[Voice] Received voice recognition request: {file.filename}")
+
+        # 读取音频内容
+        audio_bytes = await file.read()
+        # 根据文件扩展名判断音频格式
+        audio_format = "m4a"
+        if file.filename:
+            ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "m4a"
+            if ext in ["wav", "mp3", "m4a", "ogg", "flac", "amr"]:
+                audio_format = ext
+
+        logger.info(f"[Voice] Recognizing voice: {file.filename}, format: {audio_format}, size: {len(audio_bytes)} bytes")
+
+        # 调用 LLM 服务识别语音
+        text = llm_service.recognize_voice(audio_bytes, audio_format)
+
+        process_time = time.time() - start_time
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/voice/recognize",
+                "status_code": 200,
+                "process_time": process_time
+            })
+        )
+        return {"text": text}
+
+    except Exception as e:
+        process_time = time.time() - start_time
+        logger.error(f"Error recognizing voice: {str(e)}")
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/voice/recognize",
+                "status_code": 500,
+                "process_time": process_time
+            })
+        )
+        raise HTTPException(status_code=500, detail="语音识别失败")

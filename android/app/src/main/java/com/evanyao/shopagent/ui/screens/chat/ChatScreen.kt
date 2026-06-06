@@ -15,11 +15,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
@@ -44,6 +48,7 @@ import com.evanyao.shopagent.ui.components.MessageBubble
 import com.evanyao.shopagent.ui.components.RecommendSection
 import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.viewmodel.ChatViewModel
+import com.evanyao.shopagent.viewmodel.InputMode
 import kotlinx.coroutines.launch
 
 /** 对话页面，包含会话列表侧边栏、消息列表、输入框 */
@@ -52,7 +57,10 @@ import kotlinx.coroutines.launch
 fun ChatScreen(
     viewModel: ChatViewModel,
     onProductClick: (Long) -> Unit,
-    onAddToCart: ((List<Long>) -> Unit)? = null
+    onAddToCart: ((List<Long>) -> Unit)? = null,
+    onCameraClick: (() -> Unit)? = null,
+    onVoiceStart: (() -> Unit)? = null,
+    onVoiceEnd: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
@@ -69,6 +77,14 @@ fun ChatScreen(
     // SKU 选择状态
     val skuSelectionProduct by viewModel.skuSelectionProduct.collectAsState()
     val skuSelectionList by viewModel.skuSelectionList.collectAsState()
+
+    // 语音识别完成后，将结果填入输入框
+    LaunchedEffect(uiState.pendingVoiceText) {
+        uiState.pendingVoiceText?.let { text ->
+            inputText = text
+            viewModel.clearPendingVoiceText()
+        }
+    }
 
     // 自动滚动到底部（包括流式输出时）
     LaunchedEffect(uiState.messages.size, uiState.isSending, uiState.streamingContent) {
@@ -338,7 +354,7 @@ fun ChatScreen(
                 }
             }
 
-            // 输入区域
+            // 输入区域（模仿豆包布局：[📷] [🎤/⌨️] [输入框] [发送/停止]）
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -351,15 +367,106 @@ fun ChatScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 48.dp, max = 120.dp),
-                        placeholder = { Text("输入你的问题...") },
-                        maxLines = 4
-                    )
+                    // ＋ 拍照/相册按钮
+                    IconButton(
+                        onClick = { onCameraClick?.invoke() },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "拍照/相册",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // 🎤/⌨️ 模式切换按钮
+                    IconButton(
+                        onClick = { viewModel.toggleInputMode() },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.inputMode == InputMode.VOICE) {
+                                Icons.Default.Keyboard
+                            } else {
+                                Icons.Default.Mic
+                            },
+                            contentDescription = if (uiState.inputMode == InputMode.VOICE) "键盘" else "语音",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // 输入框或语音按钮
+                    if (uiState.inputMode == InputMode.VOICE) {
+                        // 语音模式：点击开始/停止录音
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(
+                                    if (uiState.isRecording) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    }
+                                )
+                                .clickable {
+                                    if (!uiState.isRecording) {
+                                        onVoiceStart?.invoke()
+                                    } else {
+                                        onVoiceEnd?.invoke()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (uiState.isRecording) {
+                                    // 录音中：蓝色圆圈 + 动画
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.primary,
+                                                CircleShape
+                                            )
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "录音中...点击停止",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Mic,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "点击说话",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // 文字模式：文本输入框
+                        OutlinedTextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp, max = 120.dp),
+                            placeholder = { Text("输入你的问题...") },
+                            maxLines = 4
+                        )
+                    }
 
                     Spacer(modifier = Modifier.width(8.dp))
 

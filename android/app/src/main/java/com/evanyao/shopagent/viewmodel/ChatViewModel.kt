@@ -1,5 +1,7 @@
 package com.evanyao.shopagent.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,6 +24,12 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+
+/** 输入模式 */
+enum class InputMode { TEXT, VOICE }
 
 /** 聊天页面 UI 状态 */
 data class ChatUiState(
@@ -34,6 +42,9 @@ data class ChatUiState(
     val streamingContent: String = "",                        // 流式接收的临时内容
     val errorMessage: String? = null,                         // 错误提示
     val userGender: Int? = null,                              // 用户性别（用于推荐问题）
+    val inputMode: InputMode = InputMode.TEXT,                // 输入模式（文字/语音）
+    val isRecording: Boolean = false,                         // 是否正在录音
+    val pendingVoiceText: String? = null,                     // 语音识别结果（等待用户确认）
     val recommendations: List<String> = listOf(               // 推荐问题列表
         "推荐一款适合油皮的精华",
         "敏感肌可以用什么面膜？",
@@ -892,6 +903,146 @@ class ChatViewModel(
 
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    /** 切换输入模式（文字/语音） */
+    fun toggleInputMode() {
+        val newMode = if (_uiState.value.inputMode == InputMode.TEXT) {
+            InputMode.VOICE
+        } else {
+            InputMode.TEXT
+        }
+        _uiState.value = _uiState.value.copy(inputMode = newMode)
+    }
+
+    /** 开始录音 */
+    fun startRecording() {
+        _uiState.value = _uiState.value.copy(isRecording = true)
+    }
+
+    /** 停止录音 */
+    fun stopRecording() {
+        _uiState.value = _uiState.value.copy(isRecording = false)
+    }
+
+    /** 语音识别完成，将结果填入输入框等待用户确认 */
+    fun sendVoiceResult(text: String) {
+        if (text.isNotBlank() && text != "语音识别未配置" && !text.startsWith("语音识别失败")) {
+            // 检查是否为无效语音（无实际说话内容）
+            val noSpeechKeywords = listOf("没有可识别", "未包含", "无人类", "嗡鸣", "底噪", "噪音", "未识别到", "未能识别")
+            if (noSpeechKeywords.any { text.contains(it) }) {
+                _uiState.value = _uiState.value.copy(
+                    isSending = false,
+                    errorMessage = "未检测到说话内容，请再试一次"
+                )
+            } else {
+                _uiState.value = _uiState.value.copy(
+                    pendingVoiceText = text,
+                    isSending = false
+                )
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(isSending = false, errorMessage = text)
+        }
+    }
+
+    /** 清除待确认的语音文本（已填入输入框后调用） */
+    fun clearPendingVoiceText() {
+        _uiState.value = _uiState.value.copy(pendingVoiceText = null)
+    }
+
+    /** 发送图片识别结果（用于对话页拍照） */
+    fun sendPhotoResult(imageDescription: String) {
+        if (imageDescription.isNotBlank() && !imageDescription.startsWith("无法识别")) {
+            // 将图片描述作为问题发送给 AI
+            sendMessage("请识别这张图片中的商品并推荐类似商品：$imageDescription")
+        } else {
+            _uiState.value = _uiState.value.copy(errorMessage = imageDescription)
+        }
+    }
+
+    /** 从 URI 发送图片（拍照或相册选择） */
+    fun sendPhotoFromUri(uri: Uri, context: Context) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isSending = true)
+
+                // 读取图片并构建请求
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val imageBytes = inputStream?.readBytes()
+                inputStream?.close()
+
+                if (imageBytes == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isSending = false,
+                        errorMessage = "无法读取图片"
+                    )
+                    return@launch
+                }
+
+                val requestBody = imageBytes.toRequestBody("image/*".toMediaType())
+                val part = MultipartBody.Part.createFormData("file", "photo.jpg", requestBody)
+
+                // 调用图片识别接口
+                val response = chatRepository.recognizeImage(part)
+                if (response.isSuccess && response.data != null) {
+                    val recognizedText = response.data
+                    Log.d(TAG, "Image recognized: $recognizedText")
+
+                    // 将识别结果发送给 AI 推荐商品
+                    sendPhotoResult(recognizedText)
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isSending = false,
+                        errorMessage = response.message ?: "图片识别失败"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Send photo failed", e)
+                _uiState.value = _uiState.value.copy(
+                    isSending = false,
+                    errorMessage = "图片识别失败: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /** 发送语音文件进行识别 */
+    fun sendVoiceFile(audioFile: java.io.File) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isSending = true)
+
+                // 读取音频文件
+                val audioBytes = audioFile.readBytes()
+                val requestBody = audioBytes.toRequestBody("audio/*".toMediaType())
+                val part = MultipartBody.Part.createFormData("file", audioFile.name, requestBody)
+
+                // 调用语音识别接口
+                val response = chatRepository.recognizeVoice(part)
+                if (response.isSuccess && response.data != null) {
+                    val recognizedText = response.data
+                    Log.d(TAG, "Voice recognized: $recognizedText")
+
+                    // 发送识别结果
+                    sendVoiceResult(recognizedText)
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isSending = false,
+                        errorMessage = response.message ?: "语音识别失败"
+                    )
+                }
+
+                // 清理临时文件
+                audioFile.delete()
+            } catch (e: Exception) {
+                Log.e(TAG, "Send voice failed", e)
+                _uiState.value = _uiState.value.copy(
+                    isSending = false,
+                    errorMessage = "语音识别失败: ${e.message}"
+                )
+            }
+        }
     }
 
     fun clearState() {

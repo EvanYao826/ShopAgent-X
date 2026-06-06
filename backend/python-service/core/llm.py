@@ -4,15 +4,9 @@ import requests
 from typing import AsyncGenerator, Generator
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from PIL import Image
-import pytesseract
 
 # 使用统一配置管理模块
 from core.config import config
-
-# 配置Tesseract OCR路径（空值时由 parser.py 自动检测）
-if config.TESSERACT_PATH:
-    pytesseract.pytesseract.tesseract_cmd = config.TESSERACT_PATH
 
 class LLMService:
     def __init__(self):
@@ -69,6 +63,7 @@ class LLMService:
             - 运动户外：运动鞋（Nike、HOKA）、冲锋衣（The North Face）、背包（Osprey）
             - 食品饮料：零食、坚果、牛奶
 
+            当前季节：{season}
             用户画像：
             {user_profile}
 
@@ -81,6 +76,7 @@ class LLMService:
             6. 不要提及"AI服务不可用"、"系统错误"等技术问题
             7. 【重要】推荐商品时，严格按照「相关商品信息」中列出的顺序来推荐，不要自行调换顺序
             8. 【重要】只回答与商城商品相关的问题。如果用户问的问题与商品无关（如政治、历史、编程等），请礼貌地引导用户咨询商品相关问题
+            9. 结合当前季节推荐应季商品，如夏季推荐防晒/清爽类，冬季推荐保湿/保暖类
 
             对话历史：
             {conversation_context}
@@ -208,7 +204,7 @@ class LLMService:
      * @param conversation_context 对话上下文（可选）
      * @return 流式生成器，逐个token返回
      * """
-    def get_answer_stream(self, question: str, context_docs: list, conversation_context: str = "", user_profile: str = "") -> Generator[str, None, None]:
+    def get_answer_stream(self, question: str, context_docs: list, conversation_context: str = "", user_profile: str = "", season: str = "") -> Generator[str, None, None]:
         import time
         start_time = time.time()
         
@@ -256,7 +252,8 @@ class LLMService:
                 "conversation_context": cleaned_context,
                 "knowledge_context": knowledge_context,
                 "question": processed_question,
-                "user_profile": user_profile or "（未知）"
+                "user_profile": user_profile or "（未知）",
+                "season": season or "（未知）"
             }):
                 full_response += chunk
                 yield json.dumps({"type": "token", "content": chunk})
@@ -302,59 +299,190 @@ class LLMService:
 
     def extract_text_from_image(self, image_url: str) -> str:
         """
-        从图片URL中提取文字
+        识别图片内容：优先用豆包 Vision API（理解图片语义），fallback 到 Tesseract OCR（仅文字）
         """
         try:
             # 处理相对路径，转换为完整URL
             if image_url.startswith('/api/'):
-                # 使用后端服务地址
-                image_url = f"http://localhost:8080{image_url}"
-            
+                image_url = f"http://localhost:8888{image_url}"
+
             config.logger.info(f"Downloading image from: {image_url}")
-            
+
             # 下载图片
             response = requests.get(image_url, timeout=10)
             response.raise_for_status()
-            
-            # 保存到临时文件
-            temp_path = os.path.join(config.TEMP_DIR, "temp_image.png")
-            with open(temp_path, "wb") as f:
-                f.write(response.content)
-            
-            config.logger.info(f"Image saved to temp file, size: {len(response.content)} bytes")
-            
-            # 使用OCR提取文字
-            image = Image.open(temp_path)
+            image_bytes = response.content
+            config.logger.info(f"Image downloaded, size: {len(image_bytes)} bytes")
+
+            return self.extract_text_from_image_bytes(image_bytes)
+
+        except Exception as e:
+            config.logger.error(f"Error extracting image content: {e}")
+            return f"无法识别图片内容: {str(e)}"
+
+    def extract_text_from_image_bytes(self, image_bytes: bytes) -> str:
+        """
+        识别图片内容（直接接收图片字节）
+        优先用豆包 Vision API，fallback 到 Tesseract OCR
+        """
+        try:
+            config.logger.info(f"Processing image bytes, size: {len(image_bytes)} bytes")
+
+            # 优先：豆包 Vision API（全模态模型，支持图像理解）
+            if config.DOUBAO_API_KEY:
+                return self._recognize_with_doubao_vision(image_bytes)
+
+            # Fallback：Tesseract OCR
+            return self._recognize_with_tesseract(image_bytes)
+
+        except Exception as e:
+            config.logger.error(f"Error extracting image content from bytes: {e}")
+            return f"无法识别图片内容: {str(e)}"
+
+    def _recognize_with_doubao_vision(self, image_bytes: bytes) -> str:
+        """用豆包 Vision API 识别图片内容"""
+        import base64
+        try:
+            b64_image = base64.b64encode(image_bytes).decode('utf-8')
+            base_url = config.DOUBAO_BASE_URL.rstrip('/')
+
+            resp = requests.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {config.DOUBAO_API_KEY}"
+                },
+                json={
+                    "model": config.DOUBAO_VISION_MODEL,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
+                            {"type": "text", "text": "请简短描述这张图片中的商品，包括品类和品牌（如有）。例如：一双白色Nike运动鞋、一部华为手机。只返回描述，不要其他内容。"}
+                        ]
+                    }],
+                    "max_tokens": 100
+                },
+                timeout=15
+            )
+
+            if resp.status_code != 200:
+                config.logger.error(f"Doubao Vision API returned {resp.status_code}: {resp.text}")
+                raise Exception(f"API返回 {resp.status_code}")
+
+            result = resp.json()
+            description = result["choices"][0]["message"]["content"].strip()
+            config.logger.info(f"Doubao Vision result: {description}")
+            return description
+        except Exception as e:
+            config.logger.error(f"Doubao Vision API error: {e}, falling back to Tesseract")
+            return self._recognize_with_tesseract(image_bytes)
+
+    def _recognize_with_tesseract(self, image_bytes: bytes) -> str:
+        """用 Tesseract OCR 提取图片中的文字（fallback）"""
+        try:
+            import io
+            from PIL import Image
+            import pytesseract
+            if config.TESSERACT_PATH:
+                pytesseract.pytesseract.tesseract_cmd = config.TESSERACT_PATH
+            image = Image.open(io.BytesIO(image_bytes))
             text = pytesseract.image_to_string(image, lang='chi_sim+eng')
-            
-            config.logger.info(f"OCR result: {text[:100]}...")  # 打印前100个字符
-            
-            # 清理临时文件
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-            
+            config.logger.info(f"Tesseract OCR result: {text[:100]}...")
             return text.strip() if text.strip() else "图片中未识别到文字"
         except Exception as e:
-            config.logger.error(f"Error extracting text from image: {e}")
-            return f"无法从图片中提取文字: {str(e)}"
+            config.logger.error(f"Tesseract OCR error: {e}")
+            return "图片识别失败"
+
+    def recognize_voice(self, audio_bytes: bytes, audio_format: str = "m4a") -> str:
+        """
+        语音识别：调用豆包多模态模型的音频理解能力
+        :param audio_bytes: 音频文件字节
+        :param audio_format: 音频格式（m4a/wav/mp3 等）
+        :return: 识别出的文字
+        """
+        import base64
+        try:
+            if not config.DOUBAO_API_KEY:
+                config.logger.warning("DOUBAO_API_KEY not configured")
+                return "语音识别未配置"
+
+            b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
+
+            # 根据格式确定 MIME 类型
+            mime_map = {
+                "m4a": "audio/mp4",
+                "mp3": "audio/mpeg",
+                "wav": "audio/wav",
+                "ogg": "audio/ogg",
+                "flac": "audio/flac",
+                "amr": "audio/amr",
+            }
+            mime_type = mime_map.get(audio_format, "audio/mp4")
+
+            # 调用豆包多模态模型，使用音频理解能力
+            base_url = config.DOUBAO_BASE_URL.rstrip('/')
+            resp = requests.post(
+                f"{base_url}/chat/completions",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {config.DOUBAO_API_KEY}"
+                },
+                json={
+                    "model": config.DOUBAO_VISION_MODEL,
+                    "messages": [{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "input_audio",
+                                "input_audio": {
+                                    "data": b64_audio,
+                                    "format": audio_format
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": "请将这段语音内容转换为文字，只返回识别出的文字，不要添加任何其他内容。"
+                            }
+                        ]
+                    }],
+                    "max_tokens": 500
+                },
+                timeout=60
+            )
+            config.logger.info(f"Voice recognition request: model={config.DOUBAO_VISION_MODEL}, audio_format={audio_format}, audio_size={len(audio_bytes)}")
+
+            if resp.status_code != 200:
+                config.logger.error(f"Doubao API returned {resp.status_code}: {resp.text}")
+                return f"语音识别失败: API返回 {resp.status_code}"
+
+            result = resp.json()
+            config.logger.info(f"Doubao API response: {json.dumps(result, ensure_ascii=False)[:500]}")
+
+            text = result["choices"][0]["message"]["content"].strip()
+            config.logger.info(f"Voice recognition result: {text}")
+            return text if text else "未能识别语音内容"
+
+        except Exception as e:
+            config.logger.error(f"Voice recognition error: {type(e).__name__}: {e}", exc_info=True)
+            return f"语音识别失败: {str(e)}"
 
     def process_question_with_images(self, question: str) -> str:
         """
-        处理包含图片URL的问题，提取图片中的文字并添加到问题中
+        处理包含图片URL的问题，识别图片内容并添加到问题中
         """
         import re
         # 查找图片URL（支持完整URL和相对路径）
         image_urls = re.findall(r'图片URL: (/api/[^\n]+)', question)
-        
+
         config.logger.info(f"Found image URLs: {image_urls}")
-        
+
         if image_urls:
             processed_question = question
             for image_url in image_urls:
-                # 提取图片中的文字
-                image_text = self.extract_text_from_image(image_url)
-                # 将图片文字添加到问题中
-                processed_question += f"\n\n图片内容: {image_text}"
+                # 识别图片内容（豆包 Vision 或 Tesseract OCR）
+                image_content = self.extract_text_from_image(image_url)
+                processed_question += f"\n\n图片内容: {image_content}"
             return processed_question
         else:
             return question

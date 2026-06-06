@@ -8,6 +8,7 @@ import com.demo.aiknowledge.entity.Conversation;
 import com.demo.aiknowledge.entity.Message;
 import com.demo.aiknowledge.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.core.io.FileSystemResource;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/chat")
 @RequiredArgsConstructor
@@ -226,6 +228,91 @@ public class ChatController {
     @PostMapping("/messages/feedback")
     public Result<Message> submitFeedback(@RequestBody FeedbackRequest request) {
         return Result.success(chatService.submitFeedback(request.getMessageId(), request.getFeedbackType()));
+    }
+
+    /**
+     * 图片识别接口（只返回识别文字，不走对话流程）
+     * 用于商品页拍照搜索场景
+     */
+    @PostMapping("/recognize-image")
+    public Result<String> recognizeImage(@RequestParam("file") MultipartFile file) {
+        try {
+            // 调用 Python 图片识别服务
+            String result = callPythonRecognize("/api/recognize-image", file);
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("Image recognition failed", e);
+            return Result.error("图片识别失败");
+        }
+    }
+
+    /**
+     * 语音识别接口（音频转文字）
+     * 用于对话页语音输入场景
+     */
+    @PostMapping("/voice/recognize")
+    public Result<String> recognizeVoice(@RequestParam("file") MultipartFile file) {
+        try {
+            // 调用 Python 语音识别服务
+            String result = callPythonRecognize("/api/voice/recognize", file);
+            return Result.success(result);
+        } catch (Exception e) {
+            log.error("Voice recognition failed", e);
+            return Result.error("语音识别失败");
+        }
+    }
+
+    /**
+     * 调用 Python 识别服务（图片或语音）
+     */
+    private String callPythonRecognize(String path, MultipartFile file) throws Exception {
+        // 使用系统临时目录保存文件，避免自定义目录权限问题
+        String ext = "";
+        String originalName = file.getOriginalFilename();
+        if (originalName != null && originalName.contains(".")) {
+            ext = originalName.substring(originalName.lastIndexOf('.'));
+        }
+        java.nio.file.Path tempFile = java.nio.file.Files.createTempFile("recognize_", ext);
+        file.transferTo(tempFile.toFile());
+
+        try {
+            org.springframework.web.client.RestTemplate restTemplate = new org.springframework.web.client.RestTemplate();
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+            org.springframework.core.io.FileSystemResource resource = new org.springframework.core.io.FileSystemResource(tempFile.toFile());
+            org.springframework.util.LinkedMultiValueMap<String, Object> body = new org.springframework.util.LinkedMultiValueMap<>();
+            body.add("file", resource);
+
+            org.springframework.http.HttpEntity<org.springframework.util.LinkedMultiValueMap<String, Object>> requestEntity =
+                    new org.springframework.http.HttpEntity<>(body, headers);
+
+            String pythonUrl = "http://localhost:8000" + path;
+            log.info("Calling Python service: {}", pythonUrl);
+
+            try {
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, String> response = restTemplate.postForObject(
+                        pythonUrl, requestEntity, java.util.Map.class);
+
+                if (response != null && response.containsKey("text")) {
+                    return response.get("text");
+                }
+                log.warn("Python service returned unexpected response: {}", response);
+                return "识别失败";
+            } catch (org.springframework.web.client.HttpClientErrorException e) {
+                log.error("Python service returned HTTP error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+                throw e;
+            } catch (org.springframework.web.client.HttpServerErrorException e) {
+                log.error("Python service returned server error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
+                throw e;
+            } catch (org.springframework.web.client.ResourceAccessException e) {
+                log.error("Cannot connect to Python service at {}: {}", pythonUrl, e.getMessage());
+                throw e;
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(tempFile);
+        }
     }
 
     /**

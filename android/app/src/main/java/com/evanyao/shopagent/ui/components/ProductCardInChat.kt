@@ -26,7 +26,10 @@ import java.nio.charset.StandardCharsets
 
 private const val BASE_URL = "http://10.0.2.2:8888"
 
-/** 编码图片 URL，处理中文字符 */
+/**
+ * 编码图片 URL 中的中文字符
+ * 例如："product-images/华为手机.jpg" → "product-images/%E5%8D%8E%E4%B8%BA%E6%89%8B%E6%9C%BA.jpg"
+ */
 fun encodeImageUrl(imageUrl: String?): String? {
     if (imageUrl.isNullOrBlank()) return null
     return try {
@@ -46,7 +49,14 @@ fun encodeImageUrl(imageUrl: String?): String? {
     }
 }
 
-/** 构建完整的图片 URL */
+/**
+ * 构建完整的图片 URL
+ * 处理逻辑：
+ * - 完整 URL：替换 localhost 为模拟器地址 10.0.2.2
+ * - /product-images/ 开头：拼接 BASE_URL
+ * - 其他：自动补全 product-images 路径前缀
+ * 最后对中文路径段进行 URL 编码
+ */
 fun buildImageUrl(imageUrl: String?): String? {
     if (imageUrl.isNullOrBlank()) return null
     val url = when {

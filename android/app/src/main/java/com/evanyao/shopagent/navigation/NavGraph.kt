@@ -381,90 +381,11 @@ fun MainNavigation() {
                 )
             }
             composable(Screen.ProductList.route) {
-                val context = LocalContext.current
-
-                // 商品页：图片选择状态
-                var productImageUri by remember { mutableStateOf<Uri?>(null) }
-                var showImageSourceDialog by remember { mutableStateOf(false) }
-
-                // 相机拍照 launcher
-                val productCameraLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.TakePicture()
-                ) { success ->
-                    if (success && productImageUri != null) {
-                        productViewModel.searchByImage(productImageUri!!, context)
-                        productImageUri = null
-                    }
-                }
-
-                // 相机权限 launcher
-                val productCameraPermissionLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestPermission()
-                ) { granted ->
-                    if (granted) {
-                        val imageFile = File(context.cacheDir, "product_photo_${System.currentTimeMillis()}.jpg")
-                        productImageUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", imageFile)
-                        productCameraLauncher.launch(productImageUri!!)
-                    }
-                }
-
-                // 相册选择 launcher
-                val productPhotoPickerLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.PickVisualMedia()
-                ) { uri ->
-                    if (uri != null) {
-                        productViewModel.searchByImage(uri, context)
-                    }
-                }
-
-                // 图片来源选择弹窗
-                if (showImageSourceDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showImageSourceDialog = false },
-                        title = { Text("选择图片来源") },
-                        text = {
-                            Column {
-                                TextButton(
-                                    onClick = {
-                                        showImageSourceDialog = false
-                                        productCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.PhotoCamera, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("拍照")
-                                }
-                                TextButton(
-                                    onClick = {
-                                        showImageSourceDialog = false
-                                        productPhotoPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.PhotoLibrary, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("从相册选择")
-                                }
-                            }
-                        },
-                        confirmButton = {},
-                        dismissButton = {
-                            TextButton(onClick = { showImageSourceDialog = false }) {
-                                Text("取消")
-                            }
-                        }
-                    )
-                }
-
                 ProductListScreen(
                     viewModel = productViewModel,
                     onProductClick = { productId ->
                         navController.navigate(Screen.ProductDetail.createRoute(productId))
-                    },
-                    onCameraClick = { showImageSourceDialog = true }
+                    }
                 )
             }
             composable(

@@ -35,6 +35,7 @@ import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
 import com.evanyao.shopagent.ui.components.LoadingIndicator
+import com.evanyao.shopagent.ui.components.ErrorState
 import com.evanyao.shopagent.viewmodel.CartViewModel
 
 // 主题配色（统一使用 MaterialTheme.colorScheme）
@@ -99,6 +100,12 @@ fun CartScreen(
         when {
             uiState.isLoading -> {
                 LoadingIndicator()
+            }
+            uiState.isError -> {
+                ErrorState(
+                    message = uiState.errorMessage ?: "加载失败",
+                    onRetry = { viewModel.loadCartList() }
+                )
             }
             uiState.cartItems.isEmpty() -> {
                 EmptyCartContent(onNavigateToProducts = onNavigateToProducts)

@@ -63,6 +63,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended:1.6.0")
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    // Accompanist Shimmer 加载动画
+    implementation("com.google.accompanist:accompanist-placeholder:0.34.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     testImplementation(libs.junit)

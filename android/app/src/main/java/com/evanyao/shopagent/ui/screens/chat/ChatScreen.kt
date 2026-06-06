@@ -44,6 +44,7 @@ import com.evanyao.shopagent.data.model.Message
 import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.ui.components.AiAvatar
 import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
+import com.evanyao.shopagent.ui.components.EmptyState
 import com.evanyao.shopagent.ui.components.MessageBubble
 import com.evanyao.shopagent.ui.components.RecommendSection
 import com.evanyao.shopagent.ui.components.buildImageUrl
@@ -51,7 +52,29 @@ import com.evanyao.shopagent.viewmodel.ChatViewModel
 import com.evanyao.shopagent.viewmodel.InputMode
 import kotlinx.coroutines.launch
 
-/** 对话页面，包含会话列表侧边栏、消息列表、输入框 */
+/**
+ * 对话页面 — 应用的核心界面
+ *
+ * 布局结构：
+ * - ModalNavigationDrawer：左侧会话列表侧边栏
+ *   - 会话列表（按置顶+时间排序）
+ *   - 新建会话按钮
+ *   - 长按菜单（重命名/删除/置顶）
+ * - Scaffold：主内容区
+ *   - TopAppBar：会话标题 + 菜单按钮
+ *   - LazyColumn：消息列表
+ *     - 空状态：推荐问题区域
+ *     - 历史消息：MessageBubble 组件
+ *     - 流式输出：实时更新的 StreamingText
+ *     - 加载指示器：TypingIndicator
+ *   - 底部输入区域：
+ *     - 📷 拍照/选图按钮（带 Tooltip）
+ *     - 🎤/⌨️ 模式切换按钮（文字/语音）
+ *     - 输入框 / 语音录制区域
+ *     - 发送/停止按钮
+ * - Snackbar：错误提示
+ * - SKU 选择弹窗：购物车加购规格选择
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
@@ -367,32 +390,48 @@ fun ChatScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    // ＋ 拍照/相册按钮
-                    IconButton(
-                        onClick = { onCameraClick?.invoke() },
-                        modifier = Modifier.size(40.dp)
+                    // ＋ 拍照/相册按钮（带 Tooltip）
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = { PlainTooltip { Text("拍照/选图") } },
+                        state = rememberTooltipState()
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "拍照/相册",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        IconButton(
+                            onClick = { onCameraClick?.invoke() },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "拍照/相册",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    // 🎤/⌨️ 模式切换按钮
-                    IconButton(
-                        onClick = { viewModel.toggleInputMode() },
-                        modifier = Modifier.size(40.dp)
+                    // 🎤/⌨️ 模式切换按钮（带 Tooltip）
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text(if (uiState.inputMode == InputMode.VOICE) "切换到键盘" else "切换到语音")
+                            }
+                        },
+                        state = rememberTooltipState()
                     ) {
-                        Icon(
-                            imageVector = if (uiState.inputMode == InputMode.VOICE) {
-                                Icons.Default.Keyboard
-                            } else {
-                                Icons.Default.Mic
-                            },
-                            contentDescription = if (uiState.inputMode == InputMode.VOICE) "键盘" else "语音",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        IconButton(
+                            onClick = { viewModel.toggleInputMode() },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.inputMode == InputMode.VOICE) {
+                                    Icons.Default.Keyboard
+                                } else {
+                                    Icons.Default.Mic
+                                },
+                                contentDescription = if (uiState.inputMode == InputMode.VOICE) "键盘" else "语音",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
                     // 输入框或语音按钮

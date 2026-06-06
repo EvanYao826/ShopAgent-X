@@ -5,9 +5,11 @@ import com.demo.aiknowledge.config.CacheConfig;
 import com.demo.aiknowledge.dto.AiResponse;
 import com.demo.aiknowledge.entity.Conversation;
 import com.demo.aiknowledge.entity.Message;
+import com.demo.aiknowledge.entity.Product;
 import com.demo.aiknowledge.entity.QaLog;
 import com.demo.aiknowledge.mapper.ConversationMapper;
 import com.demo.aiknowledge.mapper.MessageMapper;
+import com.demo.aiknowledge.mapper.ProductMapper;
 import com.demo.aiknowledge.entity.QaUnanswered;
 import com.demo.aiknowledge.mapper.QaLogMapper;
 import com.demo.aiknowledge.mapper.QaUnansweredMapper;
@@ -26,14 +28,15 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 
+import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @Slf4j
@@ -42,6 +45,7 @@ public class ChatServiceImpl implements ChatService {
 
     private final ConversationMapper conversationMapper;
     private final MessageMapper messageMapper;
+    private final ProductMapper productMapper;
     private final QaLogMapper qaLogMapper;
     private final AiService aiService;
     private final QaUnansweredMapper qaUnansweredMapper;
@@ -89,6 +93,10 @@ public class ChatServiceImpl implements ChatService {
         return conversation;
     }
 
+    /**
+     * 非流式消息发送：保存用户消息 → 构建上下文 → 调用 AI 服务 → 防幻觉校验 → 保存 AI 回答
+     * 适用于普通问答场景，同步等待 AI 返回完整回答
+     */
     @Override
     @Transactional
     public Message sendMessage(Long userId, Long conversationId, String content, String jwtToken) {
@@ -177,10 +185,13 @@ public class ChatServiceImpl implements ChatService {
         aiMsg.setContent(answer);
         aiMsg.setSources(sourcesJson);
         aiMsg.setTaskType(taskType);
-        // 如果有商品卡片，直接设置（JacksonTypeHandler 自动序列化）
+        // 如果有商品卡片，先做防幻觉校验再设置
         if (aiResponse.getProductCards() != null && !aiResponse.getProductCards().isEmpty()) {
-            aiMsg.setProductCards(aiResponse.getProductCards());
-            aiMsg.setMessageType("product_card");
+            List<Map<String, Object>> validCards = validateProductCards(aiResponse.getProductCards());
+            if (!validCards.isEmpty()) {
+                aiMsg.setProductCards(validCards);
+                aiMsg.setMessageType("product_card");
+            }
         }
         // 如果有确认卡片（购物车删除/修改确认）
         if (aiResponse.getConfirmCard() != null) {
@@ -279,6 +290,18 @@ public class ChatServiceImpl implements ChatService {
         return sendStreamMessage(userId, conversationId, content, username, isAdmin, null, null, null, jwtToken);
     }
 
+    /**
+     * SSE 流式消息发送：保存用户消息 → 构建请求 → 调用 Python SSE 流式接口 → 透传事件给客户端
+     *
+     * 处理流程：
+     * 1. 去重检查（30秒内相同内容不重复插入）
+     * 2. 保存用户消息 + 更新对话上下文
+     * 3. 首条消息异步生成标题
+     * 4. 构建请求体（包含用户画像、JWT token）
+     * 5. 调用 Python /ask/stream 接口，订阅 SSE 事件流
+     * 6. 透传 routed/token/product_cards/confirm_card/cart_selection 等事件
+     * 7. 流完成时：防幻觉校验 → 保存 AI 回答 → 记录 QA 日志
+     */
     @Override
     public SseEmitter sendStreamMessage(Long userId, Long conversationId, String content,
                                          String username, boolean isAdmin,
@@ -490,12 +513,15 @@ public class ChatServiceImpl implements ChatService {
                                 aiMsg.setContent(answer);
                                 aiMsg.setTaskType(taskType);
 
-                                // 设置商品卡片
+                                // 设置商品卡片（防幻觉校验）
                                 if (productCardsHolder[0] != null) {
                                     @SuppressWarnings("unchecked")
                                     List<Map<String, Object>> cards = (List<Map<String, Object>>) productCardsHolder[0];
-                                    aiMsg.setProductCards(cards);
-                                    aiMsg.setMessageType("product_card");
+                                    List<Map<String, Object>> validCards = validateProductCards(cards);
+                                    if (!validCards.isEmpty()) {
+                                        aiMsg.setProductCards(validCards);
+                                        aiMsg.setMessageType("product_card");
+                                    }
                                 }
 
                                 // 设置确认卡片
@@ -562,5 +588,74 @@ public class ChatServiceImpl implements ChatService {
         });
 
         return emitter;
+    }
+
+    /**
+     * 防幻觉校验：校验 AI 返回的商品卡片信息与数据库一致
+     * - 商品不存在或已下架 → 过滤掉
+     * - 价格/标题不一致 → 用数据库数据覆盖
+     */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> validateProductCards(List<Map<String, Object>> cards) {
+        if (cards == null || cards.isEmpty()) {
+            return cards;
+        }
+        List<Map<String, Object>> validCards = new ArrayList<>();
+        for (Map<String, Object> card : cards) {
+            Object idObj = card.get("product_id");
+            if (idObj == null) {
+                log.warn("幻觉检测：商品卡片缺少 product_id，跳过");
+                continue;
+            }
+            Long productId;
+            try {
+                productId = Long.valueOf(idObj.toString());
+            } catch (NumberFormatException e) {
+                log.warn("幻觉检测：product_id 格式错误 id={}, 跳过", idObj);
+                continue;
+            }
+
+            // 查数据库校验商品是否存在
+            Product dbProduct = productMapper.selectById(productId);
+            if (dbProduct == null) {
+                log.warn("幻觉检测：商品不存在 id={}", productId);
+                continue;
+            }
+            // 校验商品状态（1=上架）
+            if (dbProduct.getStatus() == null || dbProduct.getStatus() != 1) {
+                log.warn("幻觉检测：商品已下架 id={}, status={}", productId, dbProduct.getStatus());
+                continue;
+            }
+
+            // 校验价格一致性
+            Object cardPrice = card.get("price");
+            if (cardPrice != null && dbProduct.getBasePrice() != null) {
+                try {
+                    BigDecimal aiPrice = new BigDecimal(cardPrice.toString());
+                    if (aiPrice.compareTo(dbProduct.getBasePrice()) != 0) {
+                        log.warn("幻觉检测：价格不一致 id={}, AI={}, DB={}", productId, aiPrice, dbProduct.getBasePrice());
+                        card.put("price", dbProduct.getBasePrice().doubleValue());
+                    }
+                } catch (NumberFormatException ignored) {
+                    // 价格格式异常，用数据库价格覆盖
+                    card.put("price", dbProduct.getBasePrice().doubleValue());
+                }
+            }
+
+            // 校验标题一致性
+            Object cardTitle = card.get("title");
+            if (cardTitle != null && dbProduct.getTitle() != null) {
+                if (!dbProduct.getTitle().equals(cardTitle.toString())) {
+                    log.warn("幻觉检测：标题不一致 id={}, AI='{}', DB='{}'", productId, cardTitle, dbProduct.getTitle());
+                    card.put("title", dbProduct.getTitle());
+                }
+            }
+
+            validCards.add(card);
+        }
+        if (validCards.size() < cards.size()) {
+            log.info("幻觉检测：过滤了 {} 个无效商品卡片", cards.size() - validCards.size());
+        }
+        return validCards;
     }
 }

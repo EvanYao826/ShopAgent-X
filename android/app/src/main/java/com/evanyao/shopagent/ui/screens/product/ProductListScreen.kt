@@ -14,7 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PhotoCamera
+
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -44,8 +44,7 @@ import com.evanyao.shopagent.viewmodel.ProductViewModel
 @Composable
 fun ProductListScreen(
     viewModel: ProductViewModel,
-    onProductClick: (Long) -> Unit,
-    onCameraClick: (() -> Unit)? = null
+    onProductClick: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -103,20 +102,9 @@ fun ProductListScreen(
             placeholder = { Text("搜索商品...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
-                Row {
-                    // 📷 拍照搜索按钮
-                    IconButton(onClick = { onCameraClick?.invoke() }) {
-                        Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = "拍照搜索",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    // 清除按钮
-                    if (uiState.searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Clear, contentDescription = "清除")
-                        }
+                if (uiState.searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "清除")
                     }
                 }
             },

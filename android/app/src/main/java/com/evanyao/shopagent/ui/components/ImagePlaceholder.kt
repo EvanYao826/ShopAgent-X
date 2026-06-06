@@ -1,5 +1,9 @@
 package com.evanyao.shopagent.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,10 +22,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
-import coil.compose.rememberAsyncImagePainter
+import com.google.accompanist.placeholder.PlaceholderHighlight
+import com.google.accompanist.placeholder.fade
+import com.google.accompanist.placeholder.placeholder
 
 /**
- * 统一的图片加载组件，带占位图和错误图
+ * 统一的图片加载组件，带 Shimmer 加载动画和错误兜底图
+ *
+ * 三种状态：
+ * - Loading：显示 Shimmer 渐变动画占位
+ * - Success：显示实际图片
+ * - Error：显示 ImageNotSupported 图标
  */
 @Composable
 fun AsyncImageWithPlaceholder(
@@ -31,9 +42,22 @@ fun AsyncImageWithPlaceholder(
     contentScale: ContentScale = ContentScale.Crop
 ) {
     var loadState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
+    val isLoading = loadState is AsyncImagePainter.State.Loading || loadState is AsyncImagePainter.State.Empty
 
     Box(
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .placeholder(
+                visible = isLoading,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                highlight = PlaceholderHighlight.fade(
+                    highlightColor = Color.White.copy(alpha = 0.6f),
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 800, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart
+                    )
+                )
+            )
     ) {
         AsyncImage(
             model = model,

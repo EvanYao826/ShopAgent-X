@@ -38,7 +38,21 @@ import com.evanyao.shopagent.data.model.Message
 import com.evanyao.shopagent.data.model.ConfirmCard
 import com.evanyao.shopagent.data.model.Product
 
-/** 消息气泡组件，支持长按复制、点赞/踩反馈、确认卡片 */
+/**
+ * 消息气泡组件 — 对话页的核心展示单元
+ *
+ * 功能：
+ * - 用户消息：右侧对齐，蓝色背景，显示头像
+ * - AI 消息：左侧对齐，灰色背景，显示 AI 头像
+ * - 图片消息：用户发送的图片 + 文字说明
+ * - 流式输出：StreamingText 带闪烁光标动画
+ * - 商品卡片：横向滚动的商品列表（ProductCardList）
+ * - 确认卡片：购物车删除/修改确认（ConfirmCardView）
+ * - 选择卡片：批量加购勾选（SelectableProductCardList）
+ * - 购物车列表：纵向展示（CartProductList）
+ * - 长按菜单：复制文本 / 点赞 / 踩
+ * - 反馈状态：已点赞/已踩标记
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
@@ -108,8 +122,10 @@ fun MessageBubble(
             }
 
             // 消息气泡（长按弹出菜单）
+            // 流式输出时设置最小宽度，防止光标导致气泡宽度跳动
             Box(
                 modifier = Modifier
+                    .then(if (isStreaming) Modifier.widthIn(min = 80.dp) else Modifier)
                     .clip(
                         RoundedCornerShape(
                             topStart = 16.dp,
@@ -331,7 +347,7 @@ fun ConfirmCardView(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 按钮行
+            // 按钮行：确认按钮用填充样式，取消按钮用描边样式
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
@@ -339,29 +355,33 @@ fun ConfirmCardView(
                 confirmCard.buttons.forEach { button ->
                     val isConfirm = button.type == "confirm"
                     val answered = confirmCard.answered
-                    OutlinedButton(
-                        onClick = { if (!answered) onAction(button.type) },
-                        enabled = !answered,
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = if (answered) {
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                            } else if (isConfirm) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        ),
-                        border = if (isConfirm && !answered) {
-                            ButtonDefaults.outlinedButtonBorder(enabled = true)
-                        } else {
-                            null
+                    if (isConfirm && !answered) {
+                        // 确认按钮：填充样式，更突出
+                        Button(
+                            onClick = { onAction(button.type) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(text = button.label, fontWeight = FontWeight.Bold)
                         }
-                    ) {
-                        Text(
-                            text = button.label,
-                            fontWeight = if (isConfirm && !answered) FontWeight.Bold else FontWeight.Normal
-                        )
+                    } else {
+                        // 取消按钮 / 已回答状态：描边样式
+                        OutlinedButton(
+                            onClick = { if (!answered) onAction(button.type) },
+                            enabled = !answered,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (answered) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            ),
+                            border = if (!answered) ButtonDefaults.outlinedButtonBorder(enabled = true) else null
+                        ) {
+                            Text(text = button.label)
+                        }
                     }
                 }
             }

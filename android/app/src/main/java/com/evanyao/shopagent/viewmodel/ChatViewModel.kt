@@ -63,6 +63,22 @@ class ChatViewModel(
     companion object {
         private const val TAG = "ChatViewModel"
         private const val MAX_RETRY_COUNT = 2
+
+        /** 将技术性异常信息转换为用户友好的中文提示 */
+        private fun friendlyErrorMessage(error: String?): String {
+            if (error.isNullOrBlank()) return "操作失败，请稍后重试"
+            val lower = error.lowercase()
+            return when {
+                "timeout" in lower -> "请求超时，请检查网络后重试"
+                "connect" in lower && ("refused" in lower || "failed" in lower) -> "无法连接服务器，请稍后重试"
+                "network" in lower || "unreachable" in lower -> "网络不可用，请检查网络连接"
+                "ssl" in lower || "certificate" in lower -> "网络连接安全异常，请稍后重试"
+                "401" in lower || "unauthorized" in lower -> "登录已过期，请重新登录"
+                "403" in lower || "forbidden" in lower -> "没有权限执行此操作"
+                "500" in lower || "internal" in lower -> "服务器异常，请稍后重试"
+                else -> error
+            }
+        }
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -128,7 +144,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "加载会话失败：${e.message}"
+                    errorMessage = friendlyErrorMessage(e.message)
                 )
             }
         }
@@ -295,7 +311,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "加载消息失败：${e.message}"
+                    errorMessage = friendlyErrorMessage(e.message)
                 )
             }
         }
@@ -379,7 +395,7 @@ class ChatViewModel(
             .catch { e ->
                 Log.e(TAG, "Stream error (attempt ${retryCount + 1}): ${e.message}", e)
                 hasError = true
-                errorMsg = e.message ?: "连接异常"
+                errorMsg = friendlyErrorMessage(e.message)
             }
             .collect { event ->
                 when (event.type) {
@@ -524,7 +540,7 @@ class ChatViewModel(
         } catch (e: Exception) {
             _uiState.value = _uiState.value.copy(
                 isSending = false,
-                errorMessage = "发送失败：${e.message}"
+                errorMessage = friendlyErrorMessage(e.message)
             )
         }
     }
@@ -773,6 +789,7 @@ class ChatViewModel(
     /** 开始加入购物车流程：逐个弹出规格选择 */
     fun startAddToCartWithSku(productIds: List<Long>) {
         if (productIds.isEmpty()) return
+        android.util.Log.d("ChatVM", "startAddToCartWithSku: productIds=$productIds, cartRepository=${cartRepository != null}")
         _pendingAddCartProductIds.clear()
         _pendingAddCartProductIds.addAll(productIds)
         _addedCount = 0
@@ -804,6 +821,7 @@ class ChatViewModel(
             return
         }
         cartRepository?.let { repo ->
+            android.util.Log.d("ChatVM", "showNextSkuSelection: calling addItem for productId=$productId")
             viewModelScope.launch {
                 try {
                     val response = repo.getProductSkus(productId)
@@ -812,6 +830,7 @@ class ChatViewModel(
                         _skuSelectionList.value = response.data
                     } else {
                         val skuId = response.data?.firstOrNull()?.id
+                        android.util.Log.d("ChatVM", "addItem: productId=$productId, skuId=$skuId")
                         repo.addItem(productId, skuId)
                         _addedCount++
                         _cartEvent.emit(Unit)
@@ -926,7 +945,11 @@ class ChatViewModel(
         _uiState.value = _uiState.value.copy(isRecording = false)
     }
 
-    /** 语音识别完成，将结果填入输入框等待用户确认 */
+    /**
+     * 语音识别完成回调
+     * 识别成功 → 将文字填入输入框（pendingVoiceText），由用户确认后发送
+     * 识别失败/无内容 → 显示错误提示
+     */
     fun sendVoiceResult(text: String) {
         if (text.isNotBlank() && text != "语音识别未配置" && !text.startsWith("语音识别失败")) {
             // 检查是否为无效语音（无实际说话内容）
@@ -952,7 +975,11 @@ class ChatViewModel(
         _uiState.value = _uiState.value.copy(pendingVoiceText = null)
     }
 
-    /** 发送图片识别结果（用于对话页拍照） */
+    /**
+     * 发送图片识别结果（用于对话页拍照/选图）
+     * 流程：图片识别成功 → 构建带图片描述的问题 → 发送给 AI 推荐相似商品
+     * 识别失败时显示错误提示
+     */
     fun sendPhotoResult(imageDescription: String, imageUri: Uri? = null) {
         if (imageDescription.isNotBlank() && !imageDescription.startsWith("无法识别")) {
             // 用户看到的是简洁消息，图片描述作为搜索依据传给后端
@@ -1006,7 +1033,7 @@ class ChatViewModel(
                 Log.e(TAG, "Send photo failed", e)
                 _uiState.value = _uiState.value.copy(
                     isSending = false,
-                    errorMessage = "图片识别失败: ${e.message}"
+                    errorMessage = "图片识别失败：${friendlyErrorMessage(e.message)}"
                 )
             }
         }
@@ -1037,7 +1064,7 @@ class ChatViewModel(
                 Log.e(TAG, "Send voice failed", e)
                 _uiState.value = _uiState.value.copy(
                     isSending = false,
-                    errorMessage = "语音识别失败: ${e.message}"
+                    errorMessage = "语音识别失败：${friendlyErrorMessage(e.message)}"
                 )
             } finally {
                 audioFile.delete()

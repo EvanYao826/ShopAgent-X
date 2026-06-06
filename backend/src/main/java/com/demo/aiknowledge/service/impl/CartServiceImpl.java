@@ -63,6 +63,15 @@ public class CartServiceImpl implements CartService {
 
     @Override
     @Transactional
+    public void removeByCartItemId(Long userId, Long cartItemId) {
+        Cart item = cartMapper.selectById(cartItemId);
+        if (item != null && item.getUserId().equals(userId)) {
+            cartMapper.deleteById(cartItemId);
+        }
+    }
+
+    @Override
+    @Transactional
     public void decreaseQuantity(Long userId, Long productId, Integer quantity) {
         List<Cart> existingList = cartMapper.selectList(
                 new LambdaQueryWrapper<Cart>()

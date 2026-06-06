@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 data class CartUiState(
     val cartItems: List<CartItem> = emptyList(),
     val isLoading: Boolean = false,
+    val isError: Boolean = false,               // 加载失败（区分"空购物车"和"加载出错"）
     val errorMessage: String? = null,
     val selectedItems: Set<Long> = emptySet(),
     val toastMessage: String? = null,
@@ -46,24 +47,27 @@ class CartViewModel(
 
     fun loadCartList() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, isError = false, errorMessage = null)
             try {
                 val response = cartRepository.getCartList()
                 if (response.isSuccess && response.data != null) {
                     _uiState.value = _uiState.value.copy(
                         cartItems = response.data,
                         isLoading = false,
+                        isError = false,
                         errorMessage = null
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        isError = true,
                         errorMessage = response.message
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isError = true,
                     errorMessage = "加载购物车失败：${e.message}"
                 )
             }
@@ -178,7 +182,7 @@ class CartViewModel(
     }
 
     fun clearError() {
-        _uiState.value = _uiState.value.copy(errorMessage = null)
+        _uiState.value = _uiState.value.copy(isError = false, errorMessage = null)
     }
 
     fun startEditSku(cartItem: CartItem) {

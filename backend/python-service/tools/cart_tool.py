@@ -173,8 +173,26 @@ class CartTool(Tool):
 
     def _remove(self, params: Dict) -> Dict:
         product_id = params.get("product_id")
+        cart_item_id = params.get("cart_item_id")
         quantity = params.get("quantity")
         jwt_token = params.get("jwt_token")
+
+        # 按购物车项ID删除（精确删除单条记录，用于"删除第N个"场景）
+        if cart_item_id:
+            logger.info(f"[CartTool] _remove by cart_item_id: {cart_item_id}")
+            resp = requests.delete(
+                f"{JAVA_API_URL}/api/cart/removeById",
+                params={"cartItemId": int(cart_item_id)},
+                headers=self._get_headers(jwt_token),
+                timeout=5
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("code") == 200:
+                    return {"success": True, "message": "已将商品从购物车移除"}
+                return {"success": False, "message": data.get("message", "删除失败")}
+            logger.error(f"[CartTool] _remove failed: HTTP {resp.status_code}, body={resp.text}")
+            return {"success": False, "message": f"删除失败（HTTP {resp.status_code}）"}
 
         if not product_id:
             return {"success": False, "message": "缺少 product_id"}

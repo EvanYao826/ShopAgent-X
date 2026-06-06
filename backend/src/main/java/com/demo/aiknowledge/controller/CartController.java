@@ -39,6 +39,12 @@ public class CartController {
         return Result.success(null);
     }
 
+    @DeleteMapping("/removeById")
+    public Result<Void> removeById(@RequestParam Long cartItemId) {
+        cartService.removeByCartItemId(getCurrentUserId(), cartItemId);
+        return Result.success(null);
+    }
+
     @PutMapping("/update")
     public Result<Cart> update(
             @RequestParam Long productId,

@@ -321,17 +321,29 @@ class ShoppingAgent(BaseAgent):
             action, product_id, quantity, product_name = self._parse_cart_intent(question, context, user_id, cart_items)
             logger.info(f"[Cart] Parsed: action={action}, product_id={product_id}, name={product_name}, qty={quantity}")
 
-            # 2. add 无明确 product_id 时，优先检查最近推荐缓存（让用户选择）
-            if action == "add" and product_id is None:
-                recent = ShoppingAgent._recent_products.get(conversation_id, [])
-                if recent:
-                    selection = self._build_cart_selection(recent)
-                    return {
-                        "answer": selection["message"],
-                        "sources": [], "has_sources": False,
-                        "task_type": "cart", "product_cards": [],
-                        "cart_selection": selection
-                    }
+            # 2. add 操作：如果用户没有明确指定商品名，显示选择卡片
+            if action == "add":
+                user_specified_product = self._user_mentioned_product(question)
+                if not user_specified_product:
+                    recent = ShoppingAgent._recent_products.get(conversation_id, [])
+                    if recent:
+                        selection = self._build_cart_selection(recent)
+                        return {
+                            "answer": selection["message"],
+                            "sources": [], "has_sources": False,
+                            "task_type": "cart", "product_cards": [],
+                            "cart_selection": selection
+                        }
+                    else:
+                        products = self._search_products(question)
+                        if products:
+                            selection = self._build_cart_selection(products)
+                            return {
+                                "answer": selection["message"],
+                                "sources": [], "has_sources": False,
+                                "task_type": "cart", "product_cards": [],
+                                "cart_selection": selection
+                            }
 
             # 3. 解析 product_id（从名称反查数据库）
             if product_id is None and product_name:
@@ -446,14 +458,24 @@ class ShoppingAgent(BaseAgent):
             action, product_id, quantity, product_name = self._parse_cart_intent(question, context, user_id, cart_items)
             logger.info(f"[Cart Stream] Parsed: action={action}, product_id={product_id}, name={product_name}, qty={quantity}")
 
-            # 2. add 无明确 product_id 时，优先检查最近推荐缓存（让用户选择）
-            if action == "add" and product_id is None:
-                recent = ShoppingAgent._recent_products.get(conversation_id, [])
-                if recent:
-                    selection = self._build_cart_selection(recent)
-                    yield json.dumps({"type": "cart_selection", "cart_selection": selection})
-                    yield json.dumps({"type": "end"})
-                    return
+            # 2. add 操作：如果用户没有明确指定商品名，显示选择卡片（即使 LLM 从上下文提取了商品）
+            if action == "add":
+                user_specified_product = self._user_mentioned_product(question)
+                if not user_specified_product:
+                    recent = ShoppingAgent._recent_products.get(conversation_id, [])
+                    if recent:
+                        selection = self._build_cart_selection(recent)
+                        yield json.dumps({"type": "cart_selection", "cart_selection": selection})
+                        yield json.dumps({"type": "end"})
+                        return
+                    else:
+                        # 无最近推荐缓存，搜索商品供用户选择
+                        products = self._search_products(question)
+                        if products:
+                            selection = self._build_cart_selection(products)
+                            yield json.dumps({"type": "cart_selection", "cart_selection": selection})
+                            yield json.dumps({"type": "end"})
+                            return
 
             # 3. 解析 product_id（从名称反查数据库）
             if product_id is None and product_name:
@@ -598,6 +620,19 @@ class ShoppingAgent(BaseAgent):
         except Exception as e:
             logger.warning(f"[ShoppingAgent] Cart intent parse failed: {e}, defaulting to list")
             return "list", None, None, None
+
+    def _user_mentioned_product(self, question: str) -> bool:
+        """判断用户问题中是否明确提到了商品名（而非仅仅说'添加购物车'等泛化指令）"""
+        import re
+        # 去掉购物车操作关键词后，看是否还有实质性商品名
+        cart_keywords = r'(添加|加入|加到|放进|放入|购物车|加购|购买|买|下单)'
+        cleaned = re.sub(cart_keywords, '', question).strip()
+        # 如果去掉操作词后剩余内容 >= 2 个字，认为用户提到了具体商品
+        # 例如 "添加小米手机到购物车" → "小米手机" (有商品)
+        # 例如 "添加购物车" → "" (无商品)
+        # 例如 "加到购物车" → "" (无商品)
+        # 例如 "帮我加购" → "" (无商品)
+        return len(cleaned) >= 2
 
     def _resolve_product_id(self, product_name: str) -> Optional[int]:
         """通过商品名称从数据库反查 product_id"""

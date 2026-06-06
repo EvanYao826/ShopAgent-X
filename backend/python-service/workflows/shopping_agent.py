@@ -1071,24 +1071,15 @@ class ShoppingAgent(BaseAgent):
         搜索流程：
         1. 提取排除词（LLM 识别"不要/除了"等否定语义）
         2. 提取搜索关键词（LLM + 正则 fallback + 品牌/品类匹配）
-        3. 同义词展开 + 精确匹配三级优先级
-        4. SQL 模糊搜索 + 品类过滤
-        5. 用户画像偏好排序
-        6. 后处理（去重 + 加权排序）
-
-        Args:
-            question: 用户问题
-            user_profile: 用户画像字符串（包含偏好标签、肤质等）
-            conversation_context: 对话上下文（帮助理解承接上文的查询）
-
-        Returns:
-            匹配的商品列表，每个元素包含 id/title/brand/base_price 等字段
+        3. 三级优先级：精确匹配 → 泛词展开(SYNONYM_MAP) → 普通关键词+拆字
+        4. SQL 模糊搜索 + 品类过滤（PRECISE_MATCH_MAP）
+        5. 后处理（去重 + 加权排序）
         """
         try:
-            # Step 1: 提取排除关键词（如"不要含酒精的" → ["酒精"]）
+            # Step 1: 提取排除关键词
             exclusions = self._extract_exclusion_terms(question)
 
-            # Step 2: 提取搜索关键词（传入对话上下文，让 LLM 理解承接上文的查询）
+            # Step 2: 提取搜索关键词
             keywords = self._extract_keywords(question, conversation_context)
 
             # 如果关键词为空，尝试用数据库品牌/品类匹配
@@ -1096,7 +1087,6 @@ class ShoppingAgent(BaseAgent):
                 keywords = self._match_brands_and_categories(question)
 
             if not keywords:
-                # 无关键词时返回热门商品
                 results = mysql_client.fetch_all(
                     "SELECT id, title, brand, base_price, image_url, rating, "
                     "review_count, sales_count, tags, sub_category, 0 AS relevance_score "
@@ -1104,25 +1094,96 @@ class ShoppingAgent(BaseAgent):
                 )
                 return self._post_process_products(self._filter_exclusions(results, exclusions))
 
-            # LLM 已直接返回搜索词（含同义词展开），只需去重和过滤
-            search_terms = list(dict.fromkeys(keywords))  # 保序去重
-            search_terms = [t for t in search_terms if len(t) >= 2]
+            # 同义词映射：用户常用泛称 → 数据库中的具体品类/关键词
+            SYNONYM_MAP = {
+                "衣服": ["卫衣", "T恤", "短袖", "速干"],
+                "裤子": ["户外裤", "瑜伽裤", "运动短裤", "运动长裤"],
+                "鞋": ["篮球鞋", "跑步鞋", "徒步鞋", "运动鞋"],
+                "鞋子": ["篮球鞋", "跑步鞋", "徒步鞋", "运动鞋", "鞋"],
+                "运动鞋": ["篮球鞋", "跑步鞋", "徒步鞋"],
+                "护肤品": ["精华", "面霜", "化妆水", "面膜", "眼霜", "防晒", "洁面"],
+                "护肤": ["精华", "面霜", "化妆水", "面膜", "眼霜", "防晒"],
+                "水乳": ["化妆水", "面霜", "精华"],
+                "彩妆": ["粉底液", "蜜粉", "唇釉", "眉笔"],
+                "化妆品": ["粉底液", "蜜粉", "唇釉", "眉笔", "卸妆"],
+                "数码": ["智能手机", "笔记本电脑", "平板电脑", "真无线耳机"],
+                "零食": ["坚果", "方便食品"],
+                "饮料": ["功能饮料", "碳酸饮料", "茶饮", "牛奶", "咖啡"],
+                "运动装备": ["运动短裤", "运动长裤", "速干T恤", "瑜伽裤"],
+                "户外装备": ["徒步鞋", "户外裤", "背包"],
+            }
 
-            # 用户画像偏好补充：当查询较短（≤2个搜索词）时，用偏好关键词补充
+            # 精确匹配：用户说具体品类时，只匹配对应数据库品类，不展开
+            PRECISE_MATCH_MAP = {
+                "跑鞋": ["跑步鞋"], "跑步鞋": ["跑步鞋"], "跑步": ["跑步鞋"],
+                "篮球鞋": ["篮球鞋"], "篮球": ["篮球鞋"],
+                "徒步鞋": ["徒步鞋"], "徒步": ["徒步鞋"],
+                "咖啡": ["咖啡"], "茶": ["茶饮"], "茶饮": ["茶饮"],
+                "牛奶": ["牛奶"], "碳酸": ["碳酸饮料"],
+                "面膜": ["面膜"], "精华": ["精华"], "防晒": ["防晒霜", "防晒"],
+                "眼霜": ["眼霜"], "面霜": ["面霜"], "洁面": ["洁面"], "卸妆": ["卸妆"],
+                "坚果": ["坚果"],
+                "手机": ["智能手机"], "笔记本": ["笔记本电脑"],
+                "平板": ["平板电脑"], "耳机": ["真无线耳机"], "背包": ["背包"],
+            }
+
+            # 泛词集合：这些词需要展开子品类
+            BROAD_KEYWORDS = {"衣服", "裤子", "鞋", "鞋子", "运动鞋", "护肤品", "护肤",
+                              "水乳", "彩妆", "化妆品", "数码", "零食", "饮料",
+                              "运动装备", "户外装备"}
+
+            import re
+            search_terms = []
+            for kw in keywords:
+                # 优先级1：精确匹配（"跑鞋" → 只匹配"跑步鞋"，不展开）
+                if kw in PRECISE_MATCH_MAP:
+                    for term in PRECISE_MATCH_MAP[kw]:
+                        if term not in search_terms:
+                            search_terms.append(term)
+                    continue
+
+                # 优先级2：泛词展开（"裤子" → "户外裤","瑜伽裤","运动短裤","运动长裤"）
+                if kw in BROAD_KEYWORDS and kw in SYNONYM_MAP:
+                    if kw not in search_terms:
+                        search_terms.append(kw)
+                    for syn in SYNONYM_MAP[kw]:
+                        if syn not in search_terms:
+                            search_terms.append(syn)
+                    continue
+
+                # 优先级3：普通关键词 + 拆字匹配
+                if kw not in search_terms:
+                    search_terms.append(kw)
+
+                cn_chars = re.findall(r'[一-鿿]', kw)
+                # 2字中文词：拆出词根（"裤子"→"裤"）
+                if len(cn_chars) == 2:
+                    if cn_chars[1] in ('子', '品', '物'):
+                        root = cn_chars[0]
+                        if root not in search_terms:
+                            search_terms.append(root)
+                # 3字以上拆出所有2字子串（"笔记本电脑"→"笔记本","本电脑","电脑"）
+                if len(cn_chars) >= 3:
+                    for i in range(len(cn_chars) - 1):
+                        sub = ''.join(cn_chars[i:i+2])
+                        if sub not in search_terms:
+                            search_terms.append(sub)
+
+            # 用户画像偏好补充：仅泛词场景补充，且仅≤2个搜索词时
             if user_profile:
-                import re
-                pref_match = re.search(r'偏好[：:]\s*([^；;]+)', user_profile)
-                if pref_match:
-                    prefs = [tag.strip() for tag in re.split(r'[、,，]', pref_match.group(1)) if tag.strip()]
-                    if prefs and len(search_terms) <= 2:
-                        for pref in prefs:
-                            if pref not in search_terms and len(pref) >= 2:
-                                search_terms.append(pref)
+                is_broad = any(kw in BROAD_KEYWORDS for kw in keywords)
+                if is_broad:
+                    pref_match = re.search(r'偏好[：:]\s*([^；;]+)', user_profile)
+                    if pref_match:
+                        prefs = [tag.strip() for tag in re.split(r'[、,，]', pref_match.group(1)) if tag.strip()]
+                        if prefs and len(search_terms) <= 2:
+                            for pref in prefs:
+                                if pref not in search_terms and len(pref) >= 2:
+                                    search_terms.append(pref)
 
             logger.info(f"[ShoppingAgent] Search terms: {search_terms}")
 
-            # 用 LIKE 模糊匹配（搜索 title + brand + tags + sub_category + description）
-            # 相关性评分：title 命中权重最高(3分)，brand/tags/sub_category 次之(2分)，description 最低(1分)
+            # 参数化 SQL + 相关性评分
             relevance_parts = []
             conditions = " OR ".join([
                 "(title LIKE %s OR brand LIKE %s OR tags LIKE %s OR sub_category LIKE %s OR description LIKE %s)"
@@ -1131,9 +1192,7 @@ class ShoppingAgent(BaseAgent):
             params = []
             for kw in search_terms:
                 like_val = f"%{kw}%"
-                # WHERE 子句参数（5个）
                 params.extend([like_val, like_val, like_val, like_val, like_val])
-                # CASE 表达式参数（5个），参数化防注入
                 relevance_parts.append(
                     "(CASE WHEN title LIKE %s THEN 3 ELSE 0 END + "
                     "CASE WHEN brand LIKE %s THEN 2 ELSE 0 END + "
@@ -1144,7 +1203,6 @@ class ShoppingAgent(BaseAgent):
                 params.extend([like_val, like_val, like_val, like_val, like_val])
 
             relevance_expr = " + ".join(relevance_parts)
-
             sql = (
                 f"SELECT id, title, brand, base_price, image_url, rating, "
                 f"review_count, sales_count, tags, sub_category, "
@@ -1155,40 +1213,40 @@ class ShoppingAgent(BaseAgent):
             results = mysql_client.fetch_all(sql, tuple(params))
             logger.info(f"[ShoppingAgent] SQL returned {len(results)} results for terms {search_terms}")
 
-            # 品类过滤：检查搜索词是否直接命中结果中的 sub_category
-            # 例如搜索"卫衣"时，结果中 sub_category="卫衣"的商品优先，排除"跑步鞋"等
-            if results:
-                result_categories = {r.get("sub_category") for r in results if r.get("sub_category")}
-                matched_categories = {kw for kw in search_terms if kw in result_categories}
-                if matched_categories:
-                    cat_filtered = [r for r in results if r.get("sub_category") in matched_categories]
-                    if cat_filtered and len(cat_filtered) < len(results):
-                        logger.info(f"[ShoppingAgent] Sub-category filter: {len(results)} → {len(cat_filtered)} (matched: {matched_categories})")
-                        results = cat_filtered
+            # 品类过滤：精确匹配的品类优先保留
+            expected_categories = set()
+            for kw in keywords:
+                if kw in PRECISE_MATCH_MAP:
+                    expected_categories.update(PRECISE_MATCH_MAP[kw])
+            if expected_categories and results:
+                category_filtered = [r for r in results if r.get("sub_category") in expected_categories]
+                if category_filtered:
+                    logger.info(f"[ShoppingAgent] Category filter: {len(results)} → {len(category_filtered)} (keeping {expected_categories})")
+                    results = category_filtered
 
-            # 排除过滤后无结果时，重新用 LLM 从对话上下文中提取品类关键词再搜一次
+            # 无结果时用 LLM 从对话上下文重新提取关键词
             if not results:
                 logger.info(f"[ShoppingAgent] No match for keywords {keywords}, retrying with context")
                 fallback_keywords = self._extract_keywords_with_llm(question, conversation_context)
-                # 过滤单字
                 fallback_keywords = [t for t in fallback_keywords if len(t) >= 2]
                 if fallback_keywords and fallback_keywords != keywords:
-                    fb_relevance_parts = []
                     fb_conditions = " OR ".join([
                         "(title LIKE %s OR brand LIKE %s OR tags LIKE %s OR sub_category LIKE %s OR description LIKE %s)"
                         for _ in fallback_keywords
                     ])
                     fb_params = []
+                    fb_relevance_parts = []
                     for kw in fallback_keywords:
                         like_val = f"%{kw}%"
                         fb_params.extend([like_val, like_val, like_val, like_val, like_val])
                         fb_relevance_parts.append(
-                            f"(CASE WHEN title LIKE '{like_val}' THEN 3 ELSE 0 END + "
-                            f"CASE WHEN brand LIKE '{like_val}' THEN 2 ELSE 0 END + "
-                            f"CASE WHEN tags LIKE '{like_val}' THEN 2 ELSE 0 END + "
-                            f"CASE WHEN sub_category LIKE '{like_val}' THEN 2 ELSE 0 END + "
-                            f"CASE WHEN description LIKE '{like_val}' THEN 1 ELSE 0 END)"
+                            "(CASE WHEN title LIKE %s THEN 3 ELSE 0 END + "
+                            "CASE WHEN brand LIKE %s THEN 2 ELSE 0 END + "
+                            "CASE WHEN tags LIKE %s THEN 2 ELSE 0 END + "
+                            "CASE WHEN sub_category LIKE %s THEN 2 ELSE 0 END + "
+                            "CASE WHEN description LIKE %s THEN 1 ELSE 0 END)"
                         )
+                        fb_params.extend([like_val, like_val, like_val, like_val, like_val])
                     fb_relevance_expr = " + ".join(fb_relevance_parts)
                     results = mysql_client.fetch_all(
                         f"SELECT id, title, brand, base_price, image_url, rating, "
@@ -1198,18 +1256,9 @@ class ShoppingAgent(BaseAgent):
                         f"ORDER BY relevance_score DESC, sales_count DESC LIMIT 15",
                         tuple(fb_params)
                     )
-                    # fallback 结果也做品类过滤
-                    if results:
-                        result_cats = {r.get("sub_category") for r in results if r.get("sub_category")}
-                        matched_cats = {kw for kw in fallback_keywords if kw in result_cats}
-                        if matched_cats:
-                            fb_cat_filtered = [r for r in results if r.get("sub_category") in matched_cats]
-                            if fb_cat_filtered and len(fb_cat_filtered) < len(results):
-                                logger.info(f"[ShoppingAgent] Fallback category filter: {len(results)} → {len(fb_cat_filtered)} (matched: {matched_cats})")
-                                results = fb_cat_filtered
                     logger.info(f"[ShoppingAgent] Fallback with context returned {len(results)} products")
 
-            # 最终兜底：正则分词（LLM 关键词都搜不到时）
+            # 最终兜底：正则分词
             if not results:
                 regex_keywords = self._extract_keywords_regex(question)
                 regex_keywords = [t for t in regex_keywords if len(t) >= 2]
@@ -1233,12 +1282,8 @@ class ShoppingAgent(BaseAgent):
                     logger.info(f"[ShoppingAgent] Regex fallback returned {len(results)} products")
 
             if not results:
-                logger.info(f"[ShoppingAgent] Still no match, returning popular products")
-                results = mysql_client.fetch_all(
-                    "SELECT id, title, brand, base_price, image_url, rating, "
-                    "review_count, sales_count, tags, sub_category, 0 AS relevance_score "
-                    "FROM product WHERE status = 1 ORDER BY sales_count DESC LIMIT 15"
-                )
+                logger.info(f"[ShoppingAgent] No matching products found, returning empty")
+                return []
 
             final = self._post_process_products(self._filter_exclusions(results, exclusions))
             logger.info(f"[ShoppingAgent] After post-processing: {len(final)} products")
@@ -1270,12 +1315,11 @@ class ShoppingAgent(BaseAgent):
             prompt = (
                 f"从以下用户问题中提取商品搜索词，用于 MySQL LIKE 搜索。\n"
                 f"要求：\n"
-                f"1. 返回搜索词列表，用逗号分隔，每个词至少2个中文字符\n"
-                f"2. 包含：品牌名（完整）、产品类型、功效/成分\n"
-                f"3. 品类泛词要展开为具体子品类（如\"衣服\"→\"卫衣,T恤,短袖\"；\"鞋子\"→\"篮球鞋,跑步鞋,徒步鞋\"）\n"
-                f"4. 品牌名保持完整，不要拆分（如\"元气森林\"不要拆成\"元气\"或\"森林\"）\n"
-                f"5. 不要生成与商品无关的通用词（如\"推荐\"、\"相似\"、\"图片\"）\n"
-                f"6. 如果用户说排除/不要某品牌，只提取品类词\n"
+                f"1. 只返回3-5个最相关的搜索词，用逗号分隔，每个词至少2个中文字符\n"
+                f"2. 严格围绕用户说的品类提取，不要扩展到其他品类（如用户说\"裤子\"不要返回\"短袖\"）\n"
+                f"3. 包含：品牌名（完整）、产品类型。品牌名保持完整，不要拆分\n"
+                f"4. 不要生成与商品无关的通用词（如\"推荐\"、\"相似\"、\"图片\"、\"好物\"）\n"
+                f"5. 如果用户说排除/不要某品牌，只提取品类词\n"
                 f"{context_hint}\n"
                 f"用户问题：{question}\n\n"
                 f"搜索词："
@@ -1284,8 +1328,10 @@ class ShoppingAgent(BaseAgent):
             text = result.content if hasattr(result, 'content') else str(result)
             # 解析逗号分隔的关键词
             keywords = [kw.strip() for kw in text.strip().split(',') if kw.strip()]
+            # 过滤掉包含特殊字符的关键词（如"衣服→卫衣"）
+            keywords = [kw for kw in keywords if '→' not in kw and '→' not in kw]
             logger.info(f"[ShoppingAgent] LLM extracted keywords: {keywords}")
-            return keywords[:8]
+            return keywords[:5]
         except Exception as e:
             logger.warning(f"[ShoppingAgent] LLM keyword extraction failed: {e}")
             return []
@@ -1469,15 +1515,12 @@ class ShoppingAgent(BaseAgent):
             f"商品信息：\n{context}\n\n"
             f"回复规则（严格遵守）：\n"
             f"1. 控制在80字以内，简洁明了\n"
-            f"2. 根据用户性别调整称呼：男性用「兄弟/哥们」，女性用「姐妹/小姐姐」\n"
-            f"3. 不要用与用户性别不符的称呼\n"
-            f"4. 直接推荐2-3款，说明核心卖点即可\n"
-            f"5. 【重要】不要编造商品不存在的功能、参数或特性\n"
-            f"6. 【重要】不要编造价格、评分、销量等数据，所有数据必须来自商品信息\n"
-            f"7. 【重要】只推荐商品信息中列出的商品，不要推荐不存在的商品\n"
-            f"8. 如果用户有肤质信息，推荐护肤品时说明是否适合该肤质\n"
-            f"9. 如果用户有偏好标签，优先推荐与偏好相关的商品\n"
-            f"10. 结合当前季节推荐应季商品，如夏季推荐防晒/清爽类，冬季推荐保湿/保暖类\n"
+            f"2. 直接推荐商品信息中的商品，说明核心卖点即可\n"
+            f"3. 【重要】必须推荐商品信息中列出的商品，绝对不能说「暂无商品」「没有找到」\n"
+            f"4. 【重要】不要编造价格、评分、销量等数据，所有数据必须来自商品信息\n"
+            f"5. 【重要】只推荐商品信息中列出的商品，不要推荐不存在的商品\n"
+            f"6. 如果用户有肤质信息，推荐护肤品时说明是否适合该肤质\n"
+            f"7. 结合当前季节推荐应季商品，如夏季推荐防晒/清爽类，冬季推荐保湿/保暖类\n"
             f"{image_hint}"
         )
         try:

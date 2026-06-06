@@ -1194,15 +1194,22 @@ class ShoppingAgent(BaseAgent):
             if not self.llm_service.llm:
                 return []
             prompt = (
-                "从用户问题中提取「排除/不要」的关键词（品牌名、成分、类型等）。\n"
-                "只返回关键词，用逗号分隔。如果没有排除意图，返回空字符串。\n\n"
+                "从用户问题中提取用户明确「不要/排除/除了」的关键词。\n"
+                "注意：用户想要的商品不是排除词！只有用户明确说「不要」「除了」「不要xx品牌」的才算排除词。\n\n"
+                "示例：\n"
+                "问题：推荐一款手机，不要苹果 → 排除词：苹果\n"
+                "问题：有什么好用的耳机，除了索尼 → 排除词：索尼\n"
+                "问题：一部Apple iPhone 17 Pro Max手机 → 排除词：（无）\n"
+                "问题：推荐耳机，不要贵的 → 排除词：（无，贵是价格偏好不是排除词）\n\n"
+                "只返回排除关键词，用逗号分隔。如果没有排除意图，返回空字符串。\n\n"
                 f"用户问题：{question}\n\n"
                 "排除关键词："
             )
             result = self.llm_service.llm.invoke(prompt)
             text = result.content if hasattr(result, 'content') else str(result)
             text = text.strip().strip('"').strip("'")
-            if not text:
+            # 过滤掉明显的误判
+            if not text or text in ["无", "（无）", "无排除词", "空字符串", "没有"]:
                 return []
             exclusions = [kw.strip() for kw in text.split(',') if kw.strip() and len(kw.strip()) >= 2]
             logger.info(f"[ShoppingAgent] LLM extracted exclusions: {exclusions}")
@@ -1343,6 +1350,16 @@ class ShoppingAgent(BaseAgent):
             return "抱歉，暂时没有找到完全匹配您需求的商品，换个关键词试试吧～"
 
         season = self._get_current_season()
+        # 判断是否为图片识别结果（通常以量词+品牌+品类开头，如"一副xxx耳机"）
+        is_image_query = any(question.startswith(w) for w in ["一副", "一个", "一双", "一件", "一台", "一部", "一条", "一瓶", "一盒", "一罐"])
+        image_hint = ""
+        if is_image_query:
+            image_hint = (
+                f"\n9. 用户通过拍照识别了商品，这是识别结果。请推荐商城中同类商品（同品类/同类型），"
+                f"不要推荐完全不同的品类（如用户拍的是耳机，不要推荐手机或电脑）\n"
+                f"10. 开头可以说「看到你在找xxx」之类的话，自然地衔接推荐\n"
+            )
+
         prompt = (
             f"你是智能导购助手「小智」。根据用户需求和商品信息，给出简短推荐。\n\n"
             f"当前季节：{season}\n"
@@ -1358,6 +1375,7 @@ class ShoppingAgent(BaseAgent):
             f"6. 如果用户有肤质信息，推荐护肤品时说明是否适合该肤质\n"
             f"7. 如果用户有偏好标签，优先推荐与偏好相关的商品\n"
             f"8. 结合当前季节推荐应季商品，如夏季推荐防晒/清爽类，冬季推荐保湿/保暖类\n"
+            f"{image_hint}"
         )
         try:
             return self.llm_service.llm.invoke(prompt).content

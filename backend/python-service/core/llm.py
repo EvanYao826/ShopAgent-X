@@ -409,17 +409,6 @@ class LLMService:
 
             b64_audio = base64.b64encode(audio_bytes).decode('utf-8')
 
-            # 根据格式确定 MIME 类型
-            mime_map = {
-                "m4a": "audio/mp4",
-                "mp3": "audio/mpeg",
-                "wav": "audio/wav",
-                "ogg": "audio/ogg",
-                "flac": "audio/flac",
-                "amr": "audio/amr",
-            }
-            mime_type = mime_map.get(audio_format, "audio/mp4")
-
             # 调用豆包多模态模型，使用音频理解能力
             base_url = config.DOUBAO_BASE_URL.rstrip('/')
             resp = requests.post(

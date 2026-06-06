@@ -10,7 +10,8 @@ data class Message(
     val createTime: String? = null,
     val messageType: String? = null,
     val confirmCard: ConfirmCard? = null,
-    val cartSelection: CartSelection? = null
+    val cartSelection: CartSelection? = null,
+    val imageUri: String? = null  // 用户发送的图片URI（仅本地使用）
 )
 
 data class ConfirmCard(

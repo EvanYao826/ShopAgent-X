@@ -32,6 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.evanyao.shopagent.data.model.Message
 import com.evanyao.shopagent.data.model.ConfirmCard
 import com.evanyao.shopagent.data.model.Product
@@ -49,6 +51,12 @@ fun MessageBubble(
     onAddToCart: ((List<Long>) -> Unit)? = null
 ) {
     val isUser = message.role == "user"
+    // 显示文本：如果有图片附件，隐藏后端的图片描述部分
+    val displayText = if (isUser && message.imageUri != null) {
+        message.content.substringBefore("\n\n图片内容：").ifEmpty { message.content }
+    } else {
+        message.content
+    }
     val bubbleColor = if (isUser) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -82,6 +90,23 @@ fun MessageBubble(
         Column(
             modifier = Modifier.widthIn(max = if (message.cartSelection != null) 340.dp else 280.dp)
         ) {
+            // 用户发送的图片
+            if (isUser && message.imageUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(message.imageUri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "发送的图片",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
             // 消息气泡（长按弹出菜单）
             Box(
                 modifier = Modifier
@@ -102,12 +127,12 @@ fun MessageBubble(
             ) {
                 if (isStreaming) {
                     StreamingText(
-                        text = message.content,
+                        text = displayText,
                         color = textColor
                     )
                 } else {
                     Text(
-                        text = message.content,
+                        text = displayText,
                         color = textColor,
                         style = MaterialTheme.typography.bodyLarge
                     )

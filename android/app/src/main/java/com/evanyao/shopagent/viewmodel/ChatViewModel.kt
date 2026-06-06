@@ -236,7 +236,7 @@ class ChatViewModel(
         }
     }
 
-    fun createConversationAndSendMessage(content: String) {
+    fun createConversationAndSendMessage(content: String, imageUri: Uri? = null) {
         viewModelScope.launch {
             val userId = tokenManager.getUserId() ?: return@launch
             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -250,7 +250,7 @@ class ChatViewModel(
                         messages = emptyList(),
                         isLoading = false
                     )
-                    sendMessage(content)
+                    sendMessage(content, imageUri = imageUri?.toString())
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -305,7 +305,7 @@ class ChatViewModel(
      * 发送消息 - 使用 SSE 流式输出，自动重试，失败回退到普通请求
      * @param silent 为 true 时不将用户消息添加到 UI（用于内部消息）
      */
-    fun sendMessage(content: String, silent: Boolean = false) {
+    fun sendMessage(content: String, silent: Boolean = false, imageUri: String? = null) {
         val conversationId = _uiState.value.currentConversation?.id ?: return
         val isFirstMessage = _uiState.value.messages.isEmpty()
         val initialTitle = _uiState.value.currentConversation?.title
@@ -316,7 +316,8 @@ class ChatViewModel(
                 id = System.currentTimeMillis(),
                 conversationId = conversationId,
                 role = "user",
-                content = content
+                content = content,
+                imageUri = imageUri
             )
             _uiState.value = _uiState.value.copy(
                 messages = _uiState.value.messages + userMessage
@@ -952,12 +953,18 @@ class ChatViewModel(
     }
 
     /** 发送图片识别结果（用于对话页拍照） */
-    fun sendPhotoResult(imageDescription: String) {
+    fun sendPhotoResult(imageDescription: String, imageUri: Uri? = null) {
         if (imageDescription.isNotBlank() && !imageDescription.startsWith("无法识别")) {
-            // 将图片描述作为问题发送给 AI
-            sendMessage("请识别这张图片中的商品并推荐类似商品：$imageDescription")
+            // 用户看到的是简洁消息，图片描述作为搜索依据传给后端
+            val question = "根据图片给我推荐相似商品\n\n图片内容：$imageDescription"
+            val uriString = imageUri?.toString()
+            if (_uiState.value.currentConversation == null) {
+                createConversationAndSendMessage(question, imageUri)
+            } else {
+                sendMessage(question, imageUri = uriString)
+            }
         } else {
-            _uiState.value = _uiState.value.copy(errorMessage = imageDescription)
+            _uiState.value = _uiState.value.copy(isSending = false, errorMessage = "图片识别失败，请重试")
         }
     }
 
@@ -968,9 +975,7 @@ class ChatViewModel(
                 _uiState.value = _uiState.value.copy(isSending = true)
 
                 // 读取图片并构建请求
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val imageBytes = inputStream?.readBytes()
-                inputStream?.close()
+                val imageBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
 
                 if (imageBytes == null) {
                     _uiState.value = _uiState.value.copy(
@@ -989,8 +994,8 @@ class ChatViewModel(
                     val recognizedText = response.data
                     Log.d(TAG, "Image recognized: $recognizedText")
 
-                    // 将识别结果发送给 AI 推荐商品
-                    sendPhotoResult(recognizedText)
+                    // 将识别结果发送给 AI 推荐商品，传入图片URI用于聊天气泡显示
+                    sendPhotoResult(recognizedText, imageUri = uri)
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isSending = false,
@@ -1013,18 +1018,14 @@ class ChatViewModel(
             try {
                 _uiState.value = _uiState.value.copy(isSending = true)
 
-                // 读取音频文件
                 val audioBytes = audioFile.readBytes()
                 val requestBody = audioBytes.toRequestBody("audio/*".toMediaType())
                 val part = MultipartBody.Part.createFormData("file", audioFile.name, requestBody)
 
-                // 调用语音识别接口
                 val response = chatRepository.recognizeVoice(part)
                 if (response.isSuccess && response.data != null) {
                     val recognizedText = response.data
                     Log.d(TAG, "Voice recognized: $recognizedText")
-
-                    // 发送识别结果
                     sendVoiceResult(recognizedText)
                 } else {
                     _uiState.value = _uiState.value.copy(
@@ -1032,15 +1033,14 @@ class ChatViewModel(
                         errorMessage = response.message ?: "语音识别失败"
                     )
                 }
-
-                // 清理临时文件
-                audioFile.delete()
             } catch (e: Exception) {
                 Log.e(TAG, "Send voice failed", e)
                 _uiState.value = _uiState.value.copy(
                     isSending = false,
                     errorMessage = "语音识别失败: ${e.message}"
                 )
+            } finally {
+                audioFile.delete()
             }
         }
     }

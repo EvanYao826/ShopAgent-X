@@ -7,5 +7,28 @@ data class Message(
     val content: String,
     val productCards: List<Product>? = null,
     val feedbackType: Int? = null,
-    val createTime: String? = null
+    val createTime: String? = null,
+    val messageType: String? = null,
+    val confirmCard: ConfirmCard? = null,
+    val cartSelection: CartSelection? = null,
+    val imageUri: String? = null  // 用户发送的图片URI（仅本地使用）
+)
+
+data class ConfirmCard(
+    val message: String,
+    val action: String,
+    val product: Product? = null,
+    val products: List<Product>? = null,
+    val buttons: List<ConfirmButton>,
+    val answered: Boolean = false
+)
+
+data class ConfirmButton(
+    val type: String,
+    val label: String
+)
+
+data class CartSelection(
+    val message: String,
+    val items: List<Product>
 )

@@ -28,8 +28,20 @@ public class CartController {
     }
 
     @DeleteMapping("/remove")
-    public Result<Void> remove(@RequestParam Long productId) {
-        cartService.removeItem(getCurrentUserId(), productId);
+    public Result<Void> remove(@RequestParam Long productId,
+                               @RequestParam(required = false) Integer quantity) {
+        Long userId = getCurrentUserId();
+        if (quantity != null && quantity > 0) {
+            cartService.decreaseQuantity(userId, productId, quantity);
+        } else {
+            cartService.removeItem(userId, productId);
+        }
+        return Result.success(null);
+    }
+
+    @DeleteMapping("/removeById")
+    public Result<Void> removeById(@RequestParam Long cartItemId) {
+        cartService.removeByCartItemId(getCurrentUserId(), cartItemId);
         return Result.success(null);
     }
 

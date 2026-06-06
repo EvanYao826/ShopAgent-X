@@ -10,4 +10,5 @@ public class AiResponse {
     private List<Map<String, Object>> sources;
     private String taskType;
     private List<Map<String, Object>> productCards;
+    private Map<String, Object> confirmCard;
 }

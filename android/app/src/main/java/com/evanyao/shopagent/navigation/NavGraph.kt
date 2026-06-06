@@ -1,16 +1,17 @@
 package com.evanyao.shopagent.navigation
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -18,7 +19,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -56,7 +61,9 @@ import com.evanyao.shopagent.viewmodel.ProductViewModel
 import com.evanyao.shopagent.viewmodel.AddressViewModel
 import com.evanyao.shopagent.viewmodel.OrderViewModel
 import com.evanyao.shopagent.viewmodel.ProfileViewModel
+import com.evanyao.shopagent.util.AudioRecorder
 import org.koin.androidx.compose.koinViewModel
+import java.io.File
 
 /** 主导航图，管理所有页面路由和底部导航栏 */
 @Composable
@@ -74,6 +81,13 @@ fun MainNavigation() {
     val orderViewModel: OrderViewModel = koinViewModel()
     val authState by authViewModel.uiState.collectAsState()
     val cartState by cartViewModel.uiState.collectAsState()
+
+    // 监听聊天中的购物车操作事件，自动刷新购物车
+    LaunchedEffect(Unit) {
+        chatViewModel.cartEvent.collect {
+            cartViewModel.loadCartList()
+        }
+    }
 
     // 结算页临时状态（购物车结算或立即购买）
     var checkoutItems by remember { mutableStateOf<List<CheckoutItem>>(emptyList()) }
@@ -250,10 +264,119 @@ fun MainNavigation() {
                 )
             }
             composable(Screen.Chat.route) {
+                val context = LocalContext.current
+
+                // 对话页：图片选择状态
+                var chatImageUri by remember { mutableStateOf<Uri?>(null) }
+                var showImageSourceDialog by remember { mutableStateOf(false) }
+
+                // 录音相关状态
+                val audioRecorder = remember { AudioRecorder(context) }
+                var audioFile by remember { mutableStateOf<File?>(null) }
+
+                // 录音权限 launcher
+                val recordAudioLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    if (granted) {
+                        // 权限 granted，开始录音
+                        audioFile = audioRecorder.startRecording()
+                        chatViewModel.startRecording()
+                    }
+                }
+
+                // 相机拍照 launcher
+                val chatCameraLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.TakePicture()
+                ) { success ->
+                    if (success && chatImageUri != null) {
+                        chatViewModel.sendPhotoFromUri(chatImageUri!!, context)
+                        chatImageUri = null
+                    }
+                }
+
+                // 相机权限 launcher
+                val chatCameraPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { granted ->
+                    if (granted) {
+                        val imageFile = File(context.cacheDir, "chat_photo_${System.currentTimeMillis()}.jpg")
+                        chatImageUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", imageFile)
+                        chatCameraLauncher.launch(chatImageUri!!)
+                    }
+                }
+
+                // 相册选择 launcher
+                val chatPhotoPickerLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.PickVisualMedia()
+                ) { uri ->
+                    if (uri != null) {
+                        chatViewModel.sendPhotoFromUri(uri, context)
+                    }
+                }
+
+                // 图片来源选择弹窗
+                if (showImageSourceDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showImageSourceDialog = false },
+                        title = { Text("选择图片来源") },
+                        text = {
+                            Column {
+                                TextButton(
+                                    onClick = {
+                                        showImageSourceDialog = false
+                                        chatCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("拍照")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        showImageSourceDialog = false
+                                        chatPhotoPickerLauncher.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.PhotoLibrary, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("从相册选择")
+                                }
+                            }
+                        },
+                        confirmButton = {},
+                        dismissButton = {
+                            TextButton(onClick = { showImageSourceDialog = false }) {
+                                Text("取消")
+                            }
+                        }
+                    )
+                }
+
                 ChatScreen(
                     viewModel = chatViewModel,
                     onProductClick = { productId ->
                         navController.navigate(Screen.ProductDetail.createRoute(productId))
+                    },
+                    onAddToCart = { productIds ->
+                        productIds.forEach { id -> cartViewModel.addToCart(id) }
+                    },
+                    onCameraClick = { showImageSourceDialog = true },
+                    onVoiceStart = {
+                        // 请求录音权限
+                        recordAudioLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    },
+                    onVoiceEnd = {
+                        // 停止录音并发送
+                        chatViewModel.stopRecording()
+                        val file = audioRecorder.stopRecording()
+                        if (file != null && file.exists() && file.length() > 0) {
+                            chatViewModel.sendVoiceFile(file)
+                        }
                     }
                 )
             }

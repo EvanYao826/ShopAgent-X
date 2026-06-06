@@ -9,6 +9,7 @@ import com.evanyao.shopagent.data.network.SseEvent
 import com.evanyao.shopagent.data.network.api.ChatApi
 import com.evanyao.shopagent.data.network.api.FeedbackRequest
 import kotlinx.coroutines.flow.Flow
+import okhttp3.MultipartBody
 
 class ChatRepository(
     private val chatApi: ChatApi,
@@ -53,5 +54,23 @@ class ChatRepository(
 
     suspend fun submitFeedback(messageId: Long, feedbackType: Int): ApiResult<Message> {
         return chatApi.submitFeedback(FeedbackRequest(messageId, feedbackType))
+    }
+
+    suspend fun saveMessage(conversationId: Long, role: String, content: String, messageType: String? = null): ApiResult<Message> {
+        val body = mutableMapOf<String, Any>(
+            "conversationId" to conversationId,
+            "role" to role,
+            "content" to content
+        )
+        if (messageType != null) body["messageType"] = messageType
+        return chatApi.saveMessage(body)
+    }
+
+    suspend fun recognizeImage(file: MultipartBody.Part): ApiResult<String> {
+        return chatApi.recognizeImage(file)
+    }
+
+    suspend fun recognizeVoice(file: MultipartBody.Part): ApiResult<String> {
+        return chatApi.recognizeVoice(file)
     }
 }

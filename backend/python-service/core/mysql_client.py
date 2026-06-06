@@ -51,11 +51,12 @@ class MySQLClient:
         """批量插入 chunks 到 knowledge_chunk 表"""
         if not chunks:
             return 0
-        
+
         if not self.connection or not self.connection.is_connected():
             self.connect()
-        
+
         try:
+            self._ensure_clean_connection()
             cursor = self.connection.cursor()
             
             # 先删除该文档已有的 chunks（避免重复）
@@ -92,8 +93,9 @@ class MySQLClient:
         """获取 chunk 数量"""
         if not self.connection or not self.connection.is_connected():
             self.connect()
-        
+
         try:
+            self._ensure_clean_connection()
             cursor = self.connection.cursor()
             
             if doc_id:
@@ -111,46 +113,65 @@ class MySQLClient:
             logger.error(f"Error getting chunk count: {e}")
             return 0
 
+    def _ensure_clean_connection(self):
+        """确保连接上没有未读结果（线程安全保护）"""
+        if self.connection and self.connection.is_connected():
+            try:
+                self.connection.consume_results()
+            except Exception:
+                pass
+
     def fetch_one(self, sql: str, params: tuple = None) -> Dict[str, Any]:
         """执行查询并返回单行结果"""
         if not self.connection or not self.connection.is_connected():
             self.connect()
-        
+
         try:
+            self._ensure_clean_connection()
             cursor = self.connection.cursor(dictionary=True)
-            
+
             if params:
                 cursor.execute(sql, params)
             else:
                 cursor.execute(sql)
-            
+
             result = cursor.fetchone()
             cursor.close()
             return result
-        
+
         except Error as e:
             logger.error(f"Error fetching one: {e}")
+            # 连接可能已损坏，重置
+            try:
+                self.connect()
+            except Exception:
+                pass
             return None
 
     def fetch_all(self, sql: str, params: tuple = None) -> List[Dict[str, Any]]:
         """执行查询并返回所有结果"""
         if not self.connection or not self.connection.is_connected():
             self.connect()
-        
+
         try:
+            self._ensure_clean_connection()
             cursor = self.connection.cursor(dictionary=True)
-            
+
             if params:
                 cursor.execute(sql, params)
             else:
                 cursor.execute(sql)
-            
+
             result = cursor.fetchall()
             cursor.close()
             return result
-        
+
         except Error as e:
             logger.error(f"Error fetching all: {e}")
+            try:
+                self.connect()
+            except Exception:
+                pass
             return []
 
     def execute(self, sql: str, params: tuple = None) -> int:
@@ -159,6 +180,7 @@ class MySQLClient:
             self.connect()
 
         try:
+            self._ensure_clean_connection()
             cursor = self.connection.cursor()
 
             if params:
@@ -175,6 +197,10 @@ class MySQLClient:
             logger.error(f"Error executing SQL: {e}")
             if self.connection:
                 self.connection.rollback()
+            try:
+                self.connect()
+            except Exception:
+                pass
             return 0
 
     def insert_agent_run(self, run_id: str, trace_id: str, conversation_id: str,
@@ -188,6 +214,7 @@ class MySQLClient:
             self.connect()
 
         try:
+            self._ensure_clean_connection()
             cursor = self.connection.cursor()
             record_id = str(uuid.uuid4())
             sql = """

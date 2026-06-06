@@ -15,11 +15,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
@@ -32,22 +36,54 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.evanyao.shopagent.data.model.Conversation
 import com.evanyao.shopagent.data.model.Message
+import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.ui.components.AiAvatar
+import com.evanyao.shopagent.ui.components.AsyncImageWithPlaceholder
+import com.evanyao.shopagent.ui.components.EmptyState
 import com.evanyao.shopagent.ui.components.MessageBubble
 import com.evanyao.shopagent.ui.components.RecommendSection
+import com.evanyao.shopagent.ui.components.buildImageUrl
 import com.evanyao.shopagent.viewmodel.ChatViewModel
+import com.evanyao.shopagent.viewmodel.InputMode
 import kotlinx.coroutines.launch
 
-/** 对话页面，包含会话列表侧边栏、消息列表、输入框 */
+/**
+ * 对话页面 — 应用的核心界面
+ *
+ * 布局结构：
+ * - ModalNavigationDrawer：左侧会话列表侧边栏
+ *   - 会话列表（按置顶+时间排序）
+ *   - 新建会话按钮
+ *   - 长按菜单（重命名/删除/置顶）
+ * - Scaffold：主内容区
+ *   - TopAppBar：会话标题 + 菜单按钮
+ *   - LazyColumn：消息列表
+ *     - 空状态：推荐问题区域
+ *     - 历史消息：MessageBubble 组件
+ *     - 流式输出：实时更新的 StreamingText
+ *     - 加载指示器：TypingIndicator
+ *   - 底部输入区域：
+ *     - 📷 拍照/选图按钮（带 Tooltip）
+ *     - 🎤/⌨️ 模式切换按钮（文字/语音）
+ *     - 输入框 / 语音录制区域
+ *     - 发送/停止按钮
+ * - Snackbar：错误提示
+ * - SKU 选择弹窗：购物车加购规格选择
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel,
-    onProductClick: (Long) -> Unit
+    onProductClick: (Long) -> Unit,
+    onAddToCart: ((List<Long>) -> Unit)? = null,
+    onCameraClick: (() -> Unit)? = null,
+    onVoiceStart: (() -> Unit)? = null,
+    onVoiceEnd: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var inputText by remember { mutableStateOf("") }
@@ -60,6 +96,18 @@ fun ChatScreen(
     var renameText by remember { mutableStateOf("") }
 
     val recommendations = uiState.recommendations
+
+    // SKU 选择状态
+    val skuSelectionProduct by viewModel.skuSelectionProduct.collectAsState()
+    val skuSelectionList by viewModel.skuSelectionList.collectAsState()
+
+    // 语音识别完成后，将结果填入输入框
+    LaunchedEffect(uiState.pendingVoiceText) {
+        uiState.pendingVoiceText?.let { text ->
+            inputText = text
+            viewModel.clearPendingVoiceText()
+        }
+    }
 
     // 自动滚动到底部（包括流式输出时）
     LaunchedEffect(uiState.messages.size, uiState.isSending, uiState.streamingContent) {
@@ -245,7 +293,11 @@ fun ChatScreen(
                             onProductClick = onProductClick,
                             onFeedback = { messageId, feedbackType ->
                                 viewModel.submitFeedback(messageId, feedbackType)
-                            }
+                            },
+                            onConfirmAction = { actionType ->
+                                viewModel.sendConfirmAction(actionType)
+                            },
+                            onAddToCart = { productIds -> viewModel.startAddToCartWithSku(productIds) }
                         )
                     }
 
@@ -325,7 +377,7 @@ fun ChatScreen(
                 }
             }
 
-            // 输入区域
+            // 输入区域（模仿豆包布局：[📷] [🎤/⌨️] [输入框] [发送/停止]）
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -338,15 +390,122 @@ fun ChatScreen(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 48.dp, max = 120.dp),
-                        placeholder = { Text("输入你的问题...") },
-                        maxLines = 4
-                    )
+                    // ＋ 拍照/相册按钮（带 Tooltip）
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = { PlainTooltip { Text("拍照/选图") } },
+                        state = rememberTooltipState()
+                    ) {
+                        IconButton(
+                            onClick = { onCameraClick?.invoke() },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "拍照/相册",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // 🎤/⌨️ 模式切换按钮（带 Tooltip）
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                        tooltip = {
+                            PlainTooltip {
+                                Text(if (uiState.inputMode == InputMode.VOICE) "切换到键盘" else "切换到语音")
+                            }
+                        },
+                        state = rememberTooltipState()
+                    ) {
+                        IconButton(
+                            onClick = { viewModel.toggleInputMode() },
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.inputMode == InputMode.VOICE) {
+                                    Icons.Default.Keyboard
+                                } else {
+                                    Icons.Default.Mic
+                                },
+                                contentDescription = if (uiState.inputMode == InputMode.VOICE) "键盘" else "语音",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // 输入框或语音按钮
+                    if (uiState.inputMode == InputMode.VOICE) {
+                        // 语音模式：点击开始/停止录音
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(
+                                    if (uiState.isRecording) {
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    }
+                                )
+                                .clickable {
+                                    if (!uiState.isRecording) {
+                                        onVoiceStart?.invoke()
+                                    } else {
+                                        onVoiceEnd?.invoke()
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (uiState.isRecording) {
+                                    // 录音中：蓝色圆圈 + 动画
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .background(
+                                                MaterialTheme.colorScheme.primary,
+                                                CircleShape
+                                            )
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "录音中...点击停止",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Mic,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "点击说话",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        // 文字模式：文本输入框
+                        OutlinedTextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp, max = 120.dp),
+                            placeholder = { Text("输入你的问题...") },
+                            maxLines = 4
+                        )
+                    }
 
                     Spacer(modifier = Modifier.width(8.dp))
 
@@ -463,12 +622,165 @@ fun ChatScreen(
         }
     }
 
+    // 加入购物车规格选择弹窗
+    if (skuSelectionProduct != null && skuSelectionList.isNotEmpty()) {
+        ChatSkuSelectionSheet(
+            productTitle = skuSelectionProduct!!.title,
+            productImageUrl = skuSelectionProduct!!.imageUrl,
+            skus = skuSelectionList,
+            onDismiss = { viewModel.cancelSkuSelection() },
+            onConfirm = { skuId -> viewModel.confirmSkuSelection(skuId) }
+        )
+    }
+
     SnackbarHost(
         hostState = snackbarHostState,
         modifier = Modifier
             .fillMaxSize()
             .wrapContentSize(Alignment.BottomCenter)
     )
+}
+
+/** 对话中加入购物车的规格选择弹窗 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChatSkuSelectionSheet(
+    productTitle: String,
+    productImageUrl: String?,
+    skus: List<ProductSku>,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // 商品信息 + 标题
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val imageUrl = buildImageUrl(productImageUrl)
+                if (imageUrl != null) {
+                    AsyncImageWithPlaceholder(
+                        model = imageUrl,
+                        contentDescription = productTitle,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                    )
+                }
+                Column {
+                    Text(
+                        text = "选择规格",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = productTitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            // SKU 列表
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(skus.size) { index ->
+                    val sku = skus[index]
+                    val isSelected = index == selectedIndex
+                    val bgColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    val borderColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        Color.Transparent
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedIndex = index },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = bgColor),
+                        border = androidx.compose.foundation.BorderStroke(
+                            if (isSelected) 2.dp else 0.dp, borderColor
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = sku.propertiesText.ifEmpty { "默认规格" },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "库存: ${sku.stock}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "¥${String.format("%.2f", sku.price.toDouble())}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 确认按钮
+            Button(
+                onClick = {
+                    val selectedSku = skus.getOrNull(selectedIndex)
+                    if (selectedSku != null) {
+                        onConfirm(selectedSku.id)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .height(50.dp),
+                shape = RoundedCornerShape(25.dp)
+            ) {
+                Text(
+                    text = "确定加入购物车",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+
+            Spacer(modifier = Modifier.navigationBarsPadding())
+        }
+    }
 }
 
 /**

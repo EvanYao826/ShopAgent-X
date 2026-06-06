@@ -26,6 +26,8 @@ class ConfigManager:
         self.DOUBAO_API_KEY = os.getenv("DOUBAO_API_KEY", "")
         self.DOUBAO_BASE_URL = os.getenv("DOUBAO_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3/")
         self.DOUBAO_MODEL = os.getenv("DOUBAO_MODEL", "ep-20260514111645-lmgt2")
+        # 豆包视觉模型（用于图片识别，默认使用同一个全模态模型）
+        self.DOUBAO_VISION_MODEL = os.getenv("DOUBAO_VISION_MODEL", self.DOUBAO_MODEL)
         
         # Milvus Configuration
         self.MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")

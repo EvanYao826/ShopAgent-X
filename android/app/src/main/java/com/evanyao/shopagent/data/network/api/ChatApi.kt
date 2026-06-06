@@ -4,6 +4,7 @@ import com.evanyao.shopagent.data.model.ChatRequest
 import com.evanyao.shopagent.data.model.Conversation
 import com.evanyao.shopagent.data.model.Message
 import com.evanyao.shopagent.data.model.Result
+import okhttp3.MultipartBody
 import retrofit2.http.*
 
 interface ChatApi {
@@ -36,6 +37,19 @@ interface ChatApi {
     suspend fun submitFeedback(
         @Body request: FeedbackRequest
     ): Result<Message>
+
+    @POST("api/chat/messages/save")
+    suspend fun saveMessage(
+        @Body request: Map<String, Any>
+    ): Result<Message>
+
+    @Multipart
+    @POST("api/chat/recognize-image")
+    suspend fun recognizeImage(@Part file: MultipartBody.Part): Result<String>
+
+    @Multipart
+    @POST("api/chat/voice/recognize")
+    suspend fun recognizeVoice(@Part file: MultipartBody.Part): Result<String>
 }
 
 data class FeedbackRequest(

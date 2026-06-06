@@ -27,12 +27,32 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.evanyao.shopagent.data.model.Message
+import com.evanyao.shopagent.data.model.ConfirmCard
+import com.evanyao.shopagent.data.model.Product
 
-/** 消息气泡组件，支持长按复制、点赞/踩反馈 */
+/**
+ * 消息气泡组件 — 对话页的核心展示单元
+ *
+ * 功能：
+ * - 用户消息：右侧对齐，蓝色背景，显示头像
+ * - AI 消息：左侧对齐，灰色背景，显示 AI 头像
+ * - 图片消息：用户发送的图片 + 文字说明
+ * - 流式输出：StreamingText 带闪烁光标动画
+ * - 商品卡片：横向滚动的商品列表（ProductCardList）
+ * - 确认卡片：购物车删除/修改确认（ConfirmCardView）
+ * - 选择卡片：批量加购勾选（SelectableProductCardList）
+ * - 购物车列表：纵向展示（CartProductList）
+ * - 长按菜单：复制文本 / 点赞 / 踩
+ * - 反馈状态：已点赞/已踩标记
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MessageBubble(
@@ -40,9 +60,17 @@ fun MessageBubble(
     isStreaming: Boolean = false,
     userGender: Int? = null,
     onProductClick: ((Long) -> Unit)? = null,
-    onFeedback: ((Long, Int) -> Unit)? = null
+    onFeedback: ((Long, Int) -> Unit)? = null,
+    onConfirmAction: ((String) -> Unit)? = null,
+    onAddToCart: ((List<Long>) -> Unit)? = null
 ) {
     val isUser = message.role == "user"
+    // 显示文本：如果有图片附件，隐藏后端的图片描述部分
+    val displayText = if (isUser && message.imageUri != null) {
+        message.content.substringBefore("\n\n图片内容：").ifEmpty { message.content }
+    } else {
+        message.content
+    }
     val bubbleColor = if (isUser) {
         MaterialTheme.colorScheme.primary
     } else {
@@ -74,11 +102,30 @@ fun MessageBubble(
         }
 
         Column(
-            modifier = Modifier.widthIn(max = 280.dp)
+            modifier = Modifier.widthIn(max = if (message.cartSelection != null) 340.dp else 280.dp)
         ) {
+            // 用户发送的图片
+            if (isUser && message.imageUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(message.imageUri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "发送的图片",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
             // 消息气泡（长按弹出菜单）
+            // 流式输出时设置最小宽度，防止光标导致气泡宽度跳动
             Box(
                 modifier = Modifier
+                    .then(if (isStreaming) Modifier.widthIn(min = 80.dp) else Modifier)
                     .clip(
                         RoundedCornerShape(
                             topStart = 16.dp,
@@ -96,12 +143,12 @@ fun MessageBubble(
             ) {
                 if (isStreaming) {
                     StreamingText(
-                        text = message.content,
+                        text = displayText,
                         color = textColor
                     )
                 } else {
                     Text(
-                        text = message.content,
+                        text = displayText,
                         color = textColor,
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -125,6 +172,34 @@ fun MessageBubble(
                     products = message.productCards,
                     onProductClick = onProductClick
                 )
+            }
+
+            // 确认卡片（购物车删除/修改确认）
+            if (!isUser && message.messageType == "confirm_card" && message.confirmCard != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                ConfirmCardView(
+                    confirmCard = message.confirmCard!!,
+                    onAction = { actionType ->
+                        onConfirmAction?.invoke(actionType)
+                    }
+                )
+            }
+
+            // 购物车选择卡片（批量加购 / 查看购物车）
+            if (!isUser && message.cartSelection != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                if (message.messageType == "cart_list") {
+                    // 查看购物车：纵向排列，类似确认删除卡片样式
+                    CartProductList(products = message.cartSelection!!.items)
+                } else {
+                    // 批量加购：带复选框
+                    SelectableProductCardList(
+                        products = message.cartSelection!!.items,
+                        onAddToCart = { productIds ->
+                            onAddToCart?.invoke(productIds)
+                        }
+                    )
+                }
             }
         }
 
@@ -223,6 +298,220 @@ private fun MessageContextMenu(
             }
         }
     )
+}
+
+/** 确认卡片组件：显示商品信息 + 确认/取消按钮 */
+@Composable
+fun ConfirmCardView(
+    confirmCard: ConfirmCard,
+    onAction: (String) -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            // 批量商品列表（纵向排列）
+            val products = confirmCard.products
+            if (!products.isNullOrEmpty()) {
+                products.forEachIndexed { index, product ->
+                    ConfirmProductRow(product)
+                    if (index < products.lastIndex) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+            } else {
+                // 单个商品信息（兼容旧格式）
+                confirmCard.product?.let { product ->
+                    ConfirmProductRow(product)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+
+            // 确认消息
+            Text(
+                text = confirmCard.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 按钮行：确认按钮用填充样式，取消按钮用描边样式
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+            ) {
+                confirmCard.buttons.forEach { button ->
+                    val isConfirm = button.type == "confirm"
+                    val answered = confirmCard.answered
+                    if (isConfirm && !answered) {
+                        // 确认按钮：填充样式，更突出
+                        Button(
+                            onClick = { onAction(button.type) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(text = button.label, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        // 取消按钮 / 已回答状态：描边样式
+                        OutlinedButton(
+                            onClick = { if (!answered) onAction(button.type) },
+                            enabled = !answered,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (answered) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            ),
+                            border = if (!answered) ButtonDefaults.outlinedButtonBorder(enabled = true) else null
+                        ) {
+                            Text(text = button.label)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 确认卡片中的单个商品行 */
+@Composable
+private fun ConfirmProductRow(product: Product) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        val imageUrl = buildImageUrl(product.imageUrl)
+        if (imageUrl != null) {
+            AsyncImageWithPlaceholder(
+                model = imageUrl,
+                contentDescription = product.title,
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = product.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "¥${product.basePrice}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                product.brand?.let { brand ->
+                    Text(
+                        text = brand,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 购物车列表卡片：纵向展示商品，带序号，样式同确认删除卡片 */
+@Composable
+fun CartProductList(products: List<Product>) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            products.forEachIndexed { index, product ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 序号
+                    Text(
+                        text = "${index + 1}.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(24.dp)
+                    )
+
+                    // 商品图片
+                    val imageUrl = buildImageUrl(product.imageUrl)
+                    if (imageUrl != null) {
+                        AsyncImageWithPlaceholder(
+                            model = imageUrl,
+                            contentDescription = product.title,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+
+                    // 商品信息
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = product.title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "¥${product.basePrice}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            product.brand?.let { brand ->
+                                Text(
+                                    text = brand,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+                if (index < products.lastIndex) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+    }
 }
 
 @Composable

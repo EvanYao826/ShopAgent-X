@@ -3,6 +3,7 @@ package com.evanyao.shopagent.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.evanyao.shopagent.data.model.CartItem
+import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.data.model.ProductSku
 import com.evanyao.shopagent.data.repository.CartRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,11 +13,16 @@ import kotlinx.coroutines.launch
 data class CartUiState(
     val cartItems: List<CartItem> = emptyList(),
     val isLoading: Boolean = false,
+    val isError: Boolean = false,               // 加载失败（区分"空购物车"和"加载出错"）
     val errorMessage: String? = null,
     val selectedItems: Set<Long> = emptySet(),
     val toastMessage: String? = null,
     val editingSkuItem: CartItem? = null,
-    val editingSkus: List<ProductSku> = emptyList()
+    val editingSkus: List<ProductSku> = emptyList(),
+    // 加入购物车时选择规格
+    val addSkuProductId: Long? = null,
+    val addSkuProductTitle: String? = null,
+    val addSkus: List<ProductSku> = emptyList()
 ) {
     val totalPrice: Double
         get() = cartItems.sumOf { it.totalPrice.toDouble() }
@@ -41,24 +47,27 @@ class CartViewModel(
 
     fun loadCartList() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, isError = false, errorMessage = null)
             try {
                 val response = cartRepository.getCartList()
                 if (response.isSuccess && response.data != null) {
                     _uiState.value = _uiState.value.copy(
                         cartItems = response.data,
                         isLoading = false,
+                        isError = false,
                         errorMessage = null
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        isError = true,
                         errorMessage = response.message
                     )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
+                    isError = true,
                     errorMessage = "加载购物车失败：${e.message}"
                 )
             }
@@ -173,7 +182,7 @@ class CartViewModel(
     }
 
     fun clearError() {
-        _uiState.value = _uiState.value.copy(errorMessage = null)
+        _uiState.value = _uiState.value.copy(isError = false, errorMessage = null)
     }
 
     fun startEditSku(cartItem: CartItem) {
@@ -285,6 +294,53 @@ class CartViewModel(
                 } catch (_: Exception) {}
             }
         }
+    }
+
+    /** 点击"+"时，先获取SKU列表再决定是否弹窗 */
+    fun startAddSku(productId: Long, productTitle: String? = null) {
+        viewModelScope.launch {
+            try {
+                val response = cartRepository.getProductSkus(productId)
+                if (response.isSuccess && response.data != null) {
+                    val skus = response.data
+                    if (skus.size <= 1) {
+                        // 单规格或无规格，直接加购
+                        addToCart(productId, skus.firstOrNull()?.id)
+                    } else {
+                        // 多规格，显示选择弹窗
+                        _uiState.value = _uiState.value.copy(
+                            addSkuProductId = productId,
+                            addSkuProductTitle = productTitle,
+                            addSkus = skus
+                        )
+                    }
+                } else {
+                    // 获取SKU失败，直接加购（默认规格）
+                    addToCart(productId)
+                }
+            } catch (e: Exception) {
+                // 异常时直接加购
+                addToCart(productId)
+            }
+        }
+    }
+
+    fun cancelAddSku() {
+        _uiState.value = _uiState.value.copy(
+            addSkuProductId = null,
+            addSkuProductTitle = null,
+            addSkus = emptyList()
+        )
+    }
+
+    fun confirmAddSku(skuId: Long) {
+        val productId = _uiState.value.addSkuProductId ?: return
+        _uiState.value = _uiState.value.copy(
+            addSkuProductId = null,
+            addSkuProductTitle = null,
+            addSkus = emptyList()
+        )
+        addToCart(productId, skuId)
     }
 
     fun clearState() {

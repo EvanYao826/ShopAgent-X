@@ -380,4 +380,5 @@ class ProductViewModel(
         loadCategories()
         loadProducts(reset = true)
     }
+
 }

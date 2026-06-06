@@ -27,7 +27,26 @@ class TaskType(Enum):
 
 
 class RouterAgent:
-    """路由Agent - 负责将用户请求路由到合适的工作流"""
+    """路由Agent —— 中央路由器，意图分类 + 任务分发 + 统一记忆写入。
+
+    协作拓扑：
+    RouterAgent（中央路由）
+      ├── ShoppingAgent ──────── 商品导购（推荐、对比、购物车）
+      ├── ChitChatAgent ──────── 闲聊
+      ├── KnowledgeQAAgent ───── 知识问答
+      │     ├── RetrievalAgent ── L2 检索链路
+      │     └── ReasoningAgent ── L3 推理链路（走 Orchestrator）
+      ├── ReasoningAgent ─────── 复杂推理
+      └── AdminCopilotAgent ──── 管理助手
+            ├── OpsAgent ──────── 运营分析
+            └── InspectionAgent ─ 知识巡检
+
+    分发策略：
+    - 简单链路（闲聊/单次检索）→ 直接调用对应 Agent
+    - 复杂链路（L3 知识问答/多步推理）→ 走 Orchestrator 编排（支持重试+状态追踪+事件监控）
+
+    共享能力：MemoryAgent（记忆管理）、ToolRegistry（工具调用）、EventBus（事件通信）
+    """
 
     def __init__(self):
         self.knowledge_qa_agent = KnowledgeQAAgent()

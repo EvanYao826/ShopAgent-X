@@ -1,5 +1,7 @@
 package com.evanyao.shopagent.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +13,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 data class ProductDetailState(
     val product: Product? = null,
@@ -379,5 +384,55 @@ class ProductViewModel(
         _uiState.value = ProductUiState()
         loadCategories()
         loadProducts(reset = true)
+    }
+
+    /** 拍照搜索：识别图片内容并填入搜索框 */
+    fun searchByImage(uri: Uri, context: Context) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+
+                // 读取图片并构建请求
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val imageBytes = inputStream?.readBytes()
+                inputStream?.close()
+
+                if (imageBytes == null) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "无法读取图片"
+                    )
+                    return@launch
+                }
+
+                val requestBody = imageBytes.toRequestBody("image/*".toMediaType())
+                val part = MultipartBody.Part.createFormData("file", "photo.jpg", requestBody)
+
+                // 调用图片识别接口
+                val response = productRepository.recognizeImage(part)
+                if (response.isSuccess && response.data != null) {
+                    val recognizedText = response.data
+                    Log.d("ProductVM", "Image recognized: $recognizedText")
+
+                    // 将识别结果填入搜索框并触发搜索
+                    _uiState.value = _uiState.value.copy(
+                        searchQuery = recognizedText,
+                        isLoading = false
+                    )
+                    loadProducts(reset = true)
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = response.message ?: "图片识别失败"
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e("ProductVM", "Search by image failed", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "图片识别失败: ${e.message}"
+                )
+            }
+        }
     }
 }

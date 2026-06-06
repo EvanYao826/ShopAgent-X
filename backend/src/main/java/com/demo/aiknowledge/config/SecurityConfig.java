@@ -50,6 +50,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/chat/view/image/**").permitAll()
                 // 允许商品图片静态资源访问
                 .requestMatchers("/product-images/**").permitAll()
+                // 允许错误页面访问（SSE 流结束后异步分发需要）
+                .requestMatchers("/error").permitAll()
                 // 允许商品只读接口匿名访问
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/list").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/product/{id}").permitAll()

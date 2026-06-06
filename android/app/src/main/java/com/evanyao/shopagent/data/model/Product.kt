@@ -23,6 +23,7 @@ data class Product(
     val reviewCount: Int = 0,
     @SerializedName(value = "salesCount", alternate = ["sales_count"])
     val salesCount: Int = 0,
+    val quantity: Int = 1,  // 购物车中数量（仅购物车列表使用）
     val status: Int = 1,
     val createTime: String? = null,
     val updateTime: String? = null

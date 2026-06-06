@@ -230,6 +230,7 @@ CREATE TABLE `message` (
   `content`         TEXT          NOT NULL                 COMMENT '消息文本内容',
   `message_type`    VARCHAR(20)   DEFAULT 'text'           COMMENT '消息类型：text-纯文本 product_card-商品卡片 image-图片 mixed-混合',
   `product_cards`   JSON          DEFAULT NULL             COMMENT 'AI 推荐的商品卡片 JSON 数组，结构：[{product_id, title, price, image_url, reason}]',
+  `confirm_card`    JSON          DEFAULT NULL             COMMENT '确认卡片 JSON，购物车操作确认用：{message, action, product, buttons}',
   `image_url`       VARCHAR(500)  DEFAULT NULL             COMMENT '用户发送的图片 URL（多模态输入）',
   `sources`         TEXT          DEFAULT NULL             COMMENT 'RAG 参考来源 JSON',
   `task_type`       VARCHAR(50)   DEFAULT 'unknown'        COMMENT 'Agent 任务类型：shopping/chitchat/product_search/product_compare/unknown',

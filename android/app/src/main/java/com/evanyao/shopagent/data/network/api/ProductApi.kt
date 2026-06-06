@@ -3,6 +3,7 @@ package com.evanyao.shopagent.data.network.api
 import com.evanyao.shopagent.data.model.PageResponse
 import com.evanyao.shopagent.data.model.Product
 import com.evanyao.shopagent.data.model.Result
+import okhttp3.MultipartBody
 import retrofit2.http.*
 
 interface ProductApi {
@@ -44,4 +45,8 @@ interface ProductApi {
 
     @DELETE("api/recommend/browse/history/{id}")
     suspend fun deleteBrowseHistory(@Path("id") historyId: Long): Result<String>
+
+    @Multipart
+    @POST("api/chat/recognize-image")
+    suspend fun recognizeImage(@Part file: MultipartBody.Part): Result<String>
 }

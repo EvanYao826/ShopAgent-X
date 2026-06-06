@@ -22,6 +22,7 @@ class TaskType(Enum):
     KNOWLEDGE_INSPECTION = "knowledge_inspection"
     REASONING = "reasoning"
     SHOPPING = "shopping"
+    CART = "cart"
     UNKNOWN = "unknown"
 
 
@@ -63,7 +64,7 @@ class RouterAgent:
         Returns:
             执行结果
         """
-        task_type = self.classify_task(input_text, is_admin)
+        task_type = self.classify_task(input_text, is_admin, context)
         logger.info(f"[RouterAgent] Routing to: {task_type.value} for input: {input_text[:50]}...")
 
         try:
@@ -96,6 +97,11 @@ class RouterAgent:
 
             elif task_type == TaskType.SHOPPING:
                 result = self.shopping_agent.recommend(
+                    input_text, conversation_id, user_id, context, **kwargs
+                )
+
+            elif task_type == TaskType.CART:
+                result = self.shopping_agent.handle_cart(
                     input_text, conversation_id, user_id, context, **kwargs
                 )
 
@@ -137,7 +143,7 @@ class RouterAgent:
         Yields:
             JSON格式的事件流
         """
-        task_type = self.classify_task(input_text, is_admin)
+        task_type = self.classify_task(input_text, is_admin, context)
         logger.info(f"[RouterAgent] Streaming route to: {task_type.value}")
 
         try:
@@ -195,6 +201,13 @@ class RouterAgent:
                     full_answer = self._extract_answer_from_event(event, full_answer)
                     yield event
 
+            elif task_type == TaskType.CART:
+                for event in self.shopping_agent.handle_cart_stream(
+                    input_text, conversation_id, user_id, context, **kwargs
+                ):
+                    full_answer = self._extract_answer_from_event(event, full_answer)
+                    yield event
+
             else:
                 for event in self.knowledge_qa_agent.ask_stream(
                     input_text, conversation_id, user_id, context, **kwargs
@@ -213,18 +226,19 @@ class RouterAgent:
                 "content": str(e)
             })
 
-    def classify_task(self, input_text: str, is_admin: bool = False) -> TaskType:
+    def classify_task(self, input_text: str, is_admin: bool = False, context: str = "") -> TaskType:
         """
         分类任务类型 - 委托给统一分类器
 
         Args:
             input_text: 用户输入
             is_admin: 是否为管理员
+            context: 对话上下文
 
         Returns:
             任务类型
         """
-        result = self.classifier.classify(input_text, is_admin)
+        result = self.classifier.classify(input_text, is_admin, context)
 
         # 将IntentType映射到TaskType
         intent_to_task = {
@@ -234,6 +248,7 @@ class RouterAgent:
             IntentType.KNOWLEDGE_INSPECTION: TaskType.KNOWLEDGE_INSPECTION,
             IntentType.IDENTITY_QUERY: TaskType.CHITCHAT,
             IntentType.SHOPPING: TaskType.SHOPPING,
+            IntentType.CART: TaskType.CART,
             IntentType.UNKNOWN: TaskType.KNOWLEDGE_QA,
         }
 
@@ -296,6 +311,7 @@ class RouterAgent:
             TaskType.KNOWLEDGE_INSPECTION: self.inspection_agent,
             TaskType.REASONING: self.reasoning_agent,
             TaskType.SHOPPING: self.shopping_agent,
+            TaskType.CART: self.shopping_agent,
         }
         return agent_map.get(task_type, self.knowledge_qa_agent)
 

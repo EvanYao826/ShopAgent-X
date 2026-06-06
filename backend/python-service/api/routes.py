@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from core.parser import DocumentParser
@@ -6,6 +6,7 @@ from core.vector_store import vector_store
 from core.llm import LLMService
 from core.mysql_client import mysql_client
 from workflows import RouterAgent
+from workflows.shopping_agent import ShoppingAgent
 import os
 import re
 import logging
@@ -148,6 +149,7 @@ def should_return_sources(question: str) -> bool:
     return False
 
 # 初始化核心服务
+llm_service = None
 try:
     logger.info("Initializing DocumentParser...")
     parser = DocumentParser()
@@ -169,10 +171,12 @@ class ChatRequest(BaseModel):
     context: str = "" # Optional, if context is passed directly (not used here)
     conversation_id: str = None # Optional, for conversation memory
     username: str = None # Optional, if username is provided
+    user_id: str = None # Optional, user ID for cart operations
     is_admin: bool = False # Optional, whether user is admin
     gender: str = None # Optional, user gender: "男"/"女"
     skin_type: str = None # Optional, user skin type
     preference_tags: list = None # Optional, user preference tags
+    jwt_token: str = None # Optional, JWT token for calling Java API
 
 class SummaryRequest(BaseModel):
     question: str
@@ -291,15 +295,29 @@ async def ask_question(request: ChatRequest):
             answer = f"你是 {request.username}，是本系统的注册用户。"
             response = {"answer": answer, "sources": [], "task_type": "chitchat"}
         else:
-            # 使用 RouterAgent 进行任务路由
-            result = router_agent.route(
-                input_text=request.question,
-                conversation_id=request.conversation_id,
-                context=request.context,
-                username=request.username,
-                is_admin=request.is_admin,
-                user_profile=user_profile
-            )
+            # 检查是否有待确认的购物车操作（优先于意图分类）
+            pending_action = ShoppingAgent._pending_cart_actions.get(request.conversation_id)
+            if pending_action:
+                logger.info(f"Pending cart action detected for conversation {request.conversation_id}")
+                result = router_agent.shopping_agent.handle_cart(
+                    question=request.question,
+                    conversation_id=request.conversation_id,
+                    user_id=request.user_id,
+                    context=request.context,
+                    jwt_token=request.jwt_token,
+                )
+            else:
+                # 使用 RouterAgent 进行任务路由
+                result = router_agent.route(
+                    input_text=request.question,
+                    conversation_id=request.conversation_id,
+                    user_id=request.user_id,
+                    context=request.context,
+                    username=request.username,
+                    jwt_token=request.jwt_token,
+                    is_admin=request.is_admin,
+                    user_profile=user_profile
+                )
 
             # 构建响应
             response = {
@@ -313,6 +331,15 @@ async def ask_question(request: ChatRequest):
             # 如果有商品卡片，一并返回
             if result.get("product_cards"):
                 response["product_cards"] = result["product_cards"]
+            # 如果有确认卡片（购物车删除/修改确认），一并返回
+            if result.get("confirm_card"):
+                response["confirm_card"] = result["confirm_card"]
+            # 如果有购物车选择卡片（批量加购），一并返回
+            if result.get("cart_selection"):
+                response["cart_selection"] = result["cart_selection"]
+            # 如果有购物车列表卡片（查看购物车），一并返回
+            if result.get("cart_list"):
+                response["cart_list"] = result["cart_list"]
 
         logger.info(f"Response generated successfully, task_type: {response.get('task_type')}")
 
@@ -430,14 +457,36 @@ async def ask_question_stream(request: ChatRequest):
                 yield f"data: {json.dumps({'type': 'end', 'content': answer, 'task_type': 'chitchat'})}\n\n"
                 return
 
+            # 检查是否有待确认的购物车操作（优先于意图分类）
+            pending_action = ShoppingAgent._pending_cart_actions.get(request.conversation_id)
+            if pending_action:
+                logger.info(f"Pending cart action detected for conversation {request.conversation_id}, routing to cart handler")
+                for event_data in router_agent.shopping_agent.handle_cart_stream(
+                    question=request.question,
+                    conversation_id=request.conversation_id,
+                    user_id=request.user_id,
+                    context=request.context,
+                    jwt_token=request.jwt_token,
+                ):
+                    try:
+                        parsed = json.loads(event_data) if isinstance(event_data, str) else event_data
+                        if parsed.get("type") == "routed":
+                            final_task_type = parsed.get("task_type", "unknown")
+                    except (json.JSONDecodeError, AttributeError):
+                        pass
+                    yield f"data: {event_data}\n\n"
+                return
+
             # 使用 RouterAgent 进行流式任务路由
             for event_data in router_agent.route_stream(
                 input_text=request.question,
                 conversation_id=request.conversation_id,
+                user_id=request.user_id,
                 context=request.context,
                 username=request.username,
                 is_admin=request.is_admin,
-                user_profile=user_profile
+                user_profile=user_profile,
+                jwt_token=request.jwt_token
             ):
                 # 从事件中提取最终答案和任务类型
                 try:
@@ -712,3 +761,98 @@ async def delete_vector_collection():
             })
         )
         raise HTTPException(status_code=500, detail="删除向量库失败")
+
+
+@router.post("/recognize-image")
+async def recognize_image(file: UploadFile = File(...)):
+    """
+    图片识别接口（只返回识别文字，不走对话流程）
+    用于商品页拍照搜索场景
+    """
+    start_time = time.time()
+    try:
+        if llm_service is None:
+            raise HTTPException(status_code=500, detail="LLM服务未初始化")
+
+        # 读取图片内容
+        image_bytes = await file.read()
+        logger.info(f"Recognizing image: {file.filename}, size: {len(image_bytes)} bytes")
+
+        # 调用 LLM 服务识别图片
+        text = llm_service.extract_text_from_image_bytes(image_bytes)
+
+        process_time = time.time() - start_time
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/recognize-image",
+                "status_code": 200,
+                "process_time": process_time
+            })
+        )
+        return {"text": text}
+
+    except Exception as e:
+        process_time = time.time() - start_time
+        logger.error(f"Error recognizing image: {str(e)}")
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/recognize-image",
+                "status_code": 500,
+                "process_time": process_time
+            })
+        )
+        raise HTTPException(status_code=500, detail="图片识别失败")
+
+
+@router.post("/voice/recognize")
+async def recognize_voice(file: UploadFile = File(...)):
+    """
+    语音识别接口（音频转文字）
+    用于对话页语音输入场景
+    """
+    start_time = time.time()
+    try:
+        if llm_service is None:
+            raise HTTPException(status_code=500, detail="LLM服务未初始化")
+
+        logger.info(f"[Voice] Received voice recognition request: {file.filename}")
+
+        # 读取音频内容
+        audio_bytes = await file.read()
+        # 根据文件扩展名判断音频格式
+        audio_format = "m4a"
+        if file.filename:
+            ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "m4a"
+            if ext in ["wav", "mp3", "m4a", "ogg", "flac", "amr"]:
+                audio_format = ext
+
+        logger.info(f"[Voice] Recognizing voice: {file.filename}, format: {audio_format}, size: {len(audio_bytes)} bytes")
+
+        # 调用 LLM 服务识别语音
+        text = llm_service.recognize_voice(audio_bytes, audio_format)
+
+        process_time = time.time() - start_time
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/voice/recognize",
+                "status_code": 200,
+                "process_time": process_time
+            })
+        )
+        return {"text": text}
+
+    except Exception as e:
+        process_time = time.time() - start_time
+        logger.error(f"Error recognizing voice: {str(e)}")
+        logger.info(
+            json.dumps({
+                "method": "POST",
+                "path": "/api/voice/recognize",
+                "status_code": 500,
+                "process_time": process_time
+            })
+        )
+        raise HTTPException(status_code=500, detail="语音识别失败")

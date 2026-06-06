@@ -7,6 +7,7 @@ from tools.memory_read import ConversationMemoryReadTool as MemoryReadTool
 from tools.memory_write import ConversationMemoryWriteTool as MemoryWriteTool
 from tools.doc_summary import DocSummaryTool
 from tools.ocr_extract import OCRExtractTool as OCRTool
+from tools.cart_tool import CartTool
 from tools.execution import tool_execution_tracker
 
 
@@ -20,6 +21,7 @@ def register_all_tools():
         MemoryWriteTool(),
         DocSummaryTool(),
         OCRTool(),
+        CartTool(),
     ]
 
     for tool in tools:
@@ -47,5 +49,6 @@ __all__ = [
     "MemoryWriteTool",
     "DocSummaryTool",
     "OCRTool",
+    "CartTool",
     "register_all_tools",
 ]

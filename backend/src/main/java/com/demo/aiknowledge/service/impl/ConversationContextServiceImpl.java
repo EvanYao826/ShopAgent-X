@@ -20,9 +20,27 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
+/**
+ * 对话上下文服务实现 —— 双层记忆架构。
  *
- * 对话上下文服务实现
- * 实现短期记忆（Redis缓存）和长期记忆（数据库）管理
+ * 短期记忆（Redis 缓存）：
+ * - 存储最近 N 轮对话历史（默认窗口 10 轮），用于构建 AI Prompt 上下文
+ * - 缓存 key: conversation_context:{conversationId}
+ * - 自动过期 + LRU 淘汰策略
+ *
+ * 长期记忆（MySQL 数据库）：
+ * - message 表存储完整对话历史
+ * - conversation_context 表存储每轮对话的结构化摘要（意图/实体/情感等）
+ * - 支持跨会话的记忆检索（用于用户画像更新）
+ *
+ * 上下文构建流程：
+ * 1. 尝试从 Redis 缓存读取最近对话 → 命中则直接使用
+ * 2. 缓存未命中 → 从 MySQL 读取最近 N 条消息 → 格式化 → 写入 Redis 缓存
+ * 3. 将构建的上下文注入给 Python AI 服务的 Prompt
+ *
+ * @see CacheService  Redis 缓存服务
+ * @see MessageMapper 消息数据库映射
+ * @see ConversationContextMapper  上下文结构化摘要映射
  */
 @Service
 @Slf4j

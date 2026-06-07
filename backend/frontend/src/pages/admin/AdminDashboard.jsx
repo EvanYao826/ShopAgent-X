@@ -25,6 +25,7 @@ export default function AdminDashboard() {
     else if (path.includes('/conversations')) setActiveMenu('conversations');
     else if (path.includes('/users')) setActiveMenu('users');
     else if (path.includes('/knowledge')) setActiveMenu('knowledge');
+    else if (path.includes('/inspection')) setActiveMenu('inspection');
     else if (path.includes('/logs')) setActiveMenu('logs');
     else if (path.includes('/chat')) setActiveMenu('chat');
   }, [navigate, location.pathname]);
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
     { id: 'conversations', label: '对话管理', icon: '💬', path: '/admin/conversations' },
     { id: 'users', label: '用户管理', icon: '👥', path: '/admin/users' },
     { id: 'knowledge', label: '知识库管理', icon: '📚', path: '/admin/knowledge' },
+    { id: 'inspection', label: '知识巡检', icon: '🔍', path: '/admin/inspection' },
     { id: 'logs', label: '问答日志', icon: '📝', path: '/admin/logs' },
     { id: 'chat', label: '管理助手', icon: '⚙️', path: '/admin/chat' },
   ];

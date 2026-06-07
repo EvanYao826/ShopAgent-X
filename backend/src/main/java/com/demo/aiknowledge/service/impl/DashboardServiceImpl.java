@@ -163,11 +163,16 @@ public class DashboardServiceImpl implements DashboardService {
         List<Map<String, Object>> intentList = agentRunMapper.selectMaps(intentWrapper);
 
         Map<String, Long> intentMap = new HashMap<>();
+        // 排除管理类意图，只展示用户端意图
+        java.util.Set<String> adminIntents = java.util.Set.of("admin_copilot", "knowledge_inspection");
         for (Map<String, Object> item : intentList) {
             Object intentValue = item.get("intent");
             Object countValue = item.get("count");
             if (intentValue != null && countValue instanceof Number) {
-                intentMap.put(intentValue.toString(), ((Number) countValue).longValue());
+                String intent = intentValue.toString();
+                if (!adminIntents.contains(intent)) {
+                    intentMap.put(intent, ((Number) countValue).longValue());
+                }
             }
         }
         return intentMap;

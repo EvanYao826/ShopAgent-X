@@ -72,7 +72,7 @@ export default function Dashboard() {
           bottom: 0,
           left: 'center'
         },
-        color: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f'],
+        color: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#eb2f96', '#13c2c2', '#8b5cf6', '#f59e0b', '#2f54eb'],
         series: [
           {
             name: '意图',
@@ -151,6 +151,10 @@ export default function Dashboard() {
       knowledge_qa: '知识问答',
       product_search: '商品搜索',
       product_compare: '商品对比',
+      cart: '购物车',
+      admin_copilot: '管理助手',
+      knowledge_inspection: '知识巡检',
+      reasoning: '复杂推理',
       unknown: '未知'
     };
     return map[intent] || intent;
@@ -163,6 +167,10 @@ export default function Dashboard() {
       knowledge_qa: '#faad14',
       product_search: '#13c2c2',
       product_compare: '#722ed1',
+      cart: '#eb2f96',
+      admin_copilot: '#8b5cf6',
+      knowledge_inspection: '#f59e0b',
+      reasoning: '#2f54eb',
       unknown: '#999'
     };
     return map[intent] || '#999';

@@ -66,6 +66,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/products/**").hasAnyRole("USER", "ADMIN")
                 .requestMatchers("/api/admin/product/**").hasAnyRole("ADMIN")
                 .requestMatchers("/api/admin/order/**").hasAnyRole("ADMIN")
+                .requestMatchers("/api/admin-chat/**").hasAnyRole("ADMIN")
+                .requestMatchers("/api/admin/knowledge-inspection/**").hasAnyRole("ADMIN")
                 .requestMatchers("/api/admin/recommend/**").hasAnyRole("USER", "ADMIN")
                 // 管理员接口需要ADMIN角色
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

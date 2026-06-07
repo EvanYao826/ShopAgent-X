@@ -57,7 +57,7 @@ CREATE TABLE `admin` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员表——存储后台管理员账号';
 
 -- 默认管理员账号 admin / admin123
-INSERT INTO `admin` (`username`, `password`, `role`) VALUES ('admin', 'admin123', 'admin');
+INSERT INTO `admin` (`username`, `password`, `role`) VALUES ('admin', '$2b$12$d667T2SVNcOMNApPfGAVHuSWuaRkdQTqkG0h7OATc00Tv2WgFf3Da', 'admin');
 
 
 -- ============================================================

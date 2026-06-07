@@ -51,3 +51,7 @@ data/ecommerce_agent_dataset/images/
 
 # Upload files
 uploads/
+
+# Keystore
+keystore/
+*.jks

@@ -60,7 +60,7 @@ export default function AdminLogin() {
       <div className="particle-line"></div>
       <div className="particle-line"></div>
       <div className="auth-card">
-        <h1 className="auth-title">AI 知识管理系统</h1>
+        <h1 className="auth-title">ShopAgent-X</h1>
         <h2 className="auth-subtitle">管理员登录</h2>
 
         <form onSubmit={handleSubmit}>

@@ -21,9 +21,9 @@ export default function Login() {
   };
 
   useEffect(() => {
-    document.title = 'AI 知识系统-用户登录';
+    document.title = 'ShopAgent-X - 登录';
     return () => {
-      document.title = 'AI 知识系统';
+      document.title = 'ShopAgent-X';
     };
   }, []);
 
@@ -75,7 +75,7 @@ export default function Login() {
       <div className="particle-line"></div>
       <div className="particle-line"></div>
       <div className="auth-card">
-        <h1 className="auth-title">AI 知识系统</h1>
+        <h1 className="auth-title">ShopAgent-X</h1>
         <h2 className="auth-subtitle">登录</h2>
 
         <form onSubmit={handleSubmit}>

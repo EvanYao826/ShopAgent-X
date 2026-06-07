@@ -18,7 +18,7 @@ const Header = () => {
   return (
     <header className="app-header">
       <div className="header-left">
-        <span className="app-title">AI 知识库系统</span>
+        <span className="app-title">ShopAgent-X 智能导购</span>
       </div>
       <div className="header-right">
         <div className="user-profile-container">

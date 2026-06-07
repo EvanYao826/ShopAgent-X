@@ -15,14 +15,22 @@ android {
         applicationId = "com.evanyao.shopagent"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8888/\"")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("D:/keystore/my_release_key.jks")
+            storePassword = "123456"
+            keyAlias = "shopagent"
+            keyPassword = "123456"
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -30,6 +38,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

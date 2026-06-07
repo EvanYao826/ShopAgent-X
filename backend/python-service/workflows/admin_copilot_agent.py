@@ -39,12 +39,15 @@ class AdminCopilotAgent:
     def handle(self, question: str, conversation_id: Optional[str] = None,
                user_id: Optional[str] = None, context: str = "",
                **kwargs) -> Dict[str, Any]:
-        """处理管理助手请求"""
+        """处理管理助手请求 - 基于数据库真实数据分析"""
         logger.info(f"[AdminCopilotAgent] Processing admin request: {question[:50]}...")
 
         try:
             operation = self._parse_operation(question)
-            return self._execute_operation(operation, question)
+            if operation != "stats":
+                return self._execute_operation(operation, question)
+            # 通用问题：收集数据库数据，交给LLM分析
+            return self._analyze_with_llm(question)
         except Exception as e:
             logger.error(f"[AdminCopilotAgent] Error: {e}", exc_info=True)
             return self._error_result(f"抱歉，处理管理请求时出错：{str(e)}")
@@ -205,3 +208,70 @@ class AdminCopilotAgent:
         from workflows.inspection_agent import InspectionAgent
         inspection_agent = InspectionAgent()
         return inspection_agent.inspect("full")
+
+    def _analyze_with_llm(self, question: str) -> Dict[str, Any]:
+        """收集数据库真实数据，交给LLM做智能分析"""
+        try:
+            # 收集全部可用的管理数据
+            data = self._collect_all_data()
+
+            # 构建prompt让LLM基于真实数据回答
+            from core.llm import llm_service
+            if not llm_service or not llm_service.llm:
+                return self._get_stats()  # fallback
+
+            prompt = f"""你是一个电商AI管理助手。以下是系统的真实运行数据，请基于这些数据回答管理员的问题。
+
+【系统实时数据】
+- 知识库文档数：{data['doc_count']}
+- 知识片段(Chunk)数：{data['chunk_count']}
+- 问答日志总数：{data['qa_count']}
+- 未命中问题数：{data['unanswered_count']}
+- 注册用户数：{data['user_count']}
+- 问答分类数：{data['category_count']}
+- 管理员对话数：{data['admin_conv_count']}
+
+【管理员问题】
+{question}
+
+请基于以上真实数据给出专业、有洞察力的分析回答。如果数据不足以回答问题，请诚实说明并给出建议。用中文回答，语气专业友好。"""
+
+            from langchain_core.prompts import PromptTemplate
+            from langchain_core.output_parsers import StrOutputParser
+
+            pt = PromptTemplate.from_template("{prompt}")
+            chain = pt | llm_service.llm | StrOutputParser()
+            answer = chain.invoke({"prompt": prompt})
+
+            return {
+                "answer": answer,
+                "sources": [],
+                "has_sources": False,
+                "task_type": "admin_copilot",
+                "data": data
+            }
+        except Exception as e:
+            logger.error(f"[AdminCopilotAgent] LLM analysis error: {e}", exc_info=True)
+            return self._get_stats()
+
+    def _collect_all_data(self) -> dict:
+        """收集所有管理相关数据"""
+        data = {}
+        try:
+            data['doc_count'] = (mysql_client.fetch_one(
+                "SELECT COUNT(*) as cnt FROM knowledge_doc") or {}).get('cnt', 0)
+            data['chunk_count'] = (mysql_client.fetch_one(
+                "SELECT COUNT(*) as cnt FROM knowledge_chunk") or {}).get('cnt', 0)
+            data['qa_count'] = (mysql_client.fetch_one(
+                "SELECT COUNT(*) as cnt FROM qa_log") or {}).get('cnt', 0)
+            data['unanswered_count'] = (mysql_client.fetch_one(
+                "SELECT COUNT(*) as cnt FROM qa_unanswered") or {}).get('cnt', 0)
+            data['user_count'] = (mysql_client.fetch_one(
+                "SELECT COUNT(*) as cnt FROM user") or {}).get('cnt', 0)
+            data['category_count'] = (mysql_client.fetch_one(
+                "SELECT COUNT(*) as cnt FROM category") or {}).get('cnt', 0)
+            data['admin_conv_count'] = (mysql_client.fetch_one(
+                "SELECT COUNT(*) as cnt FROM conversation WHERE scene='admin_chat'") or {}).get('cnt', 0)
+        except Exception as e:
+            logger.warning(f"[AdminCopilotAgent] Data collection partial failure: {e}")
+        return data

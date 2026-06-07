@@ -108,14 +108,14 @@ class InspectionAgent:
     def _check_duplicate_docs(self) -> Dict[str, Any]:
         """检测重复文档"""
         try:
-            # 查询可能有重复的文档（相同标题或相似内容）
+            # 查询可能有重复的文档（相同名称）
             query = """
-                SELECT d1.id as doc1_id, d1.title as doc1_title,
-                       d2.id as doc2_id, d2.title as doc2_title,
-                       d1.created_at
-                FROM knowledge_docs d1
-                JOIN knowledge_docs d2 ON d1.title = d2.title AND d1.id < d2.id
-                WHERE d1.is_deleted = 0 AND d2.is_deleted = 0
+                SELECT d1.id as doc1_id, d1.doc_name as doc1_title,
+                       d2.id as doc2_id, d2.doc_name as doc2_title,
+                       d1.create_time
+                FROM knowledge_doc d1
+                JOIN knowledge_doc d2 ON d1.doc_name = d2.doc_name AND d1.id < d2.id
+                WHERE d1.status != 'FAILED' AND d2.status != 'FAILED'
                 LIMIT 20
             """
             duplicates = mysql_client.fetch_all(query) or []
@@ -174,10 +174,9 @@ class InspectionAgent:
         try:
             # 查询可能低质量的片段（内容过短或过长）
             query = """
-                SELECT id, doc_id, content, LENGTH(content) as content_length
-                FROM knowledge_chunks
-                WHERE is_deleted = 0
-                  AND (LENGTH(content) < 50 OR LENGTH(content) > 5000)
+                SELECT id, doc_id, chunk_text as content, LENGTH(chunk_text) as content_length
+                FROM knowledge_chunk
+                WHERE (LENGTH(chunk_text) < 50 OR LENGTH(chunk_text) > 5000)
                 ORDER BY content_length ASC
                 LIMIT 20
             """
@@ -246,11 +245,11 @@ class InspectionAgent:
         try:
             # 查询30天以上未更新的文档
             query = """
-                SELECT id, title, updated_at, created_at
-                FROM knowledge_docs
-                WHERE is_deleted = 0
-                  AND updated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
-                ORDER BY updated_at ASC
+                SELECT id, doc_name as title, create_time as updated_at, create_time as created_at
+                FROM knowledge_doc
+                WHERE status = 'COMPLETED'
+                  AND create_time < DATE_SUB(NOW(), INTERVAL 30 DAY)
+                ORDER BY create_time ASC
                 LIMIT 20
             """
             stale_docs = mysql_client.fetch_all(query) or []
@@ -306,15 +305,13 @@ class InspectionAgent:
     def _check_unpopular_docs(self) -> Dict[str, Any]:
         """检测无人访问的文档"""
         try:
-            # 查询从创建至今没有被访问过的文档
+            # 查询创建超过7天且无人访问的文档（用创建时间近似）
             query = """
-                SELECT d.id, d.title, d.created_at,
-                       (SELECT COUNT(*) FROM doc_view_logs WHERE doc_id = d.id) as view_count
-                FROM knowledge_docs d
-                WHERE d.is_deleted = 0
-                  AND d.created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
-                HAVING view_count = 0
-                ORDER BY d.created_at ASC
+                SELECT d.id, d.doc_name as title, d.create_time as created_at, 0 as view_count
+                FROM knowledge_doc d
+                WHERE d.status = 'COMPLETED'
+                  AND d.create_time < DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ORDER BY d.create_time ASC
                 LIMIT 20
             """
             unpopular = mysql_client.fetch_all(query) or []

@@ -11,6 +11,7 @@ import KnowledgeManagement from './pages/admin/KnowledgeManagement';
 import QaLogManagement from './pages/admin/QaLogManagement';
 import Dashboard from './pages/admin/Dashboard';
 import AdminChat from './pages/admin/AdminChat';
+import KnowledgeInspection from './pages/admin/KnowledgeInspection';
 import ProductManagement from './pages/admin/ProductManagement';
 import ConversationManagement from './pages/admin/ConversationManagement';
 import OrderManagement from './pages/admin/OrderManagement';
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="conversations" element={<ConversationManagement />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="knowledge" element={<KnowledgeManagement />} />
+          <Route path="inspection" element={<KnowledgeInspection />} />
           <Route path="logs" element={<QaLogManagement />} />
           <Route path="chat" element={<AdminChat />} />
         </Route>

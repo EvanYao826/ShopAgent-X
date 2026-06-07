@@ -214,6 +214,16 @@ class IntentClassifier:
         from langchain_core.output_parsers import StrOutputParser
 
         # 构建意图识别的prompt
+        admin_hint = ""
+        if is_admin:
+            admin_hint = """
+【管理员模式 - 强制执行】
+当前用户是管理员，请严格遵守以下规则：
+- shopping（购物导购）和 cart（购物车操作）在此模式下被禁止！永远不要归类为 shopping 或 cart！
+- 所有涉及"推荐"、"商品"、"价格"、"购买"、"对比"、"哪个好"的问题，都应归类为 admin_operation
+- 管理员视角下，"推荐"=运营数据推荐，"商品"=商品统计管理，"对比"=数据对比分析
+- 除非是明确的问候/告别（chitchat）或纯技术概念问答（knowledge_qa），否则一律归类为 admin_operation
+"""
         intent_prompt = PromptTemplate.from_template(
             """
 你是一个意图识别系统。请分析用户输入，判断其意图类型。
@@ -221,7 +231,7 @@ class IntentClassifier:
 {context_section}
 用户输入：{input_text}
 是否管理员：{is_admin}
-
+{admin_hint}
 可选的意图类型：
 1. chitchat - 闲聊（问候、告别、日常聊天、情感表达、身份询问等）
 2. knowledge_qa - 知识问答（技术问题、概念解释、方法步骤等，不涉及具体商品对比）
@@ -235,7 +245,6 @@ class IntentClassifier:
 重要提示：
 - 如果对话上下文中用户刚刚查看了购物车，当前消息中提到"删除"、"移除"、"去掉"、"清空"等操作词，应分类为 cart
 - 如果用户提到"前N个"、"后N个"、"第N个"等位置引用，结合上下文判断是购物车操作还是知识问答
-- "删除前两个"、"去掉后面的"、"删掉第一个"这类表述，如果上下文涉及购物车，应分类为 cart
 
 请返回JSON格式：
 {{"intent": "意图类型", "confidence": 0.0-1.0, "reasoning": "判断理由"}}
@@ -257,7 +266,8 @@ class IntentClassifier:
             result_str = chain.invoke({
                 "input_text": input_text,
                 "is_admin": "是" if is_admin else "否",
-                "context_section": context_section
+                "context_section": context_section,
+                "admin_hint": admin_hint
             })
 
             # 解析JSON结果
@@ -322,8 +332,12 @@ class IntentClassifier:
 
         logger.debug(f"[IntentClassifier] Scores - chitchat:{chitchat_score}, knowledge:{knowledge_score}, admin:{admin_score}, inspection:{inspection_score}, shopping:{shopping_score}, cart:{cart_score}")
 
-        # 管理员模式：优先处理管理相关任务
+        # 管理员模式：优先处理管理相关任务，屏蔽购物路由
         if is_admin:
+            # 直接清零购物相关分数，防止管理员问题被误路由到商品导购
+            shopping_score = 0
+            cart_score = 0
+
             # 知识巡检优先级最高
             if inspection_score > 0:
                 return IntentResult(
@@ -345,6 +359,12 @@ class IntentClassifier:
                     confidence=min(0.9, 0.5 + admin_score * 0.1),
                     reasoning=f"管理员模式，命中{admin_score}个管理关键词"
                 )
+            # 管理员模式下无匹配关键词时，默认走管理助手
+            return IntentResult(
+                intent=IntentType.ADMIN_OPERATION,
+                confidence=0.7,
+                reasoning="管理员模式，默认路由到管理助手"
+            )
 
         # 购物车操作（优先级高于购物导购）
         if cart_score > 0 and cart_score >= shopping_score:

@@ -87,6 +87,7 @@ export default function AdminChat() {
 
   useEffect(() => {
     if (currentConversation) {
+      setMessages([]);  // 先清空旧消息，避免残留
       loadMessages(currentConversation.id);
     }
   }, [currentConversation]);
@@ -258,9 +259,27 @@ export default function AdminChat() {
   const loadConversations = async () => {
     try {
       const response = await adminChatAPI.getConversations(adminId);
-      setConversations(response.data.data || []);
+      const convs = response.data.data || [];
+      setConversations(convs);
+      // 没有选中对话时，自动选中最新并加载消息
+      if (convs.length > 0 && !currentConversation) {
+        setCurrentConversation(convs[0]);
+        setMessages([]);
+        loadMessagesDirectly(convs[0].id);
+      }
     } catch (err) {
       console.error('加载会话失败:', err);
+    }
+  };
+
+  const loadMessagesDirectly = async (conversationId) => {
+    try {
+      const response = await adminChatAPI.getMessages(conversationId);
+      const messages = response.data.data || [];
+      const sorted = [...messages].sort((a, b) => new Date(a.createTime) - new Date(b.createTime));
+      setMessages(sorted);
+    } catch (err) {
+      console.error('加载消息失败:', err);
     }
   };
 
@@ -283,7 +302,8 @@ export default function AdminChat() {
 
   const handleCreateConversation = async () => {
     try {
-      const response = await adminChatAPI.createConversation(adminId, '新对话');
+      const title = `对话 ${new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'})}`;
+      const response = await adminChatAPI.createConversation(adminId, title);
       setConversations([response.data.data, ...conversations]);
       setCurrentConversation(response.data.data);
     } catch (err) {
@@ -480,7 +500,11 @@ export default function AdminChat() {
             <div
               key={conv.id}
               className={`admin-conversation-item ${currentConversation?.id === conv.id ? 'active' : ''} ${conv.isPinned ? 'pinned' : ''}`}
-              onClick={() => setCurrentConversation(conv)}
+              onClick={() => {
+                setCurrentConversation(conv);
+                setMessages([]);
+                loadMessagesDirectly(conv.id);
+              }}
             >
               {editingId === conv.id ? (
                 <input

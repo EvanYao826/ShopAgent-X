@@ -1,0 +1,235 @@
+/* 知识巡检页面专用样式 */
+
+/* 统计网格 */
+.ki-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.ki-stat-item {
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s;
+}
+
+.ki-stat-item:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.ki-stat-value {
+  font-size: 42px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  color: #1890ff;
+  letter-spacing: -0.5px;
+}
+
+.ki-stat-label {
+  font-size: 15px;
+  color: #666;
+  font-weight: 500;
+}
+
+/* Tab 切换 */
+.tab-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 12px;
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.tab-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.tab-btn.active {
+  background: #1890ff;
+  color: white;
+}
+
+/* 聚类列表 */
+.cluster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cluster-item {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.cluster-item:hover {
+  border-color: #40a9ff;
+  box-shadow: 0 2px 8px rgba(64, 169, 255, 0.15);
+}
+
+.cluster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background-color: #fafafa;
+}
+
+.cluster-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cluster-topic {
+  font-weight: 600;
+  color: #333;
+  font-size: 15px;
+}
+
+.cluster-count {
+  font-size: 13px;
+  color: #999;
+  background-color: #fff;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+.cluster-arrow {
+  font-size: 12px;
+  color: #999;
+  transition: transform 0.3s;
+}
+
+.cluster-details {
+  padding: 16px;
+  background-color: #fff;
+  border-top: 1px solid #e8e8e8;
+}
+
+.cluster-summary, .cluster-keywords, .cluster-questions {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #666;
+}
+
+.cluster-questions ul {
+  margin: 8px 0 0 20px;
+  padding: 0;
+}
+
+.cluster-questions li {
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.more-questions {
+  color: #999 !important;
+  font-style: italic;
+}
+
+.keyword-tag {
+  display: inline-block;
+  background-color: #e6f7ff;
+  color: #1890ff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-right: 8px;
+  margin-top: 4px;
+}
+
+.ellipsis {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 问题分组 */
+.issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.issue-group {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.issue-group-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.issue-tag {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.issue-tag.duplicate {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
+
+.issue-count {
+  font-size: 13px;
+  color: #666;
+}
+
+.issue-similarity {
+  font-size: 13px;
+  color: #999;
+  margin-left: auto;
+}
+
+/* Badge 复用 AdminDashboard.css 基础，这里只加巡检特有颜色 */
+.status-badge.warning {
+  background: #fffbe6;
+  color: #faad14;
+}
+
+.status-badge.error {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
+
+.status-badge.purple {
+  background: #f9f0ff;
+  color: #722ed1;
+}
+
+.more-hint {
+  text-align: center;
+  padding: 12px;
+  color: #999;
+  font-size: 13px;
+}

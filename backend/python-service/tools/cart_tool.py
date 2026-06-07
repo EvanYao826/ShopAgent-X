@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Java 后端地址
-JAVA_API_URL = os.getenv("JAVA_API_URL", "http://localhost:8080")
+JAVA_API_URL = os.getenv("JAVA_API_URL", "http://localhost:8888")
 
 
 class CartTool(Tool):

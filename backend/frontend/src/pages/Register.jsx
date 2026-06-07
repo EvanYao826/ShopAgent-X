@@ -78,7 +78,7 @@ export default function Register() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h1 className="auth-title">AI 知识系统</h1>
+        <h1 className="auth-title">ShopAgent-X</h1>
         <h2 className="auth-subtitle">注册</h2>
 
         <form onSubmit={handleSubmit}>

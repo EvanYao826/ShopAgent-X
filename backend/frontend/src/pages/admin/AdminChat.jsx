@@ -66,9 +66,9 @@ export default function AdminChat() {
   const menuRef = useRef(null);
 
   useEffect(() => {
-    document.title = 'AI 知识系统-管理助手';
+    document.title = 'ShopAgent-X - 管理助手';
     return () => {
-      document.title = 'AI 知识系统';
+      document.title = 'ShopAgent-X';
     };
   }, []);
 

@@ -4,9 +4,13 @@ import { chatAPI, knowledgeAPI } from '../api';
 import './Chat.css';
 
 const TASK_TYPE_INFO = {
+  shopping: { icon: '🛒', label: '商品导购', color: '#f97316' },
   chitchat: { icon: '💬', label: '闲聊', color: '#10b981' },
   knowledge_qa: { icon: '📚', label: '知识问答', color: '#3b82f6' },
-  admin_copilot: { icon: '⚙️', label: '管理助手', color: '#8b5cf6' },
+  product_search: { icon: '🔎', label: '商品搜索', color: '#e11d48' },
+  product_compare: { icon: '⚖️', label: '商品对比', color: '#8b5cf6' },
+  cart: { icon: '🛍️', label: '购物车', color: '#06b6d4' },
+  admin_copilot: { icon: '⚙️', label: '管理助手', color: '#6366f1' },
   knowledge_inspection: { icon: '🔍', label: '知识巡检', color: '#f59e0b' },
   unknown: { icon: '🤖', label: 'AI助手', color: '#6b7280' }
 };
@@ -37,9 +41,9 @@ export default function Chat() {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    document.title = 'AI 知识系统-智能对话';
+    document.title = 'ShopAgent-X - 智能导购';
     return () => {
-      document.title = 'AI 知识系统';
+      document.title = 'ShopAgent-X';
     };
   }, []);
 
@@ -698,7 +702,7 @@ export default function Chat() {
         ) : (
           <div className="welcome-screen">
             <div className="welcome-avatar">🤖</div>
-            <h1>欢迎使用 AI 知识系统</h1>
+            <h1>欢迎使用 ShopAgent-X 智能导购</h1>
             <p>基于 RAG 技术，为您提供精准的企业知识问答服务</p>
             <button className="start-btn" onClick={handleCreateConversation}>
               开始新对话

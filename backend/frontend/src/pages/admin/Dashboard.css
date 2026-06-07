@@ -105,11 +105,14 @@
 }
 
 .text-truncate {
+  max-width: 180px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: block;
 }
+.dashboard-section table.data-table { table-layout: fixed; width: 100%; }
+.dashboard-section table.data-table th:first-child,
+.dashboard-section table.data-table td:first-child { width: 40%; }
 
 .empty-text {
   color: #999;
@@ -128,7 +131,7 @@
 }
 
 .warning-text {
-  color: #ff4d4f;
+  color: #333;
 }
 
 /* 新增：响应式布局 */

@@ -8,7 +8,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import KnowledgeManagement from './pages/admin/KnowledgeManagement';
-import QaLogManagement from './pages/admin/QaLogManagement';
+import AgentRunManagement from './pages/admin/AgentRunManagement';
 import Dashboard from './pages/admin/Dashboard';
 import AdminChat from './pages/admin/AdminChat';
 import KnowledgeInspection from './pages/admin/KnowledgeInspection';
@@ -50,7 +50,7 @@ export default function App() {
           <Route path="users" element={<UserManagement />} />
           <Route path="knowledge" element={<KnowledgeManagement />} />
           <Route path="inspection" element={<KnowledgeInspection />} />
-          <Route path="logs" element={<QaLogManagement />} />
+          <Route path="agent-runs" element={<AgentRunManagement />} />
           <Route path="chat" element={<AdminChat />} />
         </Route>
 

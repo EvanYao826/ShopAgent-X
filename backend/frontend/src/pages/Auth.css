@@ -105,27 +105,30 @@
 
 .auth-card {
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12);
+  padding: 44px 40px;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  position: relative;
+  z-index: 2;
 }
 
 .auth-title {
   text-align: center;
-  font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
+  font-size: 26px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
 }
 
 .auth-subtitle {
   text-align: center;
-  font-size: 20px;
-  font-weight: 500;
-  color: #666;
-  margin-bottom: 32px;
+  font-size: 15px;
+  font-weight: 400;
+  color: #8c8c8c;
+  margin-bottom: 36px;
 }
 
 .auth-btn {

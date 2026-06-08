@@ -52,7 +52,7 @@ export default function AgentRunManagement() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      let url = '/api/agent-run/list?pageNum=1&pageSize=10';
+      let url = '/api/admin/agent/runs?page=1&size=50';
       if (filters.userId) url += `&userId=${filters.userId}`;
       if (filters.status) url += `&status=${filters.status}`;
       if (filters.dateStart) url += `&startTime=${filters.dateStart}T00:00:00`;
@@ -72,7 +72,7 @@ export default function AgentRunManagement() {
       console.log('Response result:', result);
       
       if (result.code === 200) {
-        setData(result.data.records || []);
+        setData(result.data || []);
       } else {
         console.error('API returned error:', result.message);
       }
@@ -92,8 +92,8 @@ export default function AgentRunManagement() {
       };
       
       const [runResponse, stepsResponse] = await Promise.all([
-        fetch(`/api/agent-run/${runId}`, { headers }),
-        fetch(`/api/agent-run/${runId}/steps`, { headers })
+        fetch(`/api/admin/agent/runs/${runId}`, { headers }),
+        fetch(`/api/admin/agent/tool-calls?page=1&size=100`, { headers })
       ]);
       const runResult = await runResponse.json();
       const stepsResult = await stepsResponse.json();

@@ -310,17 +310,49 @@ class Orchestrator:
         if answer is None:
             answer = "抱歉，我无法生成回答。"
 
-        return self.policies.format_response(answer, sources, True, "knowledge_qa")
+        response = self.policies.format_response(answer, sources, True, "knowledge_qa")
+        # 附带步骤数据，供上层持久化
+        response["_steps"] = [
+            {
+                "step_type": s.step_type.value if hasattr(s.step_type, 'value') else str(s.step_type),
+                "step_name": s.step_name,
+                "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+                "input": str(s.input_data)[:500] if s.input_data else None,
+                "output": str(s.output_data)[:500] if s.output_data else None,
+                "error_message": s.error_message,
+                "duration_ms": s.duration_ms,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+            }
+            for s in state.steps
+        ]
+        return response
 
     def _build_error_response(self, state: AgentState) -> Dict[str, Any]:
         """构建错误响应"""
-        return {
+        response = {
             "answer": state.error_message or "服务暂时不可用，请稍后再试。",
             "sources": [],
             "has_sources": False,
             "error": True,
             "error_code": state.error_code
         }
+        # 附带步骤数据，供上层持久化
+        response["_steps"] = [
+            {
+                "step_type": s.step_type.value if hasattr(s.step_type, 'value') else str(s.step_type),
+                "step_name": s.step_name,
+                "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+                "input": str(s.input_data)[:500] if s.input_data else None,
+                "output": str(s.output_data)[:500] if s.output_data else None,
+                "error_message": s.error_message,
+                "duration_ms": s.duration_ms,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+            }
+            for s in state.steps
+        ]
+        return response
 
     def get_state(self, run_id: str) -> Optional[AgentState]:
         """获取Agent状态（如果实现了状态存储）"""

@@ -19,7 +19,7 @@ export default function OrderManagement() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const params = { page, size: 20, ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v)) };
+      const params = { page, size: 10, ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v)) };
       const res = await orderManagementAPI.list(params);
       setData(res.data.records || []);
       setTotal(res.data.total || 0);
@@ -40,7 +40,13 @@ export default function OrderManagement() {
     } catch (err) { alert(err.message); }
   };
 
-  const pages = Math.ceil(total / 20);
+  const pages = Math.ceil(total / 10);
+  const [jumpPage, setJumpPage] = useState('');
+
+  const handleJump = () => {
+    const num = parseInt(jumpPage, 10);
+    if (num >= 1 && num <= pages) { setPage(num); setJumpPage(''); }
+  };
 
   return (
     <div className="table-page">
@@ -102,6 +108,10 @@ export default function OrderManagement() {
           <button disabled={page<=1} onClick={()=>setPage(page-1)}>上一页</button>
           <span>第{page}/{pages}页(共{total}条)</span>
           <button disabled={page>=pages} onClick={()=>setPage(page+1)}>下一页</button>
+          <span className="jump-box">
+            跳至<input type="number" min={1} max={pages} value={jumpPage} onChange={e => setJumpPage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleJump()} placeholder="页码" />页
+            <button onClick={handleJump}>GO</button>
+          </span>
         </div>
       )}
     </div>

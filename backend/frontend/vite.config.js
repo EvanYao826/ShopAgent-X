@@ -9,6 +9,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8888',
         changeOrigin: true
+      },
+      '/product-images': {
+        target: 'http://localhost:8888',
+        changeOrigin: true
       }
     }
   }

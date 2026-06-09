@@ -6,11 +6,9 @@ import Knowledge from './pages/Knowledge';
 import Header from './components/Header';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import UserManagement from './pages/admin/UserManagement';
 import KnowledgeManagement from './pages/admin/KnowledgeManagement';
 import AgentRunManagement from './pages/admin/AgentRunManagement';
 import Dashboard from './pages/admin/Dashboard';
-import AdminChat from './pages/admin/AdminChat';
 import KnowledgeInspection from './pages/admin/KnowledgeInspection';
 import ProductManagement from './pages/admin/ProductManagement';
 import ConversationManagement from './pages/admin/ConversationManagement';
@@ -47,11 +45,9 @@ export default function App() {
           <Route path="products" element={<ProductManagement />} />
           <Route path="orders" element={<OrderManagement />} />
           <Route path="conversations" element={<ConversationManagement />} />
-          <Route path="users" element={<UserManagement />} />
           <Route path="knowledge" element={<KnowledgeManagement />} />
           <Route path="inspection" element={<KnowledgeInspection />} />
           <Route path="agent-runs" element={<AgentRunManagement />} />
-          <Route path="chat" element={<AdminChat />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/chat" replace />} />

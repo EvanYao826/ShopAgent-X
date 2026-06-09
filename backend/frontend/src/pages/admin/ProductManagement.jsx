@@ -4,6 +4,24 @@ import './ProductManagement.css';
 
 const STATUS_MAP = { 0: '已下架', 1: '在售' };
 
+// 构建商品图片URL，处理中文路径编码
+const buildImageUrl = (imageUrl) => {
+  if (!imageUrl) return null;
+  if (imageUrl.startsWith('http')) return imageUrl;
+  const relPath = imageUrl.startsWith('/product-images/') ? imageUrl.slice(16) : imageUrl;
+  const encoded = relPath.split('/').map(seg => {
+    try { return encodeURIComponent(seg); } catch { return seg; }
+  }).join('/');
+  return `/product-images/${encoded}`;
+};
+
+// 提取简洁商品名称（去掉营销描述后缀）
+const getShortName = (title) => {
+  if (!title) return '-';
+  // 截取前15个字符作为简洁名称
+  return title.length > 15 ? title.slice(0, 15) + '...' : title;
+};
+
 export default function ProductManagement() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +41,7 @@ export default function ProductManagement() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const params = { page, size: 20, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '')) };
+      const params = { page, size: 10, ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '')) };
       const res = await productManagementAPI.list(params);
       setProducts(res.data.records || []);
       setTotal(res.data.total || 0);
@@ -55,7 +73,13 @@ export default function ProductManagement() {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const pages = Math.ceil(total / 20);
+  const pages = Math.ceil(total / 10);
+  const [jumpPage, setJumpPage] = useState('');
+
+  const handleJump = () => {
+    const num = parseInt(jumpPage, 10);
+    if (num >= 1 && num <= pages) { setPage(num); setJumpPage(''); }
+  };
 
   return (
     <div className="product-management">
@@ -93,18 +117,19 @@ export default function ProductManagement() {
       <table className="data-table">
         <thead>
           <tr>
-            <th>ID</th><th>商品名称</th><th>品牌</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>状态</th><th>操作</th>
+            <th>ID</th><th>图片</th><th>商品名称</th><th>品牌</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>状态</th><th>操作</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
-            <tr><td colSpan="9" className="loading-text">加载中...</td></tr>
+            <tr><td colSpan="10" className="loading-text">加载中...</td></tr>
           ) : products.length === 0 ? (
-            <tr><td colSpan="9" className="empty-text">暂无商品</td></tr>
+            <tr><td colSpan="10" className="empty-text">暂无商品</td></tr>
           ) : products.map(p => (
             <tr key={p.id}>
               <td>{p.id}</td>
-              <td className="text-truncate" title={p.title}>{p.title}</td>
+              <td>{buildImageUrl(p.imageUrl) ? <img src={buildImageUrl(p.imageUrl)} alt={p.title} className="product-thumb" onError={e => { e.target.style.display='none'; }} /> : <span className="no-image">无图</span>}</td>
+              <td className="text-truncate" title={p.title}>{getShortName(p.title)}</td>
               <td>{p.brand || '-'}</td>
               <td>¥{p.basePrice || 0}</td>
               <td>{p.stock ?? '-'}</td>
@@ -126,6 +151,10 @@ export default function ProductManagement() {
           <button disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button>
           <span>第 {page} / {pages} 页 (共 {total} 条)</span>
           <button disabled={page >= pages} onClick={() => setPage(page + 1)}>下一页</button>
+          <span className="jump-box">
+            跳至<input type="number" min={1} max={pages} value={jumpPage} onChange={e => setJumpPage(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleJump()} placeholder="页码" />页
+            <button onClick={handleJump}>GO</button>
+          </span>
         </div>
       )}
     </div>

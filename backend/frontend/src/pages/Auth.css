@@ -2,29 +2,29 @@
 
 .auth-container {
   /* 覆盖全局深暖色变量，登录页保持浅色 */
-  --color-text-primary: #3D2C1E;
-  --color-text-secondary: #7A6B5E;
-  --color-text-muted: #A89888;
-  --color-primary: #FF6B35;
-  --color-primary-hover: #E55A25;
-  --color-primary-pale: #FFF0EB;
-  --color-bg-surface: #FFFFFF;
-  --color-border: #E8D8C8;
-  --text-primary: #3D2C1E;
-  --text-secondary: #7A6B5E;
-  --text-hint: #A89888;
-  --primary: #FF6B35;
-  --primary-light: #FF8F62;
-  --primary-pale: #FFF0EB;
-  --surface: #FFFFFF;
-  --border: #E8D8C8;
-  --error: #EF4444;
+  --color-text-primary: #1A0F08;
+  --color-text-secondary: #5C4A3A;
+  --color-text-muted: #8A7565;
+  --color-primary: #E85A20;
+  --color-primary-hover: #D04A15;
+  --color-primary-pale: #FDE8E0;
+  --color-bg-surface: #FFF9F5;
+  --color-border: #D4BFAE;
+  --text-primary: #1A0F08;
+  --text-secondary: #5C4A3A;
+  --text-hint: #8A7565;
+  --primary: #E85A20;
+  --primary-light: #FF7A45;
+  --primary-pale: #FDE8E0;
+  --surface: #FFF9F5;
+  --border: #D4BFAE;
+  --error: #DC2626;
 
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, #FFF8F3 0%, #FFF0E5 40%, #FFE8D6 70%, #FFDCC8 100%);
+  background: linear-gradient(135deg, #F5E6D8 0%, #EDCFBA 30%, #E8BFA5 60%, #DFAD8E 100%);
   position: relative;
   overflow: hidden;
   padding: 20px;
@@ -44,7 +44,7 @@
 .float-icon {
   position: absolute;
   font-size: 52px;
-  opacity: 0.3;
+  opacity: 0.45;
   animation: floatDrift 12s ease-in-out infinite;
   filter: drop-shadow(0 2px 6px rgba(0,0,0,0.06));
 }
@@ -81,7 +81,7 @@
 .auth-brand-icon {
   font-size: 40px;
   line-height: 1;
-  filter: drop-shadow(0 2px 8px rgba(255, 107, 53, 0.25));
+  filter: drop-shadow(0 2px 8px rgba(232, 90, 32, 0.3));
 }
 
 .auth-title {
@@ -103,12 +103,12 @@
 
 /* ─── 卡片 ─── */
 .auth-card {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 252, 248, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(212, 191, 174, 0.5);
   border-radius: 20px;
-  box-shadow: 0 8px 40px rgba(255, 107, 53, 0.08), 0 2px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 8px 40px rgba(180, 120, 70, 0.15), 0 2px 12px rgba(0, 0, 0, 0.06);
   padding: 44px 40px;
   width: 100%;
   max-width: 400px;
@@ -161,7 +161,7 @@
 .auth-card .form-group input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+  box-shadow: 0 0 0 3px rgba(232, 90, 32, 0.15);
 }
 
 .auth-card .form-group input::placeholder {
@@ -180,13 +180,13 @@
   color: #fff;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(255, 107, 53, 0.3);
+  box-shadow: 0 4px 16px rgba(232, 90, 32, 0.35);
   transition: all 0.2s;
 }
 
 .auth-btn:hover {
   background-color: var(--primary-light);
-  box-shadow: 0 6px 24px rgba(255, 107, 53, 0.4);
+  box-shadow: 0 6px 24px rgba(232, 90, 32, 0.45);
   transform: translateY(-1px);
 }
 

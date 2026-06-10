@@ -62,9 +62,9 @@ public class AdminOrderController {
         stats.put("todayOrders", orderMapper.selectCount(new QueryWrapper<Order>()
             .ge("create_time", java.time.LocalDate.now().atStartOfDay())));
 
-        // 总销售额 (已支付+已完成+已发货)
+        // 总销售额（仅统计已完成订单）
         stats.put("totalRevenue", orderMapper.selectList(
-            new QueryWrapper<Order>().in("status", 1, 2, 3))
+            new QueryWrapper<Order>().eq("status", 3))
             .stream().mapToDouble(o -> o.getPayAmount() != null ? o.getPayAmount().doubleValue() : 0).sum());
 
         return Result.success(stats);

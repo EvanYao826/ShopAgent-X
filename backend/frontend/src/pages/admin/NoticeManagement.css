@@ -1,29 +1,54 @@
+/* ====== 公告管理样式 ====== */
+
 .notice-container {
-  padding: 20px;
+  padding: var(--space-5);
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid var(--color-border);
 }
 
 .header-actions {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .notice-table {
   width: 100%;
   border-collapse: collapse;
-  background: white;
-  border-radius: 8px;
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid var(--color-border-light);
+  font-size: 13px;
 }
 
-.notice-table th, .notice-table td {
-  padding: 12px 15px;
+.notice-table th,
+.notice-table td {
+  padding: 10px 12px;
   text-align: left;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 .notice-table th {
-  background: #fafafa;
-  font-weight: 600;
+  background: var(--color-bg-surface-alt);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.notice-table td {
+  color: var(--color-text-primary);
+}
+
+.notice-table tr:hover td {
+  background: var(--color-bg-hover);
+}
+
+.notice-table tr:last-child td {
+  border-bottom: none;
 }
 
 .content-cell {
@@ -35,87 +60,119 @@
 
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: var(--space-4);
 }
 
 .modal-content {
-  background: white;
-  padding: 25px;
-  border-radius: 8px;
+  background: var(--color-bg-surface);
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
   width: 500px;
   max-width: 90%;
+  box-shadow: var(--shadow-lg);
 }
 
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: var(--space-4);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: var(--space-2);
   font-weight: 500;
+  font-size: 13px;
+  color: var(--color-text-primary);
 }
 
 .form-group input[type="text"],
 .form-group textarea {
   width: 100%;
-  padding: 8px;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-input);
+  transition: border-color var(--transition-fast);
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }
 
 .form-group.checkbox label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   cursor: pointer;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .btn {
   padding: 8px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
 }
 
 .btn-primary {
-  background: #1890ff;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-hover);
 }
 
 .btn-secondary {
-  background: #f0f0f0;
-  color: #333;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .btn-danger {
-  background: #ff4d4f;
-  color: white;
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+}
+
+.btn-danger:hover {
+  background: #dc2626;
 }
 
 .btn-link {
   background: none;
-  color: #1890ff;
+  color: var(--color-primary);
   padding: 4px 8px;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
 }
 
 .btn-sm {
   font-size: 12px;
-  padding: 4px 8px;
+  padding: 4px 10px;
 }

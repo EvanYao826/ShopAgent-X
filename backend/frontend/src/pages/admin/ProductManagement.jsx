@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { productManagementAPI } from '../../api/admin';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import './ProductManagement.css';
 
 const STATUS_MAP = { 0: '已下架', 1: '在售' };
@@ -30,6 +31,7 @@ export default function ProductManagement() {
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState(null);
   const [brands, setBrands] = useState([]);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, productId: null, currentStatus: null });
 
   // 筛选条件
   const [filters, setFilters] = useState({
@@ -60,13 +62,24 @@ export default function ProductManagement() {
 
   const handleSearch = () => { setPage(1); fetchProducts(); };
 
-  const handleStatusToggle = async (id, currentStatus) => {
+  const handleReset = () => {
+    setFilters({ keyword: '', categoryId: '', brand: '', status: '', minPrice: '', maxPrice: '', sortBy: 'id', sortOrder: 'desc' });
+    setPage(1);
+  };
+
+  const handleStatusToggle = (id, currentStatus) => {
+    setConfirmDialog({ open: true, productId: id, currentStatus });
+  };
+
+  const confirmStatusToggle = async () => {
+    const { productId, currentStatus } = confirmDialog;
     const newStatus = currentStatus === 1 ? 0 : 1;
     try {
-      await productManagementAPI.updateStatus(id, newStatus);
+      await productManagementAPI.updateStatus(productId, newStatus);
       fetchProducts();
       fetchStats();
     } catch (err) { alert(err.message); }
+    setConfirmDialog({ open: false, productId: null, currentStatus: null });
   };
 
   const handleFilterChange = (key, value) => {
@@ -109,7 +122,8 @@ export default function ProductManagement() {
         <input placeholder="最低价" type="number" value={filters.minPrice} onChange={e => handleFilterChange('minPrice', e.target.value)} style={{width:80}} />
         <span>-</span>
         <input placeholder="最高价" type="number" value={filters.maxPrice} onChange={e => handleFilterChange('maxPrice', e.target.value)} style={{width:80}} />
-        <button onClick={handleSearch}>搜索</button>
+        <button className="btn btn-primary" onClick={handleSearch}>搜索</button>
+        <button className="btn btn-ghost" onClick={handleReset}>重置</button>
       </div>
 
       {error && <div className="error-msg">{error}</div>}
@@ -157,6 +171,16 @@ export default function ProductManagement() {
           </span>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.currentStatus === 1 ? '确认下架' : '确认上架'}
+        message={confirmDialog.currentStatus === 1 ? '确定要下架此商品吗？下架后用户将无法看到该商品。' : '确定要上架此商品吗？上架后用户将可以看到该商品。'}
+        confirmText={confirmDialog.currentStatus === 1 ? '下架' : '上架'}
+        danger={confirmDialog.currentStatus === 1}
+        onConfirm={confirmStatusToggle}
+        onCancel={() => setConfirmDialog({ open: false, productId: null, currentStatus: null })}
+      />
     </div>
   );
 }

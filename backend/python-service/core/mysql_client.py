@@ -1,6 +1,7 @@
 import os
 import json
 import uuid
+from datetime import datetime
 import mysql.connector
 from mysql.connector import Error, pooling
 from typing import List, Dict, Any
@@ -235,6 +236,72 @@ class MySQLClient:
             logger.info(f"Agent run recorded: run_id={run_id}, intent={intent}, status={status}")
         except Error as e:
             logger.error(f"Error inserting agent run: {e}")
+            if self.connection:
+                self.connection.rollback()
+
+    def insert_agent_step(self, run_id: str, step_type: str, step_name: str,
+                          status: str, input_data: str = None, output_data: str = None,
+                          error_message: str = None, duration_ms: float = None,
+                          start_time: str = None, end_time: str = None):
+        """插入 Agent 步骤记录"""
+        if not self.connection or not self.connection.is_connected():
+            self.connect()
+
+        try:
+            self._ensure_clean_connection()
+            cursor = self.connection.cursor()
+            record_id = str(uuid.uuid4())
+            sql = """
+                INSERT INTO agent_step
+                (id, run_id, step_type, step_name, status, input, output,
+                 error_message, duration_ms, start_time, end_time, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute(sql, (
+                record_id, run_id, step_type, step_name, status,
+                input_data, output_data, error_message, duration_ms,
+                start_time or now, end_time or now, now
+            ))
+            self.connection.commit()
+            cursor.close()
+            logger.debug(f"Agent step recorded: run_id={run_id}, step={step_name}, status={status}")
+        except Error as e:
+            logger.error(f"Error inserting agent step: {e}")
+            if self.connection:
+                self.connection.rollback()
+
+    def insert_recommendation_log(self, user_id: str, session_id: str,
+                                   query: str, intent: str,
+                                   recommended_product_ids: list,
+                                   recommend_reason: str = None):
+        """插入推荐日志记录"""
+        if not self.connection or not self.connection.is_connected():
+            self.connect()
+
+        try:
+            self._ensure_clean_connection()
+            cursor = self.connection.cursor()
+            sql = """
+                INSERT INTO recommendation_log
+                (user_id, session_id, query, intent, recommended_product_ids,
+                 recommend_reason, create_time)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            """
+            import json as _json
+            cursor.execute(sql, (
+                user_id or None,
+                session_id or None,
+                query,
+                intent,
+                _json.dumps(recommended_product_ids, ensure_ascii=False) if recommended_product_ids else None,
+                recommend_reason
+            ))
+            self.connection.commit()
+            cursor.close()
+            logger.info(f"Recommendation log recorded: user_id={user_id}, products={recommended_product_ids}")
+        except Error as e:
+            logger.error(f"Error inserting recommendation log: {e}")
             if self.connection:
                 self.connection.rollback()
 

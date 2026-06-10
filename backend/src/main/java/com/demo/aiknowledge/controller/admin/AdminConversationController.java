@@ -34,7 +34,30 @@ public class AdminConversationController {
         if (userId != null) qw.eq("user_id", userId);
         if (keyword != null && !keyword.isEmpty()) qw.like("title", keyword);
         qw.orderByDesc("update_time");
-        return Result.success(conversationMapper.selectPage(new Page<>(page, size), qw));
+        IPage<Conversation> result = conversationMapper.selectPage(new Page<>(page, size), qw);
+
+        // 批量查询每个对话的消息数
+        if (result.getRecords() != null && !result.getRecords().isEmpty()) {
+            List<Long> convIds = result.getRecords().stream()
+                    .map(Conversation::getId).collect(java.util.stream.Collectors.toList());
+            QueryWrapper<Message> mqw = new QueryWrapper<>();
+            mqw.select("conversation_id", "count(*) as cnt")
+                    .in("conversation_id", convIds)
+                    .in("role", "user", "assistant")
+                    .groupBy("conversation_id");
+            java.util.Map<Long, Long> countMap = new java.util.HashMap<>();
+            messageMapper.selectMaps(mqw).forEach(m -> {
+                Object convId = m.get("conversation_id");
+                Object cnt = m.get("cnt");
+                if (convId != null && cnt != null) {
+                    countMap.put(Long.valueOf(convId.toString()), ((Number) cnt).longValue());
+                }
+            });
+            result.getRecords().forEach(c ->
+                    c.setMessageCount(countMap.getOrDefault(c.getId(), 0L).intValue()));
+        }
+
+        return Result.success(result);
     }
 
     @GetMapping("/{id}/messages")

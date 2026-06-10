@@ -51,10 +51,10 @@ export default function Dashboard() {
         name: getIntentLabel(k), value: v
       }));
       pie.setOption({
-        title: { text: '意图分布', left: 'center', top: 0, textStyle: { fontSize: 15, fontWeight: 600, color: '#1a1a2e' } },
+        title: { text: '意图分布', left: 'center', top: 0, textStyle: { fontSize: 15, fontWeight: 600, color: '#2D2018' } },
         tooltip: { trigger: 'item', formatter: '{b}: {c} 次 ({d}%)', backgroundColor: 'rgba(0,0,0,0.75)', borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 13 } },
-        legend: { bottom: 0, left: 'center', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11, color: '#666' } },
-        color: ['#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#eb2f96', '#13c2c2', '#f59e0b', '#2f54eb', '#8c8c8c'],
+        legend: { bottom: 0, left: 'center', itemWidth: 10, itemHeight: 10, textStyle: { fontSize: 11, color: '#6B5D52' } },
+        color: ['#FF6B35', '#00B894', '#FDCB6E', '#E17055', '#722ed1', '#eb2f96', '#74B9FF', '#F0A500', '#FF8F62', '#BDB0A5'],
         series: [{
           name: '意图', type: 'pie', radius: ['45%', '72%'], center: ['50%', '46%'],
           avoidLabelOverlap: false,
@@ -74,27 +74,27 @@ export default function Dashboard() {
       const dates = trends.map(i => i.date?.slice(5) || i.date); // MM-DD
       const counts = trends.map(i => i.count);
       line.setOption({
-        title: { text: '近7日对话趋势', left: 'center', top: 0, textStyle: { fontSize: 15, fontWeight: 600, color: '#1a1a2e' } },
+        title: { text: '近7日对话趋势', left: 'center', top: 0, textStyle: { fontSize: 15, fontWeight: 600, color: '#2D2018' } },
         tooltip: { trigger: 'axis', backgroundColor: 'rgba(0,0,0,0.75)', borderColor: 'transparent', textStyle: { color: '#fff', fontSize: 13 } },
         grid: { left: '3%', right: '6%', top: '40px', bottom: '8%', containLabel: true },
         xAxis: {
           type: 'category', boundaryGap: false,
           data: dates.length > 0 ? dates : ['暂无'],
-          axisLine: { lineStyle: { color: '#e8e8e8' } },
-          axisLabel: { color: '#8c8c8c', fontSize: 11 }
+          axisLine: { lineStyle: { color: '#F0D8C8' } },
+          axisLabel: { color: '#6B5D52', fontSize: 11 }
         },
         yAxis: {
           type: 'value', minInterval: 1,
-          splitLine: { lineStyle: { color: '#f5f5f5', type: 'dashed' } },
-          axisLabel: { color: '#8c8c8c', fontSize: 11 }
+          splitLine: { lineStyle: { color: '#F8E8DD', type: 'dashed' } },
+          axisLabel: { color: '#6B5D52', fontSize: 11 }
         },
         series: [{
           name: '对话数', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
-          lineStyle: { color: '#1890ff', width: 3 },
-          itemStyle: { color: '#1890ff', borderColor: '#fff', borderWidth: 2 },
+          lineStyle: { color: '#FF6B35', width: 3 },
+          itemStyle: { color: '#FF6B35', borderColor: '#fff', borderWidth: 2 },
           areaStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1, [
-            { offset: 0, color: 'rgba(24,144,255,0.35)' },
-            { offset: 1, color: 'rgba(24,144,255,0.02)' }
+            { offset: 0, color: 'rgba(255,107,53,0.35)' },
+            { offset: 1, color: 'rgba(255,107,53,0.02)' }
           ])},
           data: dates.length > 0 ? counts : [0]
         }]
@@ -108,13 +108,13 @@ export default function Dashboard() {
     return m[intent] || intent;
   };
   const getIntentColor = (intent) => {
-    const m = { shopping: '#1890ff', chitchat: '#52c41a', knowledge_qa: '#faad14', product_search: '#13c2c2', product_compare: '#722ed1', cart: '#eb2f96', admin_copilot: '#8b5cf6', knowledge_inspection: '#f59e0b', reasoning: '#2f54eb', unknown: '#8c8c8c' };
+    const m = { shopping: '#FF6B35', chitchat: '#00B894', knowledge_qa: '#FDCB6E', product_search: '#74B9FF', product_compare: '#722ed1', cart: '#eb2f96', admin_copilot: '#8b5cf6', knowledge_inspection: '#F0A500', reasoning: '#FF8F62', unknown: '#BDB0A5' };
     return m[intent] || '#8c8c8c';
   };
 
-  if (loading) return <div className="loading" style={{textAlign:'center',padding:60,color:'#999'}}>加载中...</div>;
-  if (error) return <div className="error" style={{textAlign:'center',padding:60,color:'#ff4d4f'}}>{error}</div>;
-  if (!stats) return <div className="error" style={{textAlign:'center',padding:60,color:'#999'}}>暂无数据</div>;
+  if (loading) return <div className="loading" style={{textAlign:'center',padding:60,color:'#A09080'}}>加载中...</div>;
+  if (error) return <div className="error" style={{textAlign:'center',padding:60,color:'#E87730'}}>{error}</div>;
+  if (!stats) return <div className="error" style={{textAlign:'center',padding:60,color:'#A09080'}}>暂无数据</div>;
 
   return (
     <div className="dashboard-container">
@@ -134,12 +134,12 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-icon">👆</div>
-          <div className="stat-value">{(stats.clickRate || 0).toFixed(1)}<span style={{fontSize:18,color:'#8c8c8c'}}>%</span></div>
+          <div className="stat-value">{(stats.clickRate || 0).toFixed(1)}<span style={{fontSize:18,color:'#BDB0A5'}}>%</span></div>
           <div className="stat-label">推荐点击率</div>
         </div>
         <div className="stat-card">
           <div className="stat-icon">😊</div>
-          <div className="stat-value">{(stats.satisfactionRate || 0).toFixed(1)}<span style={{fontSize:18,color:'#8c8c8c'}}>%</span></div>
+          <div className="stat-value">{(stats.satisfactionRate || 0).toFixed(1)}<span style={{fontSize:18,color:'#BDB0A5'}}>%</span></div>
           <div className="stat-label">用户满意度</div>
         </div>
       </div>
@@ -165,8 +165,8 @@ export default function Dashboard() {
                       <span className="text-truncate" title={p.title}>{p.title}</span>
                     </span>
                   </td>
-                  <td style={{color:'#666'}}>{p.brand || '-'}</td>
-                  <td style={{color:'#ff4d4f',fontWeight:600}}>¥{p.base_price || 0}</td>
+                  <td style={{color:'#6B5D52'}}>{p.brand || '-'}</td>
+                  <td style={{color:'#D06828',fontWeight:600}}>¥{p.base_price || 0}</td>
                   <td><span className="sales-count">{p.sales_count || 0}</span></td>
                   <td><span className="rating-stars">{'★'.repeat(Math.round(p.rating || 0))}{'☆'.repeat(5 - Math.round(p.rating || 0))}</span></td>
                 </tr>
@@ -203,8 +203,8 @@ export default function Dashboard() {
             <tbody>
               {stats.unansweredQuestions?.length > 0 ? stats.unansweredQuestions.map((q, i) => (
                 <tr key={i}>
-                  <td className="text-truncate" title={q.question} style={{color:'#333'}}>{q.question}</td>
-                  <td><span style={{display:'inline-block',background:'#fff1f0',color:'#ff4d4f',padding:'2px 10px',borderRadius:10,fontSize:12,fontWeight:600}}>{q.count} 次</span></td>
+                  <td className="text-truncate" title={q.question} style={{color:'#2D2018'}}>{q.question}</td>
+                  <td><span style={{display:'inline-block',background:'rgba(232,119,48,0.1)',color:'#D06828',padding:'2px 10px',borderRadius:10,fontSize:12,fontWeight:600}}>{q.count} 次</span></td>
                 </tr>
               )) : <tr><td colSpan={2} className="empty-text">🎉 暂无未命中问题</td></tr>}
             </tbody>

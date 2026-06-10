@@ -6,19 +6,17 @@ import Knowledge from './pages/Knowledge';
 import Header from './components/Header';
 import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
-import UserManagement from './pages/admin/UserManagement';
 import KnowledgeManagement from './pages/admin/KnowledgeManagement';
-import QaLogManagement from './pages/admin/QaLogManagement';
-import Dashboard from './pages/admin/Dashboard';
 import AgentRunManagement from './pages/admin/AgentRunManagement';
+import Dashboard from './pages/admin/Dashboard';
 import KnowledgeInspection from './pages/admin/KnowledgeInspection';
-import Reports from './pages/admin/Reports';
-import AdminChat from './pages/admin/AdminChat';
+import ProductManagement from './pages/admin/ProductManagement';
+import ConversationManagement from './pages/admin/ConversationManagement';
+import OrderManagement from './pages/admin/OrderManagement';
 
 const Layout = () => {
   const location = useLocation();
   const showHeader = !['/login', '/register'].includes(location.pathname) && !location.pathname.startsWith('/admin');
-
   return (
     <>
       {showHeader && <Header />}
@@ -44,13 +42,12 @@ export default function App() {
         <Route path="/admin" element={<AdminDashboard />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="users" element={<UserManagement />} />
+          <Route path="products" element={<ProductManagement />} />
+          <Route path="orders" element={<OrderManagement />} />
+          <Route path="conversations" element={<ConversationManagement />} />
           <Route path="knowledge" element={<KnowledgeManagement />} />
-          <Route path="logs" element={<QaLogManagement />} />
-          <Route path="agent-runs" element={<AgentRunManagement />} />
           <Route path="inspection" element={<KnowledgeInspection />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="chat" element={<AdminChat />} />
+          <Route path="agent-runs" element={<AgentRunManagement />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/chat" replace />} />

@@ -31,10 +31,7 @@ export default function AdminLogin() {
       if (response.data.admin && response.data.admin.id) {
         localStorage.setItem('adminId', response.data.admin.id);
       }
-      // 使用replace选项，避免登录页面留在历史堆栈中
-      navigate('/admin', { replace: true }); // 修正跳转路径
-      
-      // 替换整个历史记录，使后退按钮不可用
+      navigate('/admin', { replace: true });
       setTimeout(() => {
         window.history.replaceState(null, null, window.location.href);
       }, 100);
@@ -47,21 +44,27 @@ export default function AdminLogin() {
 
   return (
     <div className="auth-container">
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle-line"></div>
-      <div className="particle-line"></div>
-      <div className="particle-line"></div>
-      <div className="particle-line"></div>
+      {/* 两侧漂浮商品图标 */}
+      <div className="auth-float-icons">
+        <span className="float-icon">👜</span>
+        <span className="float-icon">👟</span>
+        <span className="float-icon">💄</span>
+        <span className="float-icon">📱</span>
+        <span className="float-icon">🧴</span>
+        <span className="float-icon">👗</span>
+        <span className="float-icon">🎧</span>
+        <span className="float-icon">⌚</span>
+        <span className="float-icon">🧣</span>
+        <span className="float-icon">☕</span>
+      </div>
+
       <div className="auth-card">
-        <h1 className="auth-title">AI 知识管理系统</h1>
-        <h2 className="auth-subtitle">管理员登录</h2>
+        {/* 品牌区域：图标 + 标题水平对齐 */}
+        <div className="auth-brand">
+          <span className="auth-brand-icon">🛒</span>
+          <h1 className="auth-title">ShopAgent-X</h1>
+        </div>
+        <p className="auth-subtitle">AI 智能导购运营后台</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -90,15 +93,13 @@ export default function AdminLogin() {
 
           {error && <div className="error">{error}</div>}
 
-          <button type="submit" className="btn btn-primary auth-btn" disabled={loading}>
+          <button type="submit" className="auth-btn" disabled={loading}>
             {loading ? '登录中...' : '登录'}
           </button>
         </form>
 
         <div className="auth-footer">
-          <a href="/login" style={{ textDecoration: 'none', color: '#666' }}>
-            返回普通用户登录
-          </a>
+          <a href="/login">返回普通用户登录</a>
         </div>
       </div>
     </div>

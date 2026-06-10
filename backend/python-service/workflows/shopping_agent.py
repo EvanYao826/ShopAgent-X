@@ -13,7 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 class ShoppingAgent(BaseAgent):
-    """导购 Agent - 商品推荐、对比、搜索"""
+    """导购 Agent —— ShopAgent-X 的核心推荐引擎。
+
+    职责：
+    - 商品推荐：接收用户需求，通过 RAG 链路检索匹配商品并生成推荐话术
+    - 购物车操作：对话式加购/删除/修改/查看，维护会话级购物车状态
+    - 商品对比：支持"A和B哪个好"等多商品对比分析
+    - 反选排除：支持"不要XX品牌/成分"等否定语义过滤
+    - 用户画像感知：根据用户性别/肤质/偏好标签个性化推荐
+
+    RAG 链路：向量检索(FAISS) → MySQL 商品搜索(四级流水线) → LLM 生成推荐
+    状态管理：_recent_products(推荐缓存) + _cart_cache(购物车缓存) + _pending_cart_actions(待确认操作)
+    """
 
     # 缓存每个会话最近推荐的商品，供购物车操作时使用
     _recent_products: Dict[str, List[Dict]] = {}
@@ -137,7 +148,32 @@ class ShoppingAgent(BaseAgent):
     def recommend(self, question: str, conversation_id: Optional[str] = None,
                   user_id: Optional[str] = None, context: str = "",
                   user_profile: str = "", **kwargs) -> Dict[str, Any]:
-        """处理导购请求：检索商品 → 生成推荐话术 + 商品卡片"""
+        """处理导购请求：完整的 RAG 检索增强生成链路。
+
+        RAG 链路流程（7 步）：
+        1. 意图检测 → 识别是否为多商品对比请求
+        2. 会话记忆读取 → 获取对话历史，理解上下文（如"那个"、"它"等指代）
+        3. 向量检索 → 用 FAISS 检索相关商品知识文档（k=8, 阈值 0.6）
+        4. MySQL 商品搜索 → 四级搜索流水线：
+           a) 排除词提取（LLM 识别"不要/除了"否定语义）
+           b) 关键词提取（LLM + 正则 fallback + 品牌/品类匹配）
+           c) 三级优先级匹配：精确匹配(PRECISE_MATCH_MAP) → 泛词展开(SYNONYM_MAP) → 拆字匹配
+           d) SQL 模糊搜索 + 品类过滤
+        5. 后处理过滤 → 去重（按 product_id）→ 状态过滤（排除下架）→ 综合排序（评分60%+销量40%）
+        6. Prompt 构造 → 合并向量检索知识 + 商品信息 + 用户画像 → 注入季节感知 → 调用 LLM
+        7. 构建响应 → 提取商品卡片 + 缓存推荐商品（供后续购物车操作复用）
+
+        Args:
+            question: 用户问题
+            conversation_id: 会话ID（用于读取记忆和缓存推荐商品）
+            user_id: 用户ID（用于购物车操作）
+            context: 对话上下文（上一轮对话摘要）
+            user_profile: 用户画像（性别/肤质/偏好标签等）
+
+        Returns:
+            {"answer": str, "sources": List, "has_sources": bool,
+             "task_type": str, "product_cards": List[Dict]}
+        """
         logger.info(f"[ShoppingAgent] Processing: {question[:50]}...")
 
         try:
@@ -145,6 +181,20 @@ class ShoppingAgent(BaseAgent):
             if self._detect_comparison(question):
                 result = self._handle_comparison(question, user_profile)
                 if result:
+                    # 对比推荐也记录日志
+                    cards = result.get("product_cards", [])
+                    if cards:
+                        try:
+                            mysql_client.insert_recommendation_log(
+                                user_id=user_id,
+                                session_id=conversation_id,
+                                query=question,
+                                intent="shopping",
+                                recommended_product_ids=[c.get("product_id") for c in cards if c.get("product_id")],
+                                recommend_reason=result.get("answer", "")[:200]
+                            )
+                        except Exception as log_err:
+                            logger.warning(f"[ShoppingAgent] Failed to record comparison log: {log_err}")
                     return result
             # 1. 读取会话记忆
             conversation_history = ""
@@ -197,6 +247,20 @@ class ShoppingAgent(BaseAgent):
 
             sources = self._build_sources(docs)
 
+            # 推荐成功后记录到 recommendation_log
+            if products:
+                try:
+                    mysql_client.insert_recommendation_log(
+                        user_id=user_id,
+                        session_id=conversation_id,
+                        query=question,
+                        intent="shopping",
+                        recommended_product_ids=[p.get("id") for p in products if p.get("id")],
+                        recommend_reason=answer[:200] if answer else None
+                    )
+                except Exception as log_err:
+                    logger.warning(f"[ShoppingAgent] Failed to record recommendation log: {log_err}")
+
             return {
                 "answer": answer,
                 "sources": sources,
@@ -235,6 +299,20 @@ class ShoppingAgent(BaseAgent):
                         "sources": [],
                         "task_type": "shopping"
                     })
+                    # 对比推荐记录日志
+                    cards = result.get("product_cards", [])
+                    if cards:
+                        try:
+                            mysql_client.insert_recommendation_log(
+                                user_id=user_id,
+                                session_id=conversation_id,
+                                query=question,
+                                intent="shopping",
+                                recommended_product_ids=[c.get("product_id") for c in cards if c.get("product_id")],
+                                recommend_reason=None
+                            )
+                        except Exception as log_err:
+                            logger.warning(f"[ShoppingAgent] Failed to record comparison log: {log_err}")
                     yield json.dumps({"type": "end", "content": result.get("answer", "")})
                     return
             # 检索
@@ -272,6 +350,19 @@ class ShoppingAgent(BaseAgent):
                             "sources": sources,
                             "task_type": "shopping"
                         })
+                        # 推荐成功后记录到 recommendation_log
+                        if products:
+                            try:
+                                mysql_client.insert_recommendation_log(
+                                    user_id=user_id,
+                                    session_id=conversation_id,
+                                    query=question,
+                                    intent="shopping",
+                                    recommended_product_ids=[p.get("id") for p in products if p.get("id")],
+                                    recommend_reason=None
+                                )
+                            except Exception as log_err:
+                                logger.warning(f"[ShoppingAgent] Failed to record recommendation log: {log_err}")
                 except (json.JSONDecodeError, AttributeError):
                     pass
                 yield chunk
@@ -285,7 +376,38 @@ class ShoppingAgent(BaseAgent):
 
     def handle_cart(self, question: str, conversation_id: Optional[str] = None,
                     user_id: Optional[str] = None, context: str = "", **kwargs) -> Dict[str, Any]:
-        """处理购物车操作请求（同步）"""
+        """处理购物车操作请求（同步）—— Agent 购物车状态机。
+
+        状态机流程：
+        1. 内部消息检测 → 如果是 Android 端的加购确认消息(ADD_CONFIRM:)，生成确认回复
+        2. 用户校验 → 未登录返回引导登录
+        3. 待确认操作检查 → 如果有待确认的购物车操作（删除/修改/清空），先处理确认流程
+        4. 意图解析 → 用 LLM + 正则解析用户意图：
+           - add: \"加入购物车\" / \"买这个\"
+           - remove: \"删除第N个\" / \"去掉XX\"（支持位置删除 + 批量删除）
+           - update: \"数量改成X\"
+           - list: \"查看购物车\" / \"购物车里有什么\"
+           - clear: \"清空购物车\"
+        5. 位置删除 → 如\"删除第二个\"→ 精确匹配购物车第2项的 cart_item_id
+        6. 安全确认 → 删除/修改/清空操作需用户确认后执行
+        7. 执行操作 → 调用 CartTool 通过 Java Cart API 执行
+        8. 缓存失效 → 操作成功后清除购物车缓存
+
+        状态管理：
+        - _pending_cart_actions: 待确认操作 {conversation_id: {action, ...}}
+        - _cart_cache: 购物车缓存 {conversation_id: {items, ts}}
+        - _recent_products: 最近推荐商品缓存（供\"这个\"指代识别）
+
+        Args:
+            question: 用户问题
+            conversation_id: 会话ID
+            user_id: 用户ID
+            context: 对话上下文
+            jwt_token: JWT令牌（从 kwargs 传入）
+
+        Returns:
+            {\"answer\": str, \"task_type\": \"cart\", ...}
+        """
         jwt_token = kwargs.get("jwt_token")
         logger.info(f"[ShoppingAgent] Cart handling: {question[:50]}...")
 
@@ -1066,14 +1188,29 @@ class ShoppingAgent(BaseAgent):
         }
 
     def _search_products(self, question: str, user_profile: str = "", conversation_context: str = "") -> List[Dict[str, Any]]:
-        """从 MySQL 搜索匹配商品。
+        """从 MySQL 搜索匹配商品 —— 四级搜索流水线。
 
-        搜索流程：
-        1. 提取排除词（LLM 识别"不要/除了"等否定语义）
-        2. 提取搜索关键词（LLM + 正则 fallback + 品牌/品类匹配）
-        3. 三级优先级：精确匹配 → 泛词展开(SYNONYM_MAP) → 普通关键词+拆字
-        4. SQL 模糊搜索 + 品类过滤（PRECISE_MATCH_MAP）
-        5. 后处理（去重 + 加权排序）
+        搜索流程（5步）：
+        Step 1: 排除词提取 → LLM 识别不要/除了/排除等否定语义，如"不要苹果" → ["苹果"]
+        Step 2: 关键词提取 → LLM + 正则 fallback + 品牌/品类 MySQL 匹配
+        Step 3: 三级优先级匹配：
+                精确匹配(PRECISE_MATCH_MAP) → "跑鞋"只匹配"跑步鞋"，不展开篮球鞋
+                泛词展开(SYNONYM_MAP) → "鞋子"展开为 ["跑鞋", "篮球鞋", "徒步鞋"]
+                普通关键词+拆字 → 中文单字拆分模糊搜索
+        Step 4: SQL 模糊搜索 → LIKE/REGEXP 多关键词 + 品类过滤 + 排除词过滤
+        Step 5: 后处理 → 去重 + 状态过滤 + 加权排序（评分60%+销量40%）
+
+        用户画像感知：
+        - 根据 user_profile 中的偏好标签补充搜索关键词（如"运动"→"运动鞋"）
+        - 根据肤质信息调整搜索限定词（如"油皮"→"控油"）
+
+        Args:
+            question: 用户原始问题
+            user_profile: 用户画像（性别/肤质/偏好标签等，用逗号分隔）
+            conversation_context: 对话上下文（帮助理解"不要XX"等承接上文的查询）
+
+        Returns:
+            过滤排序后的商品列表，每个元素包含 title/brand/base_price/rating/sales_count 等字段
         """
         try:
             # Step 1: 提取排除关键词
@@ -1435,7 +1572,24 @@ class ShoppingAgent(BaseAgent):
             return []
 
     def _post_process_products(self, products: List[Dict[str, Any]], limit: int = 5) -> List[Dict[str, Any]]:
-        """检索结果后处理：去重、过滤、综合排序"""
+        """检索结果后处理：去重、过滤、综合排序。
+
+        三步后处理流水线：
+        1. 去重：按 product_id 去重，同一商品的不同搜索命中只保留首次出现
+        2. 状态过滤：排除 status != 1 的商品（已下架/缺货等）
+        3. 综合加权排序：
+           - 相关性得分权重 0.5（SQL MATCH 返回的 relevance_score）
+           - 评分权重 0.2（用户评分 rating，归一化）
+           - 销量权重 0.3（销售数量 sales_count，归一化）
+           各维度先做最大-最小归一化，再加权求和
+
+        Args:
+            products: 原始搜索结果列表
+            limit: 返回数量上限（默认5）
+
+        Returns:
+            去重过滤并排序后的商品列表，每项额外包含 _sort_score 排序分
+        """
         if not products:
             logger.info("[PostProcess] No products to process")
             return []

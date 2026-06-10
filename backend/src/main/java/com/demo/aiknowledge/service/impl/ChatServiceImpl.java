@@ -38,6 +38,34 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * 聊天服务实现 —— ShopAgent-X 对话核心。
+ *
+ * 核心流程：
+ * 1. 用户消息保存 → 写入 message 表
+ * 2. 上下文构建 → 读取当前会话历史 + 系统 Prompt → 发送给 Python AI 服务
+ * 3. AI 调用 → 通过 WebClient HTTP 调用 Python FastAPI 的 /api/agent/run
+ * 4. 流式输出 → SSE(Server-Sent Events) 逐 token 推送给 App 端
+ * 5. 防幻觉校验 → 收到商品卡片后校验：商品存在性/价格一致性/标题一致性/上下架状态
+ * 6. 保存 AI 回答 → 写入 message 表 + 记录 QA 日志
+ *
+ * 流式 SSE 事件格式：
+ * {"type":"routed","task_type":"shopping"}  // 路由结果
+ * {"type":"token","content":"推荐"}           // 逐 token 输出
+ * {"type":"product_cards","product_cards":[...]} // 商品卡片
+ * {"type":"end"}                             // 流结束
+ * {"type":"error","content":"错误信息"}        // 异常
+ *
+ * 防幻觉校验（validateProductCards）：
+ * - 校验 product_id 有效性 → 跳过不存在的商品
+ * - 校验商品上下架状态（status）→ 跳过已下架的
+ * - 校验价格一致性 → 不一致时使用数据库价格
+ * - 校验标题一致性 → 不一致时使用数据库标题
+ *
+ * @see AiService       Python AI 服务调用接口
+ * @see ConversationContextService  会话上下文管理
+ * @see SseEmitter      Spring SSE 流式输出
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor

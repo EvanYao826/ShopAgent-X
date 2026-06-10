@@ -350,7 +350,7 @@ async def ask_question(request: ChatRequest):
                 run_id=run_id,
                 trace_id=trace_id,
                 conversation_id=request.conversation_id or "",
-                user_id="",
+                user_id=request.user_id or "",
                 status="success",
                 goal=request.question[:200],
                 intent=response.get("task_type", "unknown"),
@@ -362,6 +362,43 @@ async def ask_question(request: ChatRequest):
             )
         except Exception as db_err:
             logger.warning(f"Failed to record agent run: {db_err}")
+
+        # 持久化 Agent 步骤到 agent_step 表
+        try:
+            steps = response.pop("_steps", None)
+            if steps:
+                # Orchestrator 编排链路：逐条写入步骤
+                for s in steps:
+                    from datetime import datetime as dt
+                    st = dt.fromtimestamp(s["start_time"]).strftime("%Y-%m-%d %H:%M:%S") if s.get("start_time") else start_dt
+                    et = dt.fromtimestamp(s["end_time"]).strftime("%Y-%m-%d %H:%M:%S") if s.get("end_time") else end_dt
+                    mysql_client.insert_agent_step(
+                        run_id=run_id,
+                        step_type=s.get("step_type", "unknown"),
+                        step_name=s.get("step_name", ""),
+                        status=s.get("status", "completed"),
+                        input_data=s.get("input"),
+                        output_data=s.get("output"),
+                        error_message=s.get("error_message"),
+                        duration_ms=s.get("duration_ms"),
+                        start_time=st,
+                        end_time=et,
+                    )
+            else:
+                # 简单链路（非Orchestrator）：写入单条步骤记录
+                mysql_client.insert_agent_step(
+                    run_id=run_id,
+                    step_type=response.get("task_type", "unknown"),
+                    step_name=response.get("task_type", "agent_execution"),
+                    status="completed",
+                    input_data=request.question[:500],
+                    output_data=response.get("answer", "")[:500],
+                    duration_ms=round((time.time() - start_time) * 1000),
+                    start_time=start_dt,
+                    end_time=end_dt,
+                )
+        except Exception as step_err:
+            logger.warning(f"Failed to record agent steps: {step_err}")
 
         process_time = time.time() - start_time
         response["run_id"] = run_id
@@ -410,7 +447,7 @@ async def ask_question(request: ChatRequest):
                     run_id=run_id,
                     trace_id=trace_id,
                     conversation_id=request.conversation_id or "",
-                    user_id="",
+                    user_id=request.user_id or "",
                     status="failed",
                     goal=request.question[:200],
                     intent="unknown",
@@ -529,7 +566,7 @@ async def ask_question_stream(request: ChatRequest):
                     run_id=run_id,
                     trace_id=trace_id,
                     conversation_id=request.conversation_id or "",
-                    user_id="",
+                    user_id=request.user_id or "",
                     status="success",
                     goal=request.question[:200],
                     intent=final_task_type,
@@ -541,6 +578,22 @@ async def ask_question_stream(request: ChatRequest):
                 )
             except Exception as db_err:
                 logger.warning(f"Failed to record agent run: {db_err}")
+
+            # 流式链路：写入单条步骤记录
+            try:
+                mysql_client.insert_agent_step(
+                    run_id=run_id,
+                    step_type=final_task_type,
+                    step_name=final_task_type,
+                    status="completed",
+                    input_data=request.question[:500],
+                    output_data=final_answer[:500],
+                    duration_ms=round((time.time() - start_time) * 1000),
+                    start_time=start_dt,
+                    end_time=end_dt,
+                )
+            except Exception as step_err:
+                logger.warning(f"Failed to record agent step: {step_err}")
 
     return StreamingResponse(
         event_generator(),

@@ -1,0 +1,249 @@
+/* ====== 知识巡检页面样式 ====== */
+
+/* 页面容器 */
+.ki-page {
+  background: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid var(--color-border);
+}
+
+.page-header {
+  margin-bottom: var(--space-5);
+}
+
+.page-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.page-header p {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* 统计网格 */
+.ki-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-5);
+}
+
+.ki-stat-item {
+  background: var(--color-bg-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+  transition: all var(--transition-normal);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.ki-stat-item:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.ki-stat-value {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: var(--space-3);
+  color: var(--color-primary);
+  letter-spacing: -0.5px;
+}
+
+.ki-stat-label {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* Tab 切换 */
+.tab-bar {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  border-bottom: 2px solid var(--color-border-light);
+  padding-bottom: var(--space-3);
+}
+
+.tab-btn {
+  padding: var(--space-3) var(--space-6);
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.tab-btn:hover {
+  background: var(--color-bg-surface-alt);
+  color: var(--color-text-primary);
+}
+
+.tab-btn.active {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+/* 聚类列表 */
+.cluster-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cluster-item {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.cluster-item:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(255, 107, 53, 0.12);
+}
+
+.cluster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  background: var(--color-bg-surface-alt);
+}
+
+.cluster-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cluster-topic {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 14px;
+}
+
+.cluster-count {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: var(--color-bg-surface);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.cluster-arrow {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.cluster-details {
+  padding: var(--space-4);
+  background: var(--color-bg-surface);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.cluster-summary,
+.cluster-keywords,
+.cluster-questions {
+  margin-bottom: var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.cluster-questions ul {
+  margin: var(--space-2) 0 0 var(--space-5);
+  padding: 0;
+}
+
+.cluster-questions li {
+  margin-bottom: var(--space-1);
+  color: var(--color-text-primary);
+  font-size: 13px;
+}
+
+.more-questions {
+  color: var(--color-text-muted) !important;
+  font-style: italic;
+}
+
+.keyword-tag {
+  display: inline-block;
+  background: var(--color-primary-pale);
+  color: var(--color-primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  margin-right: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.ellipsis {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 问题分组 */
+.issue-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.issue-group {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.issue-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-surface-alt);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.issue-tag {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.issue-tag.duplicate {
+  background: rgba(239,68,68,0.1);
+  color: var(--color-error);
+}
+
+.issue-count {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.issue-similarity {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.more-hint {
+  text-align: center;
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}

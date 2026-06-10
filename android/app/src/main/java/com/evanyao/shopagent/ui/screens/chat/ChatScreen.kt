@@ -126,6 +126,7 @@ fun ChatScreen(
                 modifier = Modifier.width(280.dp),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             ) {
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -244,7 +245,7 @@ fun ChatScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.navigationBars)
+                .imePadding()
         ) {
             TopAppBar(
                 title = {
@@ -380,8 +381,7 @@ fun ChatScreen(
             // 输入区域（模仿豆包布局：[📷] [🎤/⌨️] [输入框] [发送/停止]）
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.ime),
+                    .fillMaxWidth(),
                 shadowElevation = 8.dp
             ) {
                 Row(

@@ -1,155 +1,231 @@
+/* ====== 登录页（独立浅色风格，不跟随管理端深色主题） ====== */
+
 .auth-container {
+  /* 覆盖全局深暖色变量，登录页保持浅色 */
+  --color-text-primary: #1A0F08;
+  --color-text-secondary: #5C4A3A;
+  --color-text-muted: #8A7565;
+  --color-primary: #E85A20;
+  --color-primary-hover: #D04A15;
+  --color-primary-pale: #FDE8E0;
+  --color-bg-surface: #FFF9F5;
+  --color-border: #D4BFAE;
+  --text-primary: #1A0F08;
+  --text-secondary: #5C4A3A;
+  --text-hint: #8A7565;
+  --primary: #E85A20;
+  --primary-light: #FF7A45;
+  --primary-pale: #FDE8E0;
+  --surface: #FFF9F5;
+  --border: #D4BFAE;
+  --error: #DC2626;
+
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #e0f7fa 0%, #e8eaf6 50%, #f3e5f5 100%);
+  background: linear-gradient(135deg, #F5E6D8 0%, #EDCFBA 30%, #E8BFA5 60%, #DFAD8E 100%);
   position: relative;
   overflow: hidden;
   padding: 20px;
 }
 
-.auth-container::before {
-  content: '';
+/* ─── 两侧漂浮商品图标 ─── */
+.auth-float-icons {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background:
-    radial-gradient(ellipse at 10% 20%, rgba(0, 188, 212, 0.2) 0%, transparent 40%),
-    radial-gradient(ellipse at 90% 80%, rgba(156, 39, 176, 0.15) 0%, transparent 40%),
-    radial-gradient(ellipse at 50% 50%, rgba(255, 138, 101, 0.1) 0%, transparent 50%);
   pointer-events: none;
-  animation: bgShift 15s ease-in-out infinite alternate;
+  z-index: 0;
 }
 
-@keyframes bgShift {
-  0% { opacity: 0.8; transform: scale(1); }
-  100% { opacity: 1; transform: scale(1.1); }
-}
-
-.auth-container::after {
-  content: '';
+.float-icon {
   position: absolute;
-  top: -50%;
-  left: -50%;
-  right: -50%;
-  bottom: -50%;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(0, 150, 136, 0.1) 2px, transparent 2px),
-    radial-gradient(circle at 80% 70%, rgba(233, 30, 99, 0.08) 2px, transparent 2px);
-  background-size: 80px 80px;
-  pointer-events: none;
-  animation: gridFloat 30s linear infinite;
+  font-size: 52px;
+  opacity: 0.45;
+  animation: floatDrift 12s ease-in-out infinite;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.06));
 }
 
-@keyframes gridFloat {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  100% { transform: translate(80px, 80px) rotate(5deg); }
+/* 左侧商品 */
+.float-icon:nth-child(1) { top: 8%; left: 6%; animation-delay: 0s; animation-duration: 10s; font-size: 64px; }
+.float-icon:nth-child(2) { top: 25%; left: 10%; animation-delay: 1.5s; animation-duration: 13s; font-size: 52px; }
+.float-icon:nth-child(3) { top: 50%; left: 4%; animation-delay: 3s; animation-duration: 11s; font-size: 60px; }
+.float-icon:nth-child(4) { top: 72%; left: 12%; animation-delay: 0.8s; animation-duration: 14s; font-size: 56px; }
+.float-icon:nth-child(5) { top: 88%; left: 7%; animation-delay: 2.2s; animation-duration: 12s; font-size: 58px; }
+/* 右侧商品 */
+.float-icon:nth-child(6) { top: 5%; right: 8%; left: auto; animation-delay: 0.5s; animation-duration: 12s; font-size: 60px; }
+.float-icon:nth-child(7) { top: 22%; right: 5%; left: auto; animation-delay: 2s; animation-duration: 10s; font-size: 68px; }
+.float-icon:nth-child(8) { top: 45%; right: 10%; left: auto; animation-delay: 1s; animation-duration: 14s; font-size: 50px; }
+.float-icon:nth-child(9) { top: 68%; right: 6%; left: auto; animation-delay: 3.5s; animation-duration: 11s; font-size: 62px; }
+.float-icon:nth-child(10) { top: 85%; right: 12%; left: auto; animation-delay: 0.3s; animation-duration: 13s; font-size: 54px; }
+
+@keyframes floatDrift {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-18px) rotate(5deg); }
+  50% { transform: translateY(8px) rotate(-3deg); }
+  75% { transform: translateY(-12px) rotate(4deg); }
 }
 
-@keyframes particleFloat {
-  0% { transform: translate(0, 0) scale(1); opacity: 0.8; }
-  25% { transform: translate(15px, -25px) scale(1.2); opacity: 1; }
-  50% { transform: translate(-10px, -40px) scale(0.9); opacity: 0.7; }
-  75% { transform: translate(-25px, -15px) scale(1.1); opacity: 0.9; }
-  100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+/* ─── 品牌区域（图标 + 标题水平对齐） ─── */
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
-@keyframes particleGlow {
-  0%, 100% { box-shadow: 0 0 8px currentColor, 0 0 20px currentColor; }
-  50% { box-shadow: 0 0 15px currentColor, 0 0 35px currentColor; }
-}
-
-.auth-container .particle {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  animation: particleFloat 8s ease-in-out infinite, particleGlow 3s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.auth-container .particle:nth-child(1) { top: 12%; left: 8%; background: #00bcd4; color: #00bcd4; animation-delay: 0s, 0s; animation-duration: 8s, 2.5s; }
-.auth-container .particle:nth-child(2) { top: 20%; left: 88%; background: #9c27b0; color: #9c27b0; animation-delay: 1s, 0.5s; animation-duration: 10s, 3s; }
-.auth-container .particle:nth-child(3) { top: 75%; left: 12%; background: #ff7043; color: #ff7043; animation-delay: 2s, 1s; animation-duration: 9s, 2.8s; }
-.auth-container .particle:nth-child(4) { top: 85%; left: 85%; background: #4caf50; color: #4caf50; animation-delay: 0.5s, 1.5s; animation-duration: 11s, 3.2s; }
-.auth-container .particle:nth-child(5) { top: 50%; left: 3%; background: #2196f3; color: #2196f3; animation-delay: 3s, 0.8s; animation-duration: 7s, 2.6s; }
-.auth-container .particle:nth-child(6) { top: 8%; left: 55%; background: #e91e63; color: #e91e63; animation-delay: 1.5s, 1.2s; animation-duration: 12s, 2.9s; }
-.auth-container .particle:nth-child(7) { top: 65%; left: 92%; background: #ff9800; color: #ff9800; animation-delay: 2.5s, 0.3s; animation-duration: 8.5s, 3.1s; }
-.auth-container .particle:nth-child(8) { top: 40%; left: 50%; background: #00bcd4; color: #00bcd4; animation-delay: 0.8s, 1.8s; animation-duration: 10.5s, 2.7s; }
-
-@keyframes lineDrift {
-  0% { transform: translateX(-100%) rotate(var(--angle)); opacity: 0; }
-  10% { opacity: 0.8; }
-  90% { opacity: 0.8; }
-  100% { transform: translateX(100vw) rotate(var(--angle)); opacity: 0; }
-}
-
-.particle-line {
-  position: absolute;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(0, 150, 136, 0.6), rgba(233, 30, 99, 0.6), transparent);
-  transform-origin: left center;
-  pointer-events: none;
-  opacity: 0;
-  animation: lineDrift 12s linear infinite;
-}
-
-.particle-line:nth-child(9) { top: 25%; --angle: 25deg; animation-delay: 0s; }
-.particle-line:nth-child(10) { top: 55%; --angle: -15deg; animation-delay: 3s; }
-.particle-line:nth-child(11) { top: 70%; --angle: 35deg; animation-delay: 6s; }
-.particle-line:nth-child(12) { top: 40%; --angle: -30deg; animation-delay: 9s; }
-
-.auth-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  padding: 40px;
-  width: 100%;
-  max-width: 400px;
+.auth-brand-icon {
+  font-size: 40px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 8px rgba(232, 90, 32, 0.3));
 }
 
 .auth-title {
-  text-align: center;
   font-size: 28px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: 0.5px;
 }
 
 .auth-subtitle {
   text-align: center;
-  font-size: 20px;
-  font-weight: 500;
-  color: #666;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
   margin-bottom: 32px;
+  margin-top: 4px;
 }
 
+/* ─── 卡片 ─── */
+.auth-card {
+  background: rgba(255, 252, 248, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(212, 191, 174, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(180, 120, 70, 0.15), 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 44px 40px;
+  width: 100%;
+  max-width: 400px;
+  position: relative;
+  z-index: 2;
+}
+
+/* 欢迎文字 */
+.auth-welcome {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-welcome h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+}
+
+.auth-welcome p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* 输入框 */
+.auth-card .form-group {
+  margin-bottom: 18px;
+}
+
+.auth-card .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.auth-card .form-group input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  font-size: 15px;
+  background: var(--surface);
+  transition: all 0.2s;
+}
+
+.auth-card .form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(232, 90, 32, 0.15);
+}
+
+.auth-card .form-group input::placeholder {
+  color: var(--text-hint);
+}
+
+/* 登录按钮 */
 .auth-btn {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
   font-size: 16px;
-  margin-top: 8px;
+  font-weight: 600;
+  margin-top: 4px;
+  border-radius: 12px;
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(232, 90, 32, 0.35);
+  transition: all 0.2s;
 }
 
+.auth-btn:hover {
+  background-color: var(--primary-light);
+  box-shadow: 0 6px 24px rgba(232, 90, 32, 0.45);
+  transform: translateY(-1px);
+}
+
+.auth-btn:disabled {
+  opacity: 0.6;
+  box-shadow: none;
+  transform: none;
+}
+
+/* 底部链接 */
 .auth-footer {
   text-align: center;
-  margin-top: 24px;
-  color: #666;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--text-secondary);
 }
 
 .auth-footer a {
-  color: #1890ff;
+  color: var(--primary);
   text-decoration: none;
+  font-weight: 500;
 }
 
 .auth-footer a:hover {
   text-decoration: underline;
 }
 
+/* 错误信息 */
+.auth-card .error {
+  background: var(--primary-pale);
+  color: var(--error);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* 验证码输入组 */
 .code-input-group {
   display: flex;
   gap: 10px;

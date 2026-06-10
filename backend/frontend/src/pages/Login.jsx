@@ -21,9 +21,9 @@ export default function Login() {
   };
 
   useEffect(() => {
-    document.title = 'AI 知识系统-用户登录';
+    document.title = 'ShopAgent-X - 登录';
     return () => {
-      document.title = 'AI 知识系统';
+      document.title = 'ShopAgent-X';
     };
   }, []);
 
@@ -62,21 +62,27 @@ export default function Login() {
 
   return (
     <div className="auth-container">
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle"></div>
-      <div className="particle-line"></div>
-      <div className="particle-line"></div>
-      <div className="particle-line"></div>
-      <div className="particle-line"></div>
+      {/* 两侧漂浮商品图标 */}
+      <div className="auth-float-icons">
+        <span className="float-icon">👜</span>
+        <span className="float-icon">👟</span>
+        <span className="float-icon">💄</span>
+        <span className="float-icon">📱</span>
+        <span className="float-icon">🧴</span>
+        <span className="float-icon">👗</span>
+        <span className="float-icon">🎧</span>
+        <span className="float-icon">⌚</span>
+        <span className="float-icon">🧣</span>
+        <span className="float-icon">☕</span>
+      </div>
+
       <div className="auth-card">
-        <h1 className="auth-title">AI 知识系统</h1>
-        <h2 className="auth-subtitle">登录</h2>
+        {/* 品牌区域：图标 + 标题水平对齐 */}
+        <div className="auth-brand">
+          <span className="auth-brand-icon">🛒</span>
+          <h1 className="auth-title">ShopAgent-X</h1>
+        </div>
+        <p className="auth-subtitle">AI 智能导购，为你精选好物</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">

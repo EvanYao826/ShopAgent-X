@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import './AdminDashboard.css';
+import './KnowledgeInspection.css';
 
 const priorityColors = {
-  '高': '#ff4d4f',
-  '中': '#faad14',
-  '低': '#52c41a'
+  '高': '#E17055',
+  '中': '#FDCB6E',
+  '低': '#00B894'
 };
 
 const suggestionTypeLabels = {
@@ -121,10 +122,10 @@ export default function KnowledgeInspection() {
   };
 
   return (
-    <div className="admin-panel">
-      <div className="panel-header">
-        <h2>🔍 知识巡检</h2>
-        <p>分析未命中问题，检测重复文档、低质量Chunk、过期知识和无人访问文档</p>
+    <div className="ki-page">
+      <div className="page-header">
+        <h1>知识巡检</h1>
+        <p>分析未命中问题 · 检测重复文档 · 低质量Chunk · 过期知识 · 无人访问文档</p>
       </div>
 
       <div className="tab-bar">
@@ -183,7 +184,8 @@ export default function KnowledgeInspection() {
               </div>
               <div className="search-actions">
                 <button className="btn btn-primary" onClick={handleSearch}>分析</button>
-                <button className="btn btn-default" onClick={handleExport}>导出</button>
+                <button className="btn btn-secondary" onClick={handleExport}>导出</button>
+                <button className="btn btn-ghost" onClick={() => { setFilters({ startDate: '', endDate: '', minCount: 1, clusterThreshold: 3 }); }}>重置</button>
               </div>
             </div>
           </div>
@@ -200,18 +202,18 @@ export default function KnowledgeInspection() {
                 <div className="card-header">
                   <h2>📊 分析概览</h2>
                 </div>
-                <div className="stats-grid">
-                  <div className="stat-item">
-                    <div className="stat-value">{data.totalUnansweredCount}</div>
-                    <div className="stat-label">未命中问题总数</div>
+                <div className="ki-stats-grid">
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value">{data.totalUnansweredCount}</div>
+                    <div className="ki-stat-label">未命中问题总数</div>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-value">{data.totalUniqueQuestions}</div>
-                    <div className="stat-label">独立问题数</div>
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value">{data.totalUniqueQuestions}</div>
+                    <div className="ki-stat-label">独立问题数</div>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-value">{data.clusterCount}</div>
-                    <div className="stat-label">主题聚类数</div>
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value">{data.clusterCount}</div>
+                    <div className="ki-stat-label">主题聚类数</div>
                   </div>
                 </div>
               </div>
@@ -377,7 +379,8 @@ export default function KnowledgeInspection() {
               </div>
               <div className="search-actions">
                 <button className="btn btn-primary" onClick={handleSearch}>巡检</button>
-                <button className="btn btn-default" onClick={handleExport}>导出</button>
+                <button className="btn btn-secondary" onClick={handleExport}>导出</button>
+                <button className="btn btn-ghost" onClick={() => { setFilters({ startDate: '', endDate: '', minCount: 1, clusterThreshold: 3 }); }}>重置</button>
               </div>
             </div>
           </div>
@@ -394,32 +397,32 @@ export default function KnowledgeInspection() {
                 <div className="card-header">
                   <h2>📊 巡检概览</h2>
                 </div>
-                <div className="stats-grid">
-                  <div className="stat-item">
-                    <div className="stat-value">{data.stats.totalDocs || 0}</div>
-                    <div className="stat-label">文档总数</div>
+                <div className="ki-stats-grid">
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value">{data.stats.totalDocs || 0}</div>
+                    <div className="ki-stat-label">文档总数</div>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-value">{data.stats.totalChunks || 0}</div>
-                    <div className="stat-label">Chunk总数</div>
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value">{data.stats.totalChunks || 0}</div>
+                    <div className="ki-stat-label">Chunk总数</div>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-value" style={{ color: '#ff4d4f' }}>{data.stats.duplicateDocGroups || 0}</div>
-                    <div className="stat-label">重复文档组</div>
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value" style={{ color: '#E17055' }}>{data.stats.duplicateDocGroups || 0}</div>
+                    <div className="ki-stat-label">重复文档组</div>
                   </div>
                 </div>
-                <div className="stats-grid" style={{ marginTop: '16px' }}>
-                  <div className="stat-item">
-                    <div className="stat-value" style={{ color: '#faad14' }}>{data.stats.lowQualityChunkCount || 0}</div>
-                    <div className="stat-label">低质量Chunk</div>
+                <div                className="ki-stats-grid" style={{ marginTop: '16px' }}>
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value" style={{ color: '#FDCB6E' }}>{data.stats.lowQualityChunkCount || 0}</div>
+                    <div className="ki-stat-label">低质量Chunk</div>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-value" style={{ color: '#52c41a' }}>{data.stats.outdatedDocCount || 0}</div>
-                    <div className="stat-label">过期文档</div>
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value" style={{ color: '#00B894' }}>{data.stats.outdatedDocCount || 0}</div>
+                    <div className="ki-stat-label">过期文档</div>
                   </div>
-                  <div className="stat-item">
-                    <div className="stat-value" style={{ color: '#722ed1' }}>{data.stats.unaccessedDocCount || 0}</div>
-                    <div className="stat-label">无人访问文档</div>
+                  <div className="ki-stat-item">
+                    <div className="ki-stat-value" style={{ color: '#722ed1' }}>{data.stats.unaccessedDocCount || 0}</div>
+                    <div className="ki-stat-label">无人访问文档</div>
                   </div>
                 </div>
               </div>
@@ -572,245 +575,6 @@ export default function KnowledgeInspection() {
         </>
       )}
 
-      <style>{`
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
-        }
-
-        .stat-item {
-          background: white;
-          border: 1px solid #e8e8e8;
-          border-radius: 12px;
-          padding: 28px 24px;
-          color: #333;
-          text-align: center;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-          transition: all 0.3s;
-        }
-
-        .stat-item:hover {
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-          transform: translateY(-2px);
-        }
-
-        .stat-value {
-          font-size: 42px;
-          font-weight: 800;
-          margin-bottom: 12px;
-          color: #1890ff;
-          letter-spacing: -0.5px;
-        }
-
-        .stat-label {
-          font-size: 15px;
-          color: #666;
-          font-weight: 500;
-        }
-
-        .tab-bar {
-          display: flex;
-          gap: 12px;
-          margin-bottom: 20px;
-          border-bottom: 2px solid #f0f0f0;
-          padding-bottom: 12px;
-        }
-
-        .tab-btn {
-          padding: 12px 24px;
-          border: none;
-          background: transparent;
-          font-size: 15px;
-          font-weight: 500;
-          color: #666;
-          cursor: pointer;
-          border-radius: 8px;
-          transition: all 0.3s;
-        }
-
-        .tab-btn:hover {
-          background: #f5f5f5;
-          color: #333;
-        }
-
-        .tab-btn.active {
-          background: #1890ff;
-          color: white;
-        }
-
-        .cluster-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .cluster-item {
-          border: 1px solid #e8e8e8;
-          border-radius: 8px;
-          overflow: hidden;
-          cursor: pointer;
-          transition: all 0.3s;
-        }
-
-        .cluster-item:hover {
-          border-color: #40a9ff;
-          box-shadow: 0 2px 8px rgba(64, 169, 255, 0.15);
-        }
-
-        .cluster-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 16px;
-          background-color: #fafafa;
-        }
-
-        .cluster-info {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .cluster-topic {
-          font-weight: 600;
-          color: #333;
-          font-size: 15px;
-        }
-
-        .cluster-count {
-          font-size: 13px;
-          color: #999;
-          background-color: #fff;
-          padding: 4px 10px;
-          border-radius: 12px;
-        }
-
-        .cluster-arrow {
-          font-size: 12px;
-          color: #999;
-          transition: transform 0.3s;
-        }
-
-        .cluster-details {
-          padding: 16px;
-          background-color: #fff;
-          border-top: 1px solid #e8e8e8;
-        }
-
-        .cluster-summary, .cluster-keywords, .cluster-questions {
-          margin-bottom: 12px;
-          font-size: 14px;
-          color: #666;
-        }
-
-        .cluster-questions ul {
-          margin: 8px 0 0 20px;
-          padding: 0;
-        }
-
-        .cluster-questions li {
-          margin-bottom: 6px;
-          color: #333;
-        }
-
-        .more-questions {
-          color: #999 !important;
-          font-style: italic;
-        }
-
-        .keyword-tag {
-          display: inline-block;
-          background-color: #e6f7ff;
-          color: #1890ff;
-          padding: 4px 10px;
-          border-radius: 4px;
-          font-size: 12px;
-          margin-right: 8px;
-          margin-top: 4px;
-        }
-
-        .ellipsis {
-          max-width: 200px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-
-        .issue-list {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .issue-group {
-          border: 1px solid #e8e8e8;
-          border-radius: 8px;
-          overflow: hidden;
-        }
-
-        .issue-group-header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
-          background: #fafafa;
-          border-bottom: 1px solid #e8e8e8;
-        }
-
-        .issue-tag {
-          padding: 4px 12px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .issue-tag.duplicate {
-          background: #fff1f0;
-          color: #ff4d4f;
-        }
-
-        .issue-count {
-          font-size: 13px;
-          color: #666;
-        }
-
-        .issue-similarity {
-          font-size: 13px;
-          color: #999;
-          margin-left: auto;
-        }
-
-        .status-badge {
-          display: inline-block;
-          padding: 4px 10px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-weight: 500;
-        }
-
-        .status-badge.warning {
-          background: #fffbe6;
-          color: #faad14;
-        }
-
-        .status-badge.error {
-          background: #fff1f0;
-          color: #ff4d4f;
-        }
-
-        .status-badge.purple {
-          background: #f9f0ff;
-          color: #722ed1;
-        }
-
-        .more-hint {
-          text-align: center;
-          padding: 12px;
-          color: #999;
-          font-size: 13px;
-        }
-      `}</style>
     </div>
   );
 }

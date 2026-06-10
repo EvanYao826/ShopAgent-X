@@ -2,9 +2,12 @@ package com.demo.aiknowledge.controller.admin;
 
 import com.demo.aiknowledge.common.Result;
 import com.demo.aiknowledge.entity.AgentRun;
+import com.demo.aiknowledge.entity.AgentStep;
 import com.demo.aiknowledge.entity.ToolCall;
+import com.demo.aiknowledge.mapper.AgentStepMapper;
 import com.demo.aiknowledge.service.AgentRunService;
 import com.demo.aiknowledge.service.ToolCallService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +20,7 @@ public class AgentAdminController {
 
     private final AgentRunService agentRunService;
     private final ToolCallService toolCallService;
+    private final AgentStepMapper agentStepMapper;
 
     @GetMapping("/runs")
     public Result<List<AgentRun>> getAgentRuns(
@@ -47,6 +51,15 @@ public class AgentAdminController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int size) {
         return Result.success(toolCallService.getAllToolCalls(page, size));
+    }
+
+    @GetMapping("/runs/{runId}/steps")
+    public Result<List<AgentStep>> getRunSteps(@PathVariable String runId) {
+        List<AgentStep> steps = agentStepMapper.selectList(
+                new LambdaQueryWrapper<AgentStep>()
+                        .eq(AgentStep::getRunId, runId)
+                        .orderByAsc(AgentStep::getCreatedAt));
+        return Result.success(steps);
     }
 
     @GetMapping("/tool-calls/failed")

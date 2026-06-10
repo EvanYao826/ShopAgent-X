@@ -20,7 +20,7 @@
 
 ## 📖 项目简介
 
-ShopAgent-X 是一个面向电商场景的**多模态智能导购 AI Agent 系统**。用户可以通过**自然语言对话、拍照识图、语音输入**等方式与 AI 交互，获取个性化商品推荐、购物车管理、商品对比等完整购物体验。
+ShopAgent-X 是一个面向电商场景的**多模态智能导购 AI Agent 系统**。用户可以通过**自然语言对话、拍照识图、语音输入**等方式与 AI 交互，获取个性化商品推荐、购物车管理等完整购物体验。
 
 核心亮点是**五层可编排 Agent 架构**——RouterAgent 自动识别用户意图并分发给 9 个专业子 Agent，通过统一 Tool Registry 管理 7 个 AI 工具，支持简单链路直接分发与复杂链路 Orchestrator 编排两种模式。
 
@@ -39,19 +39,23 @@ ShopAgent-X 是一个面向电商场景的**多模态智能导购 AI Agent 系�
 
 <div align="center">
 
-| 登录页 | 注册页 | 对话页 |
-|:---:|:---:|:---:|
-| ![登录页](docs/screenshots/登录页.png) | ![注册页](docs/screenshots/注册页.png) | ![对话页](docs/screenshots/对话页.png) |
-
 | 商品推荐 | 语义推荐 | 识图推荐 |
 |:---:|:---:|:---:|
 | ![商品推荐](docs/screenshots/商品推荐.png) | ![语义推荐](docs/screenshots/语义推荐.png) | ![识图推荐](docs/screenshots/识图推荐.png) |
 
-| 购物车页 | 商品页 | 我的页 |
-|:---:|:---:|:---:|
-| ![购物车页](docs/screenshots/购物车页.png) | ![商品页](docs/screenshots/商品页.png) | ![我的页](docs/screenshots/我的页.png) |
+| 仪表盘 | Agent 监控 |
+|:---:|:---:|
+| ![仪表盘](docs/screenshots/仪表盘.png) | ![Agent监控](docs/screenshots/Agent监控.png) |
 
 </div>
+
+### 演示视频
+
+| 视频 | 说明 |
+|------|------|
+| [常规对话演示](docs/screenshots/常规演示1.mp4) | 商品推荐、知识问答等日常对话场景 |
+| [拍照识图 & 语音识别](docs/screenshots/拍照识图，语音识别展示.mp4) | 多模态交互：拍照找同款、语音输入 |
+| [管理端演示](docs/screenshots/管理端演示.mp4) | 后台管理系统功能演示 |
 
 ---
 
@@ -123,7 +127,7 @@ flowchart TB
 flowchart TD
     Q["🗣️ 用户请求"] --> R{"🎯 RouterAgent<br/>LLM 意图分类<br/>8 类意图，88.9% 准确率"}
 
-    R -->|"推荐/搜索商品"| S["🛒 ShoppingAgent<br/>同义词展开 · 精确匹配<br/>反选排除 · 多商品对比"]
+    R -->|"推荐/搜索商品"| S["🛒 ShoppingAgent<br/>同义词展开 · 精确匹配<br/>反选排除"]
     R -->|"知识问答"| K["📚 KnowledgeQAAgent<br/>L1 简单 / L2 检索 / L3 编排"]
     R -->|"闲聊/问候"| C["💬 ChitChatAgent<br/>会话记忆感知"]
     R -->|"复杂推理"| RE["🧠 ReasoningAgent<br/>多步推理"]
@@ -193,7 +197,7 @@ flowchart TD
 
 **核心能力：**
 - **意图分类**：8 类意图（shopping / knowledge / chitchat / comparison / cart / admin / reasoning / photo），88.9% 准确率
-- **购物导购**：同义词展开 + 精确匹配 + 反选排除 + 多商品对比 + 季节感知
+- **购物导购**：同义词展开 + 精确匹配 + 反选排除
 - **知识问答**：L1 直答 / L2 检索 / L3 Orchestrator 编排，三级复杂度自动判断
 - **购物车管理**：对话式加购、删除、批量操作，30s 会话缓存
 
@@ -344,21 +348,6 @@ Android 长按录音 → 音频文件
 > "推荐防晒霜，但不要含酒精的"
 
 LLM 提取排除词 → 搜索时过滤掉匹配商品 → 只返回符合条件的结果
-
-### 多商品对比
-
-用户可以对比两个商品：
-
-> "A和B哪个更保湿？"
-
-自动提取两个商品名 → 分别搜索 → LLM 从价格/评分/销量维度生成对比话术 → 返回对比卡片 + 商品卡片
-
-### 季节感知推荐
-
-AI 结合当前季节推荐应季商品：
-
-- 夏季 → 推荐防晒、清爽类护肤品
-- 冬季 → 推荐保湿、保暖类产品
 
 ### 用户画像感知
 
@@ -514,7 +503,6 @@ ShopAgent-X/
 | `shopping` | "推荐一款洗面奶" | ShoppingAgent |
 | `knowledge` | "这款手机的参数是什么" | KnowledgeQAAgent |
 | `chitchat` | "你好" / "今天天气怎么样" | ChitChatAgent |
-| `comparison` | "A和B哪个好" | ShoppingAgent（对比模块） |
 | `cart` | "把这个加到购物车" | ShoppingAgent（购物车模块） |
 | `admin` | "查看本月销售报表" | AdminCopilotAgent |
 | `reasoning` | "帮我分析一下..." | ReasoningAgent |

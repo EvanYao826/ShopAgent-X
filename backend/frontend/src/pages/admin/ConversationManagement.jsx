@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { conversationManagementAPI } from '../../api/admin';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import './TablePage.css';
 
 export default function ConversationManagement() {
@@ -11,6 +12,7 @@ export default function ConversationManagement() {
   const [expanded, setExpanded] = useState(null);
   const [messages, setMessages] = useState([]);
   const [filters, setFilters] = useState({ userId: '', keyword: '' });
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, conversationId: null });
 
   useEffect(() => { fetchData(); fetchStats(); }, [page]);
 
@@ -38,9 +40,16 @@ export default function ConversationManagement() {
     } catch (err) { alert(err.message); }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('确定删除此对话？')) return;
-    try { await conversationManagementAPI.delete(id); fetchData(); } catch (err) { alert(err.message); }
+  const handleDelete = (id) => {
+    setConfirmDialog({ open: true, conversationId: id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await conversationManagementAPI.delete(confirmDialog.conversationId);
+      fetchData();
+    } catch (err) { alert(err.message); }
+    setConfirmDialog({ open: false, conversationId: null });
   };
 
   const pages = Math.ceil(total / 10);
@@ -64,7 +73,8 @@ export default function ConversationManagement() {
       <div className="filter-bar">
         <input placeholder="用户ID" value={filters.userId} onChange={e => setFilters({...filters, userId: e.target.value})} style={{width:100}} />
         <input placeholder="搜索标题" value={filters.keyword} onChange={e => setFilters({...filters, keyword: e.target.value})} />
-        <button onClick={() => { setPage(1); fetchData(); }}>搜索</button>
+        <button className="btn btn-primary" onClick={() => { setPage(1); fetchData(); }}>搜索</button>
+        <button className="btn btn-ghost" onClick={() => { setFilters({ userId: '', keyword: '' }); setPage(1); }}>重置</button>
       </div>
       <table className="data-table">
         <thead><tr><th>ID</th><th>用户ID</th><th>标题</th><th>消息数</th><th>创建时间</th><th>操作</th></tr></thead>
@@ -108,6 +118,16 @@ export default function ConversationManagement() {
           </span>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="确认删除"
+        message="确定要删除此对话吗？删除后将无法恢复。"
+        confirmText="删除"
+        danger={true}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDialog({ open: false, conversationId: null })}
+      />
     </div>
   );
 }

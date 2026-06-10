@@ -67,7 +67,8 @@ export default function OrderManagement() {
           {Object.entries(STATUS_MAP).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <input placeholder="订单号" value={filters.orderNo} onChange={e => setFilters({...filters, orderNo: e.target.value})} style={{width:160}} />
-        <button onClick={() => { setPage(1); fetchData(); }}>搜索</button>
+        <button className="btn btn-primary" onClick={() => { setPage(1); fetchData(); }}>搜索</button>
+        <button className="btn btn-ghost" onClick={() => { setFilters({ userId: '', status: '', orderNo: '' }); setPage(1); }}>重置</button>
       </div>
       <table className="data-table">
         <thead><tr><th>ID</th><th>订单号</th><th>用户</th><th>金额</th><th>状态</th><th>收货人</th><th>时间</th></tr></thead>

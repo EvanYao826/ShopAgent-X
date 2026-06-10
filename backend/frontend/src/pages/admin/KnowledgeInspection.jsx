@@ -3,9 +3,9 @@ import './AdminDashboard.css';
 import './KnowledgeInspection.css';
 
 const priorityColors = {
-  '高': '#ff4d4f',
-  '中': '#faad14',
-  '低': '#52c41a'
+  '高': '#E17055',
+  '中': '#FDCB6E',
+  '低': '#00B894'
 };
 
 const suggestionTypeLabels = {
@@ -122,8 +122,8 @@ export default function KnowledgeInspection() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div className="page-header" style={{ marginBottom: '24px' }}>
+    <div className="ki-page">
+      <div className="page-header">
         <h1>知识巡检</h1>
         <p>分析未命中问题 · 检测重复文档 · 低质量Chunk · 过期知识 · 无人访问文档</p>
       </div>
@@ -184,7 +184,8 @@ export default function KnowledgeInspection() {
               </div>
               <div className="search-actions">
                 <button className="btn btn-primary" onClick={handleSearch}>分析</button>
-                <button className="btn btn-default" onClick={handleExport}>导出</button>
+                <button className="btn btn-secondary" onClick={handleExport}>导出</button>
+                <button className="btn btn-ghost" onClick={() => { setFilters({ startDate: '', endDate: '', minCount: 1, clusterThreshold: 3 }); }}>重置</button>
               </div>
             </div>
           </div>
@@ -378,7 +379,8 @@ export default function KnowledgeInspection() {
               </div>
               <div className="search-actions">
                 <button className="btn btn-primary" onClick={handleSearch}>巡检</button>
-                <button className="btn btn-default" onClick={handleExport}>导出</button>
+                <button className="btn btn-secondary" onClick={handleExport}>导出</button>
+                <button className="btn btn-ghost" onClick={() => { setFilters({ startDate: '', endDate: '', minCount: 1, clusterThreshold: 3 }); }}>重置</button>
               </div>
             </div>
           </div>
@@ -405,17 +407,17 @@ export default function KnowledgeInspection() {
                     <div className="ki-stat-label">Chunk总数</div>
                   </div>
                   <div className="ki-stat-item">
-                    <div className="ki-stat-value" style={{ color: '#ff4d4f' }}>{data.stats.duplicateDocGroups || 0}</div>
+                    <div className="ki-stat-value" style={{ color: '#E17055' }}>{data.stats.duplicateDocGroups || 0}</div>
                     <div className="ki-stat-label">重复文档组</div>
                   </div>
                 </div>
                 <div                className="ki-stats-grid" style={{ marginTop: '16px' }}>
                   <div className="ki-stat-item">
-                    <div className="ki-stat-value" style={{ color: '#faad14' }}>{data.stats.lowQualityChunkCount || 0}</div>
+                    <div className="ki-stat-value" style={{ color: '#FDCB6E' }}>{data.stats.lowQualityChunkCount || 0}</div>
                     <div className="ki-stat-label">低质量Chunk</div>
                   </div>
                   <div className="ki-stat-item">
-                    <div className="ki-stat-value" style={{ color: '#52c41a' }}>{data.stats.outdatedDocCount || 0}</div>
+                    <div className="ki-stat-value" style={{ color: '#00B894' }}>{data.stats.outdatedDocCount || 0}</div>
                     <div className="ki-stat-label">过期文档</div>
                   </div>
                   <div className="ki-stat-item">

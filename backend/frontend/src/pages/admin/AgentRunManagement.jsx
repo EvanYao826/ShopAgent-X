@@ -2,17 +2,17 @@ import { useState, useEffect } from 'react';
 import './AgentRunManagement.css';
 
 const statusColors = {
-  PENDING: '#d9d9d9',
-  RUNNING: '#1890ff',
-  COMPLETED: '#52c41a',
-  FAILED: '#ff4d4f',
-  INTERRUPTED: '#faad14',
-  WAITING: '#13c2c2',
-  pending: '#d9d9d9',
-  running: '#1890ff',
-  completed: '#52c41a',
-  failed: '#ff4d4f',
-  success: '#52c41a',
+  PENDING: '#BDB0A5',
+  RUNNING: '#FF6B35',
+  COMPLETED: '#00B894',
+  FAILED: '#E17055',
+  INTERRUPTED: '#FDCB6E',
+  WAITING: '#74B9FF',
+  pending: '#BDB0A5',
+  running: '#FF6B35',
+  completed: '#00B894',
+  failed: '#E17055',
+  success: '#00B894',
 };
 
 const statusLabels = {
@@ -163,7 +163,7 @@ export default function AgentRunManagement() {
           </div>
           <div className="search-actions">
             <button className="btn btn-primary" onClick={handleSearch}>搜索</button>
-            <button className="btn btn-default" onClick={handleReset}>重置</button>
+            <button className="btn btn-ghost" onClick={handleReset}>重置</button>
           </div>
         </div>
       </div>

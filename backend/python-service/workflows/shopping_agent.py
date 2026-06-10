@@ -181,6 +181,20 @@ class ShoppingAgent(BaseAgent):
             if self._detect_comparison(question):
                 result = self._handle_comparison(question, user_profile)
                 if result:
+                    # 对比推荐也记录日志
+                    cards = result.get("product_cards", [])
+                    if cards:
+                        try:
+                            mysql_client.insert_recommendation_log(
+                                user_id=user_id,
+                                session_id=conversation_id,
+                                query=question,
+                                intent="shopping",
+                                recommended_product_ids=[c.get("product_id") for c in cards if c.get("product_id")],
+                                recommend_reason=result.get("answer", "")[:200]
+                            )
+                        except Exception as log_err:
+                            logger.warning(f"[ShoppingAgent] Failed to record comparison log: {log_err}")
                     return result
             # 1. 读取会话记忆
             conversation_history = ""
@@ -233,6 +247,20 @@ class ShoppingAgent(BaseAgent):
 
             sources = self._build_sources(docs)
 
+            # 推荐成功后记录到 recommendation_log
+            if products:
+                try:
+                    mysql_client.insert_recommendation_log(
+                        user_id=user_id,
+                        session_id=conversation_id,
+                        query=question,
+                        intent="shopping",
+                        recommended_product_ids=[p.get("id") for p in products if p.get("id")],
+                        recommend_reason=answer[:200] if answer else None
+                    )
+                except Exception as log_err:
+                    logger.warning(f"[ShoppingAgent] Failed to record recommendation log: {log_err}")
+
             return {
                 "answer": answer,
                 "sources": sources,
@@ -271,6 +299,20 @@ class ShoppingAgent(BaseAgent):
                         "sources": [],
                         "task_type": "shopping"
                     })
+                    # 对比推荐记录日志
+                    cards = result.get("product_cards", [])
+                    if cards:
+                        try:
+                            mysql_client.insert_recommendation_log(
+                                user_id=user_id,
+                                session_id=conversation_id,
+                                query=question,
+                                intent="shopping",
+                                recommended_product_ids=[c.get("product_id") for c in cards if c.get("product_id")],
+                                recommend_reason=None
+                            )
+                        except Exception as log_err:
+                            logger.warning(f"[ShoppingAgent] Failed to record comparison log: {log_err}")
                     yield json.dumps({"type": "end", "content": result.get("answer", "")})
                     return
             # 检索
@@ -308,6 +350,19 @@ class ShoppingAgent(BaseAgent):
                             "sources": sources,
                             "task_type": "shopping"
                         })
+                        # 推荐成功后记录到 recommendation_log
+                        if products:
+                            try:
+                                mysql_client.insert_recommendation_log(
+                                    user_id=user_id,
+                                    session_id=conversation_id,
+                                    query=question,
+                                    intent="shopping",
+                                    recommended_product_ids=[p.get("id") for p in products if p.get("id")],
+                                    recommend_reason=None
+                                )
+                            except Exception as log_err:
+                                logger.warning(f"[ShoppingAgent] Failed to record recommendation log: {log_err}")
                 except (json.JSONDecodeError, AttributeError):
                     pass
                 yield chunk

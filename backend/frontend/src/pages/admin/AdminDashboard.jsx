@@ -41,7 +41,7 @@ export default function AdminDashboard() {
     { id: 'conversations', label: '对话管理', icon: '💬', path: '/admin/conversations' },
     { id: 'knowledge', label: '知识库管理', icon: '📚', path: '/admin/knowledge' },
     { id: 'inspection', label: '知识巡检', icon: '🔍', path: '/admin/inspection' },
-    { id: 'agent-runs', label: 'Agent执行', icon: '🤖', path: '/admin/agent-runs' },
+    { id: 'agent-runs', label: 'Agent执行记录', icon: '🤖', path: '/admin/agent-runs' },
   ];
 
   return (

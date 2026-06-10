@@ -271,6 +271,40 @@ class MySQLClient:
             if self.connection:
                 self.connection.rollback()
 
+    def insert_recommendation_log(self, user_id: str, session_id: str,
+                                   query: str, intent: str,
+                                   recommended_product_ids: list,
+                                   recommend_reason: str = None):
+        """插入推荐日志记录"""
+        if not self.connection or not self.connection.is_connected():
+            self.connect()
+
+        try:
+            self._ensure_clean_connection()
+            cursor = self.connection.cursor()
+            sql = """
+                INSERT INTO recommendation_log
+                (user_id, session_id, query, intent, recommended_product_ids,
+                 recommend_reason, create_time)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
+            """
+            import json as _json
+            cursor.execute(sql, (
+                user_id or None,
+                session_id or None,
+                query,
+                intent,
+                _json.dumps(recommended_product_ids, ensure_ascii=False) if recommended_product_ids else None,
+                recommend_reason
+            ))
+            self.connection.commit()
+            cursor.close()
+            logger.info(f"Recommendation log recorded: user_id={user_id}, products={recommended_product_ids}")
+        except Error as e:
+            logger.error(f"Error inserting recommendation log: {e}")
+            if self.connection:
+                self.connection.rollback()
+
 # 创建全局实例
 mysql_client = MySQLClient()
 

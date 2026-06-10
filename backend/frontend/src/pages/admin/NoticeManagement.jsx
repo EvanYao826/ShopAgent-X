@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getNoticeList, addNotice, updateNotice, deleteNotice } from '../../api/notice';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import './NoticeManagement.css';
 
 export default function NoticeManagement() {
@@ -8,6 +9,7 @@ export default function NoticeManagement() {
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ title: '', content: '', isActive: true });
   const [editingId, setEditingId] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, noticeId: null });
 
   useEffect(() => {
     fetchNotices();
@@ -39,14 +41,18 @@ export default function NoticeManagement() {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('确认删除?')) return;
+  const handleDelete = (id) => {
+    setConfirmDialog({ open: true, noticeId: id });
+  };
+
+  const confirmDelete = async () => {
     try {
-      await deleteNotice(id);
+      await deleteNotice(confirmDialog.noticeId);
       fetchNotices();
     } catch (error) {
       alert('删除失败');
     }
+    setConfirmDialog({ open: false, noticeId: null });
   };
 
   const handleSubmit = async (e) => {
@@ -138,6 +144,16 @@ export default function NoticeManagement() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="确认删除"
+        message="确定要删除此通知吗？删除后将无法恢复。"
+        confirmText="删除"
+        danger={true}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmDialog({ open: false, noticeId: null })}
+      />
     </div>
   );
 }

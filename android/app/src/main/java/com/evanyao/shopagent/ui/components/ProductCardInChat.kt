@@ -24,7 +24,7 @@ import com.evanyao.shopagent.data.model.Product
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-private const val BASE_URL = "http://60.17.179.9:8888"
+private const val BASE_URL = "http://10.0.2.2:8888"
 
 /**
  * 编码图片 URL 中的中文字符
@@ -60,9 +60,9 @@ fun encodeImageUrl(imageUrl: String?): String? {
 fun buildImageUrl(imageUrl: String?): String? {
     if (imageUrl.isNullOrBlank()) return null
     val url = when {
-        imageUrl.startsWith("http") -> imageUrl.replace("localhost:8080", "60.17.179.9:8888")
-                                               .replace("localhost:8888", "60.17.179.9:8888")
-                                               .replace("localhost", "60.17.179.9:8888")
+        imageUrl.startsWith("http") -> imageUrl.replace("localhost:8080", "10.0.2.2:8888")
+                                               .replace("localhost:8888", "10.0.2.2:8888")
+                                               .replace("localhost", "10.0.2.2:8888")
         imageUrl.startsWith("/product-images/") -> "$BASE_URL$imageUrl"
         else -> "$BASE_URL/product-images/$imageUrl"
     }

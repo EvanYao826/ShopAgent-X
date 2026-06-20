@@ -20,7 +20,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "BASE_URL", "\"http://60.17.179.9:8888/\"")
+        buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8888/\"")
     }
 
     signingConfigs {
